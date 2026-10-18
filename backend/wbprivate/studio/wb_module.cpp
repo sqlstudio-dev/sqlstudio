@@ -223,6 +223,7 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     "Windows 11",
     "Windows Server 2022",
     "Windows Server 2025",
+    "macOS 14",
     "macOS 15",
     "macOS 26",
     "macOS 27",
