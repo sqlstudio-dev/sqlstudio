@@ -24,6 +24,14 @@
         },
         {
           "text": "set exec-wrapper /bin/bash \"${workspaceFolder}/.vscode/sqlstudio-gdb-wrapper.sh\""
+        },
+        {
+          "description": "Diagnose unexpected application shutdown",
+          "text": "-break-insert -f wb::WBContextUI::request_quit"
+        },
+        {
+          "description": "Catch process exit if shutdown bypasses request_quit",
+          "text": "-break-insert -f exit"
         }
       ]
     }
