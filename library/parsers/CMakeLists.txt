@@ -20,6 +20,7 @@ set(GENERATED_OTHERS
 
 set (GENERATED_FILES ${GENERATED_OTHERS} ${GENERATED_SOURCES})
 
+if(ANTLR_JAR_PATH AND Java_JAVA_EXECUTABLE)
 add_custom_command(OUTPUT ${GENERATED_FILES} 
           DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/grammars/MySQLLexer.g4 ${CMAKE_CURRENT_SOURCE_DIR}/grammars/MySQLParser.g4
           COMMAND ${Java_JAVA_EXECUTABLE} -Xmx1024m -jar ${ANTLR_JAR_PATH} -Dlanguage=Cpp -listener -visitor -o ../mysql -package parsers ${CMAKE_CURRENT_SOURCE_DIR}/grammars/MySQLLexer.g4 ${CMAKE_CURRENT_SOURCE_DIR}/grammars/MySQLParser.g4
@@ -34,6 +35,17 @@ add_custom_target(generate_parser_mysql
                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 set_source_files_properties(${GENERATED_FILES} PROPERTIES GENERATED TRUE)
+else()
+  foreach(parser_file IN LISTS GENERATED_FILES)
+    if(NOT EXISTS "${parser_file}")
+      message(FATAL_ERROR
+        "Missing generated parser file: ${parser_file}. Install Java and provide "
+        "antlr-4.13.2-complete.jar using build/compile.sh --antlr-jar /path/to/antlr-4.13.2-complete.jar "
+        "or CMake -DWITH_ANTLR_JAR=/path/to/antlr-4.13.2-complete.jar.")
+    endif()
+  endforeach()
+  add_custom_target(generate_parser_mysql)
+endif()
 
 set(PARSERS_SOURCES
     ${GENERATED_SOURCES}

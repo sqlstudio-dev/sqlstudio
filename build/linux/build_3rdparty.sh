@@ -595,9 +595,23 @@ build_override_mysql_server() {
 # Needs to find the libmysqlclient that was just built above.
 build_override_mysql_connector_cpp() {
     local source_dir="$1" build_dir="$2"
+    local dependency_cmake="${source_dir}/cdk/cmake/dependency.cmake"
+    local protobuf_cmake="${source_dir}/cdk/extra/protobuf/CMakeLists.txt"
 
     info "Build system: ${C_GREEN}CMake${C_RESET} ${C_YELLOW}(mysql-connector-cpp)${C_RESET}"
     mkdir -p "$build_dir"
+
+    if [[ -f "${protobuf_cmake}" ]]; then
+        info "Normalizing bundled protobuf CMake policy compatibility"
+        sed -i.bak 's/^cmake_minimum_required(VERSION 3\.1)$/cmake_minimum_required(VERSION 3.5)/' "${protobuf_cmake}"
+        rm -f "${protobuf_cmake}.bak"
+    fi
+
+    if [[ -f "${dependency_cmake}" ]]; then
+        info "Forwarding CMake policy minimum into bundled dependency builds"
+        perl -0pi.bak -e 's/(set\(EXT_FWD\s*\n\s*CMAKE_BUILD_TYPE\s*\n)/$1  CMAKE_POLICY_VERSION_MINIMUM\n/' "${dependency_cmake}"
+        rm -f "${dependency_cmake}.bak"
+    fi
 
     run_cmd "cmake configure (connector-cpp)" \
         cmake \
@@ -610,6 +624,7 @@ build_override_mysql_connector_cpp() {
         -DCMAKE_INSTALL_LIBDIR="${BUNDLE_LIB}" \
         -DCMAKE_INSTALL_INCLUDEDIR="${BUNDLE_INCLUDE}" \
         -DCMAKE_PREFIX_PATH="${BUNDLE_DIR}" \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DMYSQL_DIR="${BUNDLE_DIR}" \
         -DWITH_JDBC=ON \
         -DWITH_SSL=system
@@ -859,10 +874,12 @@ build_override_antlr4_runtime() {
         -G "Unix Makefiles" \
         -DCMAKE_INSTALL_PREFIX="${BUNDLE_DIR}" \
         -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_INSTALL_LIBDIR="${BUNDLE_LIB}" \
         -DCMAKE_INSTALL_INCLUDEDIR="${BUNDLE_INCLUDE}" \
         -DANTLR4_INSTALL=ON \
+        -DANTLR_BUILD_CPP_TESTS=OFF \
         -DWITH_DEMO=OFF
 
     run_cmd "cmake build (antlr4-runtime)" \
@@ -898,6 +915,15 @@ process_dep() {
     fi
 
     $DOWNLOAD_ONLY && return 0
+
+    # JAR tools are installed directly; they do not need extraction or compilation.
+    local artifact="${BUNDLE_SOURCE}/$(archive_name "$idx")"
+    if [[ "$artifact" == *.jar ]]; then
+        mkdir -p "${BUNDLE_BIN}"
+        cp -f "$artifact" "${BUNDLE_BIN}/$(basename "$artifact")"
+        ok "Installed JAR → ${C_DIM}${BUNDLE_BIN}/$(basename "$artifact")${C_RESET}"
+        return 0
+    fi
 
     # ── extract ───────────────────────────────────────────────────────
     extract_archive "$idx"

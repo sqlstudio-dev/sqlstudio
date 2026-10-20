@@ -152,8 +152,8 @@ SqlStudio is built on the foundation of MySQL Workbench, originally developed by
 ## Links
 
 - 📘 Documentation: *(coming soon - published with first stable release)*
-- 🐛 Issue Tracker: [GitHub Issues](https://github.com/marcinm1980/sqlstudio/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/marcinm1980/mysqlstudio/discussions)
+- 🐛 Issue Tracker: [GitHub Issues](https://github.com/sqlstudio-dev/sqlstudio/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/sqlstudio-dev/sqlstudio/discussions)
 - 🎧 Discord Channel: [Join the Discord server](https://discord.gg/gQNPbpgeg)
-- 🔖 Releases: [GitHub Releases](../../releases)
-- 🌐 Source repository: [https://github.com/dante-d4f/mysqlstudio](https://github.com_dante/marcinm1980/mysqlstudio)
+- 🔖 Releases: [GitHub Releases](https://github.com/sqlstudio-dev/releases)
+- 🌐 Source repository: [Source repo](https://github.com/sqlstudio-dev/sqlstudio)
