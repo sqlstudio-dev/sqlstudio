@@ -19,18 +19,18 @@ Version = utils.Version
 class MySQLVersionTests(unittest.TestCase):
     def test_known_release_lines(self):
         for version in ("5.6.51", "5.7.44", "8.0.36", "8.2.0", "8.4.0",
-                        "9.0.0", "9.7.0", "26.7.0", "26.7.1-commercial"):
+                        "9.0.0", "9.7.0", "26.7.0", "26.7.1-commercial", "26.10.0", "9.7.2", "8.4.13", "8.0.46"):
             with self.subTest(version=version):
                 self.assertTrue(Version.fromstr(version).is_supported_mysql_version())
 
     def test_unknown_and_non_mysql_release_lines(self):
         for version in ("5.5.62", "6.0.0", "8.5.0", "9.8.0", "10.11.0-MariaDB",
-                        "11.4.0-MariaDB", "26.6.0", "26.10.0", "27.7.0"):
+                        "11.4.0-MariaDB", "26.6.0", "26.11.0", "27.7.0"):
             with self.subTest(version=version):
                 self.assertFalse(Version.fromstr(version).is_supported_mysql_version())
 
     def test_features_on_new_servers(self):
-        for version in ("8.2.0", "8.4.0", "9.7.0", "26.7.0"):
+        for version in ("8.2.0", "8.4.0", "9.7.0", "26.7.0", "26.10.0"):
             with self.subTest(version=version):
                 server = Version.fromstr(version)
                 for feature in ((5, 6, 0), (5, 7, 8), (8, 0, 22)):

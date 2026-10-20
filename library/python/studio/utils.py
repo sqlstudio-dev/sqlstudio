@@ -219,7 +219,7 @@ class Version:
         return ((self.majorNumber == 5 and self.minorNumber in (6, 7)) or
                 (self.majorNumber == 8 and 0 <= self.minorNumber <= 4) or
                 (self.majorNumber == 9 and 0 <= self.minorNumber <= 7) or
-                (self.majorNumber == 26 and self.minorNumber == 7))
+                (self.majorNumber == 26 and self.minorNumber in (7, 10)))
 
     def is_supported_mysql_version_at_least(self, major, minor = None, release=-1):
         assert type(major) == int or isinstance(major, Version)

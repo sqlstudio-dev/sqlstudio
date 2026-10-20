@@ -33,12 +33,18 @@
 
 namespace base {
 
-// SQL symbol sets. Newer compatible servers currently use the MySQL 8.0 set.
+// SQL symbol snapshots, not the list of supported server releases.
+// MySQL8021 means vocabulary introduced in 8.0.21 (likewise 8022/8023/8031).
 enum class MySQLVersion {
   Unknown,
   MySQL56,
   MySQL57,
   MySQL80,
+  MySQL8021,
+  MySQL8022,
+  MySQL8023,
+  MySQL8031,
+  MySQL82,
 };
 
 class BASELIBRARY_PUBLIC_FUNC MySQLSymbolInfo {

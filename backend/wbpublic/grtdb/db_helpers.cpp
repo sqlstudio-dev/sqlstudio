@@ -140,22 +140,7 @@ MySQLVersion bec::versionToEnum(const GrtVersionRef &version) {
   if (!version.is_valid() || version->majorNumber() == -1)
     return MySQLVersion::Unknown;
 
-  if (version->majorNumber() >= 8)
-    return MySQLVersion::MySQL80;
-
-  if (version->majorNumber() != 5)
-    return MySQLVersion::Unknown;
-
-  switch (version->minorNumber()) {
-    case 6:
-      return MySQLVersion::MySQL56;
-
-    case 7:
-      return MySQLVersion::MySQL57;
-
-    default:
-      return MySQLVersion::Unknown;
-  }
+  return MySQLSymbolInfo::numberToVersion(version_to_int(version));
 }
 
 //----------------------------------------------------------------------------------------------------------------------

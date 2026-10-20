@@ -634,7 +634,7 @@ bool DbConnectPanel::test_connection() {
                              "A connection to this database can be established but some SqlStudio features may "
                              "not work properly since the database is not fully compatible with the supported versions "
                              "of MySQL.\n\n"
-                             "SqlStudio recognizes MySQL Server versions 5.6, 5.7, 8.0-8.4, 9.0-9.7 and 26.7.\n"
+                             "SqlStudio recognizes MySQL Server versions 5.6, 5.7, 8.0-8.4, 9.0-9.7, 26.7 and 26.10.\n"
                              "Support for SQL syntax and administration features varies by server version.",
                              bec::sanitize_server_version_number(version).c_str()),
                 "Continue Anyway", "Cancel") != mforms::ResultOk)

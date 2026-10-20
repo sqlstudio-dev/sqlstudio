@@ -32,13 +32,37 @@ using namespace base;
 #include "server/keyword_list56.h"
 #include "server/keyword_list57.h"
 #include "server/keyword_list80.h"
+#include "server/keyword_list80_updates.h"
+#include <algorithm>
+#include <cctype>
 #include <map>
 
 //----------------------------------------------------------------------------------------------------------------------
 
 static std::set<std::string> empty;
 
+static std::string normalizedKeyword(std::string word) {
+  std::transform(word.begin(), word.end(), word.begin(), [](unsigned char c) { return std::toupper(c); });
+  return word;
+}
+
+static int keywordVersion(MySQLVersion version) {
+  switch (version) {
+    case MySQLVersion::MySQL82: return 80200;
+    case MySQLVersion::MySQL8021: return 80021;
+    case MySQLVersion::MySQL8022: return 80022;
+    case MySQLVersion::MySQL8023: return 80023;
+    case MySQLVersion::MySQL8031: return 80031;
+    default: return 80000;
+  }
+}
+
 std::set<std::string> const& MySQLSymbolInfo::systemFunctionsForVersion(MySQLVersion version) {
+  static const auto modernFunctions = [] {
+    auto functions = systemFunctions80;
+    functions.insert("json_value");
+    return functions;
+  }();
   switch (version) {
     case MySQLVersion::MySQL56:
       return systemFunctions56;
@@ -46,6 +70,12 @@ std::set<std::string> const& MySQLSymbolInfo::systemFunctionsForVersion(MySQLVer
       return systemFunctions57;
     case MySQLVersion::MySQL80:
       return systemFunctions80;
+    case MySQLVersion::MySQL8021:
+    case MySQLVersion::MySQL8022:
+    case MySQLVersion::MySQL8023:
+    case MySQLVersion::MySQL8031:
+    case MySQLVersion::MySQL82:
+      return modernFunctions;
 
     default:
       return empty;
@@ -83,7 +113,12 @@ std::set<std::string> const& MySQLSymbolInfo::keywordsForVersion(MySQLVersion ve
         break;
       }
 
-      case MySQLVersion::MySQL80: {
+      case MySQLVersion::MySQL80:
+      case MySQLVersion::MySQL8021:
+      case MySQLVersion::MySQL8022:
+      case MySQLVersion::MySQL8023:
+      case MySQLVersion::MySQL8031:
+      case MySQLVersion::MySQL82: {
         size_t listSize = sizeof(keyword_list80) / sizeof(keyword_list80[0]);
         for (size_t i = 0; i < listSize; ++i) {
           std::string word = keyword_list80[i].word;
@@ -91,6 +126,16 @@ std::set<std::string> const& MySQLSymbolInfo::keywordsForVersion(MySQLVersion ve
           if (keyword_list80[i].reserved != 0)
             reservedList.insert(word);
         }
+        for (const auto &keyword : keyword_updates80) {
+          if (keyword.introduced <= keywordVersion(version)) {
+            list.insert(keyword.word);
+            if (keyword.reserved)
+              reservedList.insert(keyword.word);
+          }
+        }
+        // MEMBER became non-reserved in 8.0.19, before these additions.
+        if (version != MySQLVersion::MySQL80)
+          reservedList.erase("MEMBER");
         break;
       }
 
@@ -98,6 +143,7 @@ std::set<std::string> const& MySQLSymbolInfo::keywordsForVersion(MySQLVersion ve
         break;
     }
     keywords[version] = list;
+    reservedKeywords[version] = reservedList;
   }
 
   return keywords[version];
@@ -107,7 +153,7 @@ std::set<std::string> const& MySQLSymbolInfo::keywordsForVersion(MySQLVersion ve
 
 bool MySQLSymbolInfo::isReservedKeyword(std::string const& identifier, MySQLVersion version) {
   std::ignore = keywordsForVersion(version);
-  return reservedKeywords[version].count(identifier) > 0;
+  return reservedKeywords[version].count(normalizedKeyword(identifier)) > 0;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -116,8 +162,8 @@ bool MySQLSymbolInfo::isReservedKeyword(std::string const& identifier, MySQLVers
  * For both, reserved and non-reserved keywords.
  */
 bool MySQLSymbolInfo::isKeyword(std::string const& identifier, MySQLVersion version) {
-  auto keywords = keywordsForVersion(version);
-  return keywords.count(identifier) > 0;
+  const auto &keywords = keywordsForVersion(version);
+  return keywords.count(normalizedKeyword(identifier)) > 0;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -128,10 +174,21 @@ MySQLVersion MySQLSymbolInfo::numberToVersion(long version) {
   if (!isSupportedServerVersion(major, minor))
     return MySQLVersion::Unknown;
 
-  // Keep the existing SQL vocabulary available on newer servers. This does
-  // not imply grammar support for every statement added after MySQL 8.0.
-  if (major >= 8)
+  // Newer releases share the implemented SQL vocabulary, without claiming
+  // support for every statement introduced by those releases.
+  if (major >= 8) {
+    if (version >= 80200)
+      return MySQLVersion::MySQL82;
+    if (version >= 80031)
+      return MySQLVersion::MySQL8031;
+    if (version >= 80023)
+      return MySQLVersion::MySQL8023;
+    if (version >= 80022)
+      return MySQLVersion::MySQL8022;
+    if (version >= 80021)
+      return MySQLVersion::MySQL8021;
     return MySQLVersion::MySQL80;
+  }
 
   if (major != 5)
     return MySQLVersion::Unknown;
@@ -155,5 +212,5 @@ bool MySQLSymbolInfo::isSupportedServerVersion(int major, int minor) {
   return (major == 5 && (minor == 6 || minor == 7)) ||
          (major == 8 && minor >= 0 && minor <= 4) ||
          (major == 9 && minor >= 0 && minor <= 7) ||
-         (major == 26 && minor == 7);
+         (major == 26 && (minor == 7 || minor == 10));
 }
