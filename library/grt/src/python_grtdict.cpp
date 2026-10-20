@@ -491,143 +491,16 @@ static PyTypeObject PyGRTDictObjectType = {
 #endif
 };
 
-typedef struct {
-  PyObject_HEAD
-  bool isNew;
-  grt::DictRef::const_iterator iterator;
-  grt::DictRef::const_iterator last; 
-  grt::DictRef::const_iterator end; 
-} PyGRTDictIteratorObject;
-
-static PyObject *dictiter_iter(PyGRTDictIteratorObject *self);
-static PyObject *dictiter_iternext(PyGRTDictIteratorObject *self);
-
-
-static PyTypeObject PyGRTDictIteratorObjectType = {
-  PyVarObject_HEAD_INIT(&PyType_Type, 0) // PyObject_VAR_HEAD
-  "grt.DictIterator",   //  tp_name
-  sizeof(PyGRTDictIteratorObject),  //  tp_basicsize
-  0, /* tp_itemsize For allocation */
-  
-  /* Methods to implement standard operations */
-
-  (destructor)dict_dealloc, //  tp_dealloc destructor tp_dealloc;
-  0,  //  tp_print
-  0,  //  tp_getattr
-  0,  //  tp_setattr
-  0,  //  tp_as_async
-  0,  //  tp_repr
-
-  /* Method suites for standard classes */
-
-  0,  //  tp_as_number
-  0,  //  tp_as_sequence
-  &PyGRTDictObject_as_mapping,    //  tp_as_mapping
-
-  /* More standard operations (here for binary compatibility) */
-
-  0,  //  tp_hash
-  0,  //  tp_call
-  (reprfunc)dict_printable,   //  tp_str
-
-  (getattrofunc)dict_getattro,  //  tp_getattro
-  0,  //  tp_setattro
-
-  /* Functions to access object as input/output buffer */
-  0,  //  tp_as_buffer
-
-  /* Flags to define presence of optional/expanded features */
-  Py_TPFLAGS_DEFAULT, //  tp_flags
-
-  "GRT Dictionary iterator object", /* tp_doc Documentation string */
-
-  /* Assigned meaning in release 2.0 */
-  /* call function for all accessible objects */
-  0,  //  tp_traverse
-
-  /* delete references to contained objects */
-  0,  //  tp_clear
-
-  /* Assigned meaning in release 2.1 */
-  /* rich comparisons */
-  0,  //  tp_richcompare
-
-  /* weak reference enabler */
-  0,  //  tp_weaklistoffset
-
-  /* Iterators */
-  (getiterfunc)dictiter_iter,    //  tp_iter
-  (iternextfunc)dictiter_iternext,    //  tp_iternext
-
-  /* Attribute descriptor and subclassing stuff */
-  0, //  tp_methods
-  0,  //  tp_members
-  0,  //  tp_getset
-  0,  //  tp_base
-  0,  //  tp_dict
-  0,  //  tp_descr_get
-  0,  //  tp_descr_set
-  0,  //  tp_dictoffset
-  0,  //  tp_init
-  0,  //  tp_alloc
-  0,    //  tp_new
-  0, /* tp_free Low-level free-memory routine */
-  0, /* tp_is_gc For PyObject_IS_GC */
-  0,  //  tp_bases
-  0, /* tp_mro method resolution order */
-  0,  //  tp_cache
-  0,  //  tp_subclasses
-  0,  //  tp_weaklist
-  0,  //  tp_del
-
-  /* Type attribute cache version tag. Added in version 2.6 */
-  0,  //  tp_version_tag
-
-  0, //  tp_finalize
-#if PY_VERSION_HEX >= 0x030c0000
-  nullptr, // tp_vectorcall
-  0        // tp_watched
-#elif PY_VERSION_HEX >= 0x03090000
-  nullptr   //  tp_vectorcall
-#elif PY_VERSION_HEX >= 0x03080000
-  nullptr,  //  tp_vectorcall
-  nullptr   //  tp_print
-#endif
-};
-
-
 static PyObject *dict_iter(PyGRTDictObject *self) {
-  PyGRTDictIteratorObject *object = (PyGRTDictIteratorObject *)PyType_GenericNew(&PyGRTDictIteratorObjectType, nullptr, nullptr);
-  
-  object->isNew = true;
-  object->iterator = self->dict->begin();
-  object->last = --self->dict->end();
-  object->end = self->dict->end();
-  
-  return (PyObject *)object;
-}
-
-static PyObject *dictiter_iter(PyGRTDictIteratorObject *self) {
-  Py_XINCREF(self);
-  self->isNew = true;
-  return (PyObject *) self;
-}
-
-static PyObject *dictiter_iternext(PyGRTDictIteratorObject *self) {
-  if (self->iterator == self->last || self->iterator == self->end) {
-    PyErr_SetNone(PyExc_StopIteration);
+  // Iterate over a snapshot so the iterator owns its values and remains valid
+  // even when the original GRT dictionary is released or changed.
+  PyObject *values = dict_values(self, nullptr);
+  if (!values)
     return nullptr;
-  }
-  
-  if(!self->isNew) {
-    ++self->iterator;
-  }
-  
-  self->isNew = false;  
-  
-  PythonContext *ctx = PythonContext::get_and_check();
-  return ctx->from_grt(self->iterator->second);
-  
+
+  PyObject *iterator = PyObject_GetIter(values);
+  Py_DECREF(values);
+  return iterator;
 }
 
 void grt::PythonContext::init_grt_dict_type() {
@@ -636,13 +509,7 @@ void grt::PythonContext::init_grt_dict_type() {
     throw std::runtime_error("Could not initialize GRT Dict type in python");
   }
 
-  if (PyType_Ready(&PyGRTDictIteratorObjectType) < 0) {
-    PyErr_Print();
-    throw std::runtime_error("Could not initialize GRT Dict type in python");
-  }
-
   Py_XINCREF(&PyGRTDictObjectType);
-  Py_XINCREF(&PyGRTDictIteratorObjectType);
   PyModule_AddObject(get_grt_module(), "Dict", reinterpret_cast<PyObject *>(&PyGRTDictObjectType));
 
   _grt_dict_class = PyDict_GetItemString(PyModule_GetDict(get_grt_module()), "Dict");

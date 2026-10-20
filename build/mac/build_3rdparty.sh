@@ -965,6 +965,15 @@ process_dep() {
 
     $DOWNLOAD_ONLY && return 0
 
+    # JAR tools are installed directly; they do not need extraction or compilation.
+    local artifact="${BUNDLE_SOURCE}/$(archive_name "$idx")"
+    if [[ "$artifact" == *.jar ]]; then
+        mkdir -p "${BUNDLE_BIN}"
+        cp -f "$artifact" "${BUNDLE_BIN}/$(basename "$artifact")"
+        ok "Installed JAR → ${C_DIM}${BUNDLE_BIN}/$(basename "$artifact")${C_RESET}"
+        return 0
+    fi
+
     # ── extract ───────────────────────────────────────────────────────
     extract_archive "$idx"
 

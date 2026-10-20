@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build SqlStudio Linux",
+      "type": "process",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/build/output", "--parallel", "4"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gcc"]
+    }
+  ]
+}

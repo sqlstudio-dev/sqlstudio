@@ -36,6 +36,9 @@ gdal|3.10.2|https://github.com/OSGeo/gdal/releases/download/v3.10.2/gdal-3.10.2.
 # ANTLR4 C++ runtime (parser generator runtime)
 antlr4-runtime|4.13.2|https://www.antlr.org/download/antlr4-cpp-runtime-4.13.2-source.zip
 
+# ANTLR4 parser generator (installed directly into bin/)
+antlr4-jar|4.13.2|https://www.antlr.org/download/antlr-4.13.2-complete.jar
+
 # libssh (SSH client library)
 libssh|0.11.1|https://www.libssh.org/files/0.11/libssh-0.11.1.tar.xz
 

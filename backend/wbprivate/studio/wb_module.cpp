@@ -214,19 +214,19 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
   }
 
   static std::vector<std::string> supportedOsList{
-    "Ubuntu 24.04",
-    "Ubuntu 24.10",
-    "Debian 10",
-    "Red Hat Enterprise Linux release 9", // Oracle 9.0: Red Hat Enterprise Linux release 9.0 (Plow)
-    "Fedora release 39",
-    "Fedora release 40",
-    "CentOS release 7",
-    "Windows 10",
+    "Ubuntu 26.04",
+    "Ubuntu 26.10",
+    "Fedora release 44",
+    "Fedora release 45",
     "Windows Server 2016",
     "Windows Server 2019",
     "Windows 11",
     "Windows Server 2022",
-    "macOS 14"
+    "Windows Server 2025",
+    "macOS 14",
+    "macOS 15",
+    "macOS 26",
+    "macOS 27",
   };
 
   for (std::string s : supportedOsList) {

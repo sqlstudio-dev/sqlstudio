@@ -166,14 +166,15 @@ if(WITH_ANTLR_JAR)
   get_filename_component(ANTLR_JAR_USER_DIR ${WITH_ANTLR_JAR} DIRECTORY)
   find_path(ANTLR_JAR_PATH ${ANTLR_JAR_FILENAME} ${LINUX_RES_BIN_DIR} ${ANTLR_JAR_USER_DIR})
 else(WITH_ANTLR_JAR)
-  find_path(ANTLR_JAR_PATH ${ANTLR_JAR_FILENAME} ${LINUX_RES_BIN_DIR})
+  find_path(ANTLR_JAR_PATH ${ANTLR_JAR_FILENAME} ${LINUX_RES_BIN_DIR}
+    "${SOURCE_PARENT_DIR}/bundle/bin" "$ENV{WB_BUNDLE_DIR}/bin")
 endif(WITH_ANTLR_JAR)
 
 if(ANTLR_JAR_PATH AND Java_JAVA_EXECUTABLE) 
   set(ANTLR_JAR_PATH ${ANTLR_JAR_PATH}/${ANTLR_JAR_FILENAME})
   message(STATUS "ANTLR jar: " ${ANTLR_JAR_PATH})
 else()
-  message(WARNING ${ANTLR_JAR_FILENAME} " or java runtime wasn't found which is required if you'd like to rebuild Lexer and Parser files")
+  message(STATUS "ANTLR generator unavailable; checking for pre-generated parser files")
 endif()
 
 
