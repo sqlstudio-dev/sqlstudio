@@ -33,7 +33,7 @@
 
 namespace base {
 
-// Currently supported MySQL versions.
+// SQL symbol sets. Newer compatible servers currently use the MySQL 8.0 set.
 enum class MySQLVersion {
   Unknown,
   MySQL56,
@@ -50,6 +50,7 @@ public:
   static bool isKeyword(std::string const& identifier, MySQLVersion version);
 
   static MySQLVersion numberToVersion(long version);
+  static bool isSupportedServerVersion(int major, int minor);
 };
 
 }

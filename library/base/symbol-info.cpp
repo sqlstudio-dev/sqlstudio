@@ -125,10 +125,12 @@ bool MySQLSymbolInfo::isKeyword(std::string const& identifier, MySQLVersion vers
 MySQLVersion MySQLSymbolInfo::numberToVersion(long version) {
   long major = version / 10000, minor = (version / 100) % 100;
 
-  if (major < 5 || major > 8)
+  if (!isSupportedServerVersion(major, minor))
     return MySQLVersion::Unknown;
 
-  if (major == 8)
+  // Keep the existing SQL vocabulary available on newer servers. This does
+  // not imply grammar support for every statement added after MySQL 8.0.
+  if (major >= 8)
     return MySQLVersion::MySQL80;
 
   if (major != 5)
@@ -145,3 +147,13 @@ MySQLVersion MySQLSymbolInfo::numberToVersion(long version) {
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+
+bool MySQLSymbolInfo::isSupportedServerVersion(int major, int minor) {
+  // Keep in sync with studio.utils.Version.is_supported_mysql_version.
+  // Explicit release lines avoid treating MariaDB or unknown future servers
+  // as MySQL merely because their version number is larger.
+  return (major == 5 && (minor == 6 || minor == 7)) ||
+         (major == 8 && minor >= 0 && minor <= 4) ||
+         (major == 9 && minor >= 0 && minor <= 7) ||
+         (major == 26 && minor == 7);
+}

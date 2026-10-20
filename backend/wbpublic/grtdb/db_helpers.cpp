@@ -25,6 +25,7 @@
 
 #include "db_helpers.h"
 #include "base/string_utilities.h"
+#include "base/symbol-info.h"
 #include "grtpp_util.h"
 #include "base/log.h"
 
@@ -268,8 +269,7 @@ bool bec::version_greater(GrtVersionRef a, GrtVersionRef b) {
 /** Checks if the given server version numbers is in the set of supported MySQL servers
  */
 bool bec::is_supported_mysql_version(int mysql_major, int mysql_minor, int mysql_release) {
-  return ((mysql_major == 5 && (mysql_minor == 6 || mysql_minor == 7)) ||
-          (mysql_major == 8 && mysql_minor == 0));
+  return base::MySQLSymbolInfo::isSupportedServerVersion(mysql_major, mysql_minor);
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -302,7 +302,7 @@ bool bec::is_supported_mysql_version_at_least(int mysql_major, int mysql_minor, 
   // value possible
   unsigned int available = mysql_major * 100000 + mysql_minor * 1000 + (mysql_release < 0 ? 999 : mysql_release);
 
-  if (major < 5 || (major == 5 && minor < 6) || (major == 8 && minor == 0)) {
+  if (major < 5 || (major == 5 && minor < 6)) {
     return (required <= available);
   } else if (is_supported_mysql_version(mysql_major, mysql_minor, mysql_release)) {
     return (required <= available);

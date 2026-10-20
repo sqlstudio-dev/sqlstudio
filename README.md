@@ -62,6 +62,11 @@ SqlStudio is tested and supported with:
 - **MySQL** 5.7, 8.0, 8.1, 8.2, 8.3, 8.4 (LTS), 9.x
 - **MariaDB** 10.4, 10.5, 10.6 (LTS), 10.11 (LTS), 11.x (support will be soon published)
 
+MySQL **26.7** has initial compatibility for connections, common queries, and
+table editing using the existing MySQL 8.0 SQL vocabulary. See the
+[compatibility scope and tests](testing/mysql-compatibility.md) for limitations
+and verification instructions.
+
 ---
 
 ## Supported Platforms
