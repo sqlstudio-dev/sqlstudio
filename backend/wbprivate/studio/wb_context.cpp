@@ -2918,8 +2918,8 @@ std::shared_ptr<SqlEditorForm> WBContext::add_new_query_window(const db_mgmt_Con
                 "Incompatible/nonstandard server version or connection protocol detected (%s).\n\n"
                 "A connection to this database can be established but some SqlStudio features may not work "
                 "properly since the database is not fully compatible with the supported versions of MySQL.\n\n"
-                "SqlStudio is developed and tested for MySQL Server versions 5.6, 5.7 and 8.0.\n"
-                "Please note: there may be some incompatibilities with version 8.4.\n"
+                "SqlStudio recognizes MySQL Server versions 5.6, 5.7, 8.0-8.4, 9.0-9.7, 26.7 and 26.10.\n"
+                "Support for SQL syntax and administration features varies by server version.\n"
                 "For MySQL Server older than 5.6, please use SqlStudio version 6.3.",
                 bec::sanitize_server_version_number(form->connection_details()["dbmsProductVersion"]).c_str()),
               "Continue Anyway", "Cancel", "", "wb.supported_server_check.suppress_warning",
