@@ -864,11 +864,13 @@ namespace MySQL.Controls
       r0.Right--;
       r0.Bottom--;
       Rectangle scrollerRect = new Rectangle(r0.Location, r0.Size);
-			using (Brush br = new SolidBrush(SystemColors.Control))
+			using (Brush br = new SolidBrush(Conversions.InDarkMode() && !SystemInformation.HighContrast
+        ? Color.FromArgb(37, 37, 38) : SystemColors.Control))
         g.FillRectangle(br, scrollerRect);
 			
       // Make a small outer border.
-			using (Pen border = new Pen(SystemColors.ControlDark))
+			using (Pen border = new Pen(Conversions.InDarkMode() && !SystemInformation.HighContrast
+        ? Color.FromArgb(69, 69, 69) : SystemColors.ControlDark))
       {
         Rectangle rborder = scrollerRect;
         rborder.Inflate(-1, -1);

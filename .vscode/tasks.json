@@ -5,7 +5,12 @@
       "label": "Build SqlStudio Linux",
       "type": "process",
       "command": "cmake",
-      "args": ["--build", "${workspaceFolder}/build/output", "--parallel", "4"],
+      "args": [
+        "--build",
+        "${workspaceFolder}/build/output",
+        "--parallel",
+        "4"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -13,7 +18,53 @@
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Build SqlStudio Windows (Debug)",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/build/compile-studio.ps1",
+        "-Configuration",
+        "Debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": [
+        "$msCompile"
+      ]
+    },
+    {
+      "label": "Build SqlStudio Windows (Release)",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}/build/compile-studio.ps1",
+        "-Configuration",
+        "Release"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "problemMatcher": [
+        "$msCompile"
+      ]
     }
   ]
 }

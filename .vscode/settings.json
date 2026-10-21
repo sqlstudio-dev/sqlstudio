@@ -1,0 +1,11 @@
+{
+    "cSpell.words": [
+        "DPARTY",
+        "zlibd"
+    ],
+    "files.associations": {
+        "*.css": "tailwindcss",
+        "xutility": "cpp"
+    },
+    "dotnet.preferCSharpExtension": true
+}

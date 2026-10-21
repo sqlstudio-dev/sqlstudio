@@ -34,6 +34,29 @@
           "text": "-break-insert -f exit"
         }
       ]
+    },
+    {
+      "name": "SqlStudio (C#, Windows)",
+      "type": "clr",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/x64/Debug/SqlStudio.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/bin/x64/Debug",
+      "stopAtEntry": false,
+      "console": "internalConsole",
+      "justMyCode": false,
+      "preLaunchTask": "Build SqlStudio Windows (Debug)"
+    },
+    {
+      "name": "SqlStudio (C++, Windows)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/bin/x64/Debug/SqlStudio.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/bin/x64/Debug",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "preLaunchTask": "Build SqlStudio Windows (Debug)"
     }
   ]
 }
