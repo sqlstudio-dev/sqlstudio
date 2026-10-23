@@ -38,6 +38,8 @@ jobs:
         include:
           - { name: Ubuntu 22.04, image: "ubuntu:22.04", tag: ubuntu22.04 }
           - { name: Ubuntu 24.04, image: "ubuntu:24.04", tag: ubuntu24.04 }
+          - { name: Ubuntu 26.04, image: "ubuntu:26.04", tag: ubuntu26.04 }
+          - { name: Ubuntu 26.10, image: "ubuntu:26.10", tag: ubuntu26.10 }
           - { name: Debian 12,    image: "debian:12",    tag: debian12 }
           - { name: Debian 13,    image: "debian:13",    tag: debian13 }
     container:
@@ -166,6 +168,8 @@ jobs:
         include:
           - { name: Ubuntu 22.04, image: "ubuntu:22.04", tag: ubuntu22.04 }
           - { name: Ubuntu 24.04, image: "ubuntu:24.04", tag: ubuntu24.04 }
+          - { name: Ubuntu 26.04, image: "ubuntu:26.04", tag: ubuntu26.04 }
+          - { name: Ubuntu 26.10, image: "ubuntu:26.10", tag: ubuntu26.10 }
           - { name: Debian 12,    image: "debian:12",    tag: debian12 }
           - { name: Debian 13,    image: "debian:13",    tag: debian13 }
     container:
