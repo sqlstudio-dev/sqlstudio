@@ -56,7 +56,7 @@ done
     exit 1
 }
 
-for tool in dpkg-deb dpkg-shlibdeps dpkg-architecture strip patchelf; do
+for tool in dpkg-deb dpkg-shlibdeps dpkg-query dpkg-architecture objdump strip patchelf; do
     command -v "$tool" >/dev/null || { echo "$tool not found (run build/linux/install_deps.sh)" >&2; exit 1; }
 done
 
@@ -122,6 +122,35 @@ SHLIBS_DEPENDS="$(
     sed -n 's/^shlibs:Depends=//p'
 )" || { cat "${WORK_DIR}/shlibdeps.log" >&2; exit 1; }
 [[ -n "${SHLIBS_DEPENDS}" ]] || { cat "${WORK_DIR}/shlibdeps.log" >&2; exit 1; }
+
+# dpkg-shlibdeps maps a bundled library to the distro package that ships the
+# same SONAME when one is installed (e.g. the bundled OpenSSL 3 on Ubuntu
+# 26.10 → libssl3t64). The package already contains those libraries, so
+# drop such dependencies instead of installing a second copy.
+declare -A BUNDLED_PKGS=()
+for lib in "${PKG_DIR}/${LIB_DIR}"/*.so.*; do
+    [[ -f "$lib" && ! -L "$lib" ]] || continue
+    soname="$(objdump -p "$lib" 2>/dev/null | awk '$1 == "SONAME" { print $2 }')"
+    [[ -n "$soname" ]] || continue
+    while IFS= read -r pkg; do
+        [[ -n "$pkg" ]] && BUNDLED_PKGS["$pkg"]=1
+    done < <(dpkg-query -S "*/${soname}" 2>/dev/null | sed -n 's/^\([^:,]*\).*/\1/p')
+done
+if [[ ${#BUNDLED_PKGS[@]} -gt 0 ]]; then
+    kept=()
+    IFS=',' read -ra deps <<<"${SHLIBS_DEPENDS}"
+    for dep in "${deps[@]}"; do
+        dep="${dep# }"
+        name="${dep%% *}"
+        if [[ -n "${BUNDLED_PKGS[${name%%:*}]:-}" ]]; then
+            echo "Dropped dependency on ${dep}: the library is bundled"
+        else
+            kept+=("$dep")
+        fi
+    done
+    SHLIBS_DEPENDS="$(printf '%s, ' "${kept[@]}")"
+    SHLIBS_DEPENDS="${SHLIBS_DEPENDS%, }"
+fi
 
 # ── Documentation required by Debian policy ───────────────────────────────
 DOC_DIR="${PKG_DIR}/usr/share/doc/${PACKAGE}"
