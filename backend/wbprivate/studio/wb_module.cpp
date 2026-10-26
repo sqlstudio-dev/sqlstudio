@@ -214,6 +214,8 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
   }
 
   static std::vector<std::string> supportedOsList{
+    "Ubuntu 22.04",
+    "Ubuntu 24.04",
     "Ubuntu 26.04",
     "Ubuntu 26.10",
     "Fedora release 44",

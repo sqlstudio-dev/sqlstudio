@@ -101,12 +101,16 @@ TEST_F(WbModuleTestsForSqlStudioTest, SupportedOsTest) {
     EXPECT_FALSE(isOsSupportedProxy("Ubuntu 20.10"));
     EXPECT_FALSE(isOsSupportedProxy("Ubuntu 21.04"));
     EXPECT_FALSE(isOsSupportedProxy("Ubuntu 21.10"));
-    EXPECT_FALSE(isOsSupportedProxy("Ubuntu 22.04"));
+    EXPECT_TRUE(isOsSupportedProxy("Ubuntu 22.04"));
     EXPECT_FALSE(isOsSupportedProxy("Ubuntu 22.10"));
     EXPECT_FALSE(isOsSupportedProxy("Ubuntu 23.04"));
     EXPECT_FALSE(isOsSupportedProxy("Ubuntu 23.10"));
     EXPECT_TRUE(isOsSupportedProxy("Ubuntu 24.04"));
-    EXPECT_TRUE(isOsSupportedProxy("Ubuntu 24.10"));
+    EXPECT_FALSE(isOsSupportedProxy("Ubuntu 24.10"));
+    EXPECT_FALSE(isOsSupportedProxy("Ubuntu 25.04"));
+    EXPECT_FALSE(isOsSupportedProxy("Ubuntu 25.10"));
+    EXPECT_TRUE(isOsSupportedProxy("Ubuntu 26.04"));
+    EXPECT_TRUE(isOsSupportedProxy("Ubuntu 26.10"));
 
     // red-hat based
     EXPECT_FALSE(isOsSupportedProxy("Red Hat Enterprise Linux Server release"));
