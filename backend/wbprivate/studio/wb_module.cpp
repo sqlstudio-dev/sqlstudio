@@ -249,10 +249,10 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                \
     plugin->caption(aCaption);                          \
     plugin->description(descr);                         \
-    plugin->moduleName("SqlStudio");                  \
+    plugin->moduleName("SqlStudio");                    \
     plugin->moduleFunctionName(aName);                  \
     plugin->pluginType(type);                           \
-    plugin->groups().insert("Application/SqlStudio"); \
+    plugin->groups().insert("Application/SqlStudio");   \
     list.insert(plugin);                                \
   }
 
@@ -262,10 +262,10 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                        \
     plugin->caption(aCaption);                                  \
     plugin->description(descr);                                 \
-    plugin->moduleName("SqlStudio");                          \
+    plugin->moduleName("SqlStudio");                            \
     plugin->moduleFunctionName(aName);                          \
     plugin->pluginType(NORMAL_PLUGIN_TYPE);                     \
-    plugin->groups().insert("Application/SqlStudio");         \
+    plugin->groups().insert("Application/SqlStudio");           \
     app_PluginObjectInputRef input(grt::Initialized);           \
     input->owner(plugin);                                       \
     input->objectStructName(klass::static_class_name());        \
@@ -279,10 +279,10 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                         \
     plugin->caption(aCaption);                                   \
     plugin->description(descr);                                  \
-    plugin->moduleName("SqlStudio");                           \
+    plugin->moduleName("SqlStudio");                             \
     plugin->moduleFunctionName(aName);                           \
     plugin->pluginType(NORMAL_PLUGIN_TYPE);                      \
-    plugin->groups().insert("Application/SqlStudio");          \
+    plugin->groups().insert("Application/SqlStudio");            \
     app_PluginObjectInputRef input(grt::Initialized);            \
     input->owner(plugin);                                        \
     input->name("activeDiagram");                                \
@@ -297,10 +297,10 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                       \
     plugin->caption(aCaption);                                 \
     plugin->description(descr);                                \
-    plugin->moduleName("SqlStudio");                         \
+    plugin->moduleName("SqlStudio");                           \
     plugin->moduleFunctionName(aName);                         \
     plugin->pluginType(NORMAL_PLUGIN_TYPE);                    \
-    plugin->groups().insert("Application/SqlStudio");        \
+    plugin->groups().insert("Application/SqlStudio");          \
     app_PluginObjectInputRef input(grt::Initialized);          \
     input->owner(plugin);                                      \
     input->name("activeModel");                                \
@@ -315,10 +315,10 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                       \
     plugin->caption(aCaption);                                 \
     plugin->description(descr);                                \
-    plugin->moduleName("SqlStudio");                         \
+    plugin->moduleName("SqlStudio");                           \
     plugin->moduleFunctionName(aName);                         \
     plugin->pluginType(STANDALONE_GUI_PLUGIN_TYPE);            \
-    plugin->groups().insert("Application/SqlStudio");        \
+    plugin->groups().insert("Application/SqlStudio");          \
     app_PluginObjectInputRef input(grt::Initialized);          \
     input->owner(plugin);                                      \
     input->name("activeModel");                                \
@@ -327,17 +327,17 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     list.insert(plugin);                                       \
   }
 
-#define def_form_plugin(group, aName, aCaption, descr)  \
-  {                                                     \
-    app_PluginRef plugin(grt::Initialized);             \
-    plugin->name("wb." group "." aName);                \
-    plugin->caption(aCaption);                          \
-    plugin->description(descr);                         \
-    plugin->moduleName("SqlStudio");                  \
-    plugin->moduleFunctionName(aName);                  \
-    plugin->pluginType(STANDALONE_GUI_PLUGIN_TYPE);     \
-    plugin->groups().insert("Application/SqlStudio"); \
-    list.insert(plugin);                                \
+#define def_form_plugin(group, aName, aCaption, descr) \
+  {                                                    \
+    app_PluginRef plugin(grt::Initialized);            \
+    plugin->name("wb." group "." aName);               \
+    plugin->caption(aCaption);                         \
+    plugin->description(descr);                        \
+    plugin->moduleName("SqlStudio");                   \
+    plugin->moduleFunctionName(aName);                 \
+    plugin->pluginType(STANDALONE_GUI_PLUGIN_TYPE);    \
+    plugin->groups().insert("Application/SqlStudio");  \
+    list.insert(plugin);                               \
   }
 
 #define def_arg_plugin(group, aName, type, aCaption, descr) \
@@ -347,13 +347,13 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                    \
     plugin->caption(aCaption);                              \
     plugin->description(descr);                             \
-    plugin->moduleName("SqlStudio");                      \
+    plugin->moduleName("SqlStudio");                        \
     plugin->moduleFunctionName(aName);                      \
     plugin->pluginType(type);                               \
     pdef->owner(plugin);                                    \
     pdef->name("string");                                   \
     plugin->inputValues().insert(pdef);                     \
-    plugin->groups().insert("Application/SqlStudio");     \
+    plugin->groups().insert("Application/SqlStudio");       \
     list.insert(plugin);                                    \
   }
 
@@ -363,7 +363,7 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                          \
     plugin->caption(aCaption);                                    \
     plugin->description(descr);                                   \
-    plugin->moduleName("SqlStudio");                            \
+    plugin->moduleName("SqlStudio");                              \
     plugin->moduleFunctionName(aName);                            \
     plugin->pluginType(type);                                     \
     app_PluginInputDefinitionRef pdef(grt::Initialized);          \
@@ -375,7 +375,7 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     model->name("activeModel");                                   \
     model->objectStructName(model_Model::static_class_name());    \
     plugin->inputValues().insert(model);                          \
-    plugin->groups().insert("Application/SqlStudio");           \
+    plugin->groups().insert("Application/SqlStudio");             \
     list.insert(plugin);                                          \
   }
 
@@ -386,7 +386,7 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     plugin->name("wb." group "." aName);                                                          \
     plugin->caption(aCaption);                                                                    \
     plugin->description(descr);                                                                   \
-    plugin->moduleName("SqlStudio");                                                            \
+    plugin->moduleName("SqlStudio");                                                              \
     plugin->moduleFunctionName(aName);                                                            \
     plugin->pluginType(ptype);                                                                    \
     pdef->owner(plugin);                                                                          \
@@ -394,7 +394,7 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     pdef->dialogType(aType);                                                                      \
     pdef->fileExtensions(aExtensions);                                                            \
     plugin->inputValues().insert(pdef);                                                           \
-    plugin->groups().insert("Application/SqlStudio");                                           \
+    plugin->groups().insert("Application/SqlStudio");                                             \
     list.insert(plugin);                                                                          \
   }
 
@@ -1556,9 +1556,8 @@ static const char *DEFAULT_RDBMS_ID = "com.mysql.rdbms.mysql";
  * The new connection is also returned.
  */
 db_mgmt_ConnectionRef SqlStudioImpl::create_connection(const std::string &host, const std::string &user,
-                                                         const std::string socket_or_pipe_name, int can_use_networking,
-                                                         int can_use_socket_or_pipe, int port,
-                                                         const std::string &name) {
+                                                       const std::string socket_or_pipe_name, int can_use_networking,
+                                                       int can_use_socket_or_pipe, int port, const std::string &name) {
   logDebug("Creating new connection (%s) to host %s:%d for user %s (socket/pipe: %s)\n", name.c_str(), host.c_str(),
            port, user.c_str(), socket_or_pipe_name.c_str());
 
@@ -2040,9 +2039,9 @@ db_mgmt_SSHConnectionRef SqlStudioImpl::createSSHSession(const grt::ObjectRef &v
 }
 
 /**
-* Removes a connection from the stored connections list along with all associated data
-* (including its server instance entry).
-*/
+ * Removes a connection from the stored connections list along with all associated data
+ * (including its server instance entry).
+ */
 int SqlStudioImpl::deleteConnection(const db_mgmt_ConnectionRef &connection) {
   grt::ListRef<db_mgmt_Connection> connections(_wb->get_root()->rdbmsMgmt()->storedConns());
   grt::ListRef<db_mgmt_ServerInstance> instances = _wb->get_root()->rdbmsMgmt()->storedInstances();
