@@ -148,7 +148,11 @@ TEST_F(WbModuleTestsForSqlStudioTest, SupportedOsTest) {
   // other debian-based
   EXPECT_FALSE(isOsSupportedProxy("Debian 5 x86_64"));
   EXPECT_FALSE(isOsSupportedProxy("Debian 9 x86_64"));
-  EXPECT_TRUE(isOsSupportedProxy("Debian 10 x86_64"));
+  EXPECT_FALSE(isOsSupportedProxy("Debian 10 x86_64"));
+  EXPECT_FALSE(isOsSupportedProxy("Debian 11 x86_64"));
+  EXPECT_TRUE(isOsSupportedProxy("Debian 12 x86_64"));
+  EXPECT_TRUE(isOsSupportedProxy("Debian 13 x86_64"));
+  EXPECT_FALSE(isOsSupportedProxy("Debian 14 x86_64"));
 
   // other red-hat-based
   EXPECT_FALSE(isOsSupportedProxy("Fedora release 26 x86_64"));
