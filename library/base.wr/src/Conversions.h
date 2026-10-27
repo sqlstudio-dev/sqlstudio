@@ -51,6 +51,14 @@ public
     AppColorTopTabSelectedFocused = base::AppColorTopTabSelectedFocused,
     AppColorTopTabSelectedUnfocused = base::AppColorTopTabSelectedUnfocused,
     AppColorStatusbar = base::AppColorStatusbar,
+    AppColorControl = base::AppColorControl,
+    AppColorBorder = base::AppColorBorder,
+    AppColorSelection = base::AppColorSelection,
+    AppColorHover = base::AppColorHover,
+    AppColorPressed = base::AppColorPressed,
+    AppColorDisabled = base::AppColorDisabled,
+    AppColorSplitter = base::AppColorSplitter,
+    AppColorAccent = base::AppColorAccent,
   };
 
   // Conversions from native to managed types.

@@ -87,13 +87,14 @@ namespace MySQL.Utilities
 			Graphics g = e.Graphics;
 			Rectangle r = ClientRectangle;
 
-			if (BevelStyle == BevelStyleType.White || BevelStyle == BevelStyleType.Dark)
+			if (BevelStyle == BevelStyleType.White || BevelStyle == BevelStyleType.Dark ||
+        (Conversions.InDarkMode() && BevelStyle != BevelStyleType.Flat))
 			{
 				Color lineColor = BevelStyle == BevelStyleType.White ? Color.White : SystemColors.ControlDark;
 				if (SystemInformation.HighContrast)
 					lineColor = SystemColors.WindowText;
 				else if (Conversions.InDarkMode())
-					lineColor = Color.FromArgb(69, 69, 69);
+					lineColor = Conversions.GetApplicationColor(ApplicationColor.AppColorBorder, false);
 				Pen p = new Pen(lineColor);
 
 				switch (borderSide)

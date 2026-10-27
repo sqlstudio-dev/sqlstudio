@@ -22,6 +22,12 @@ namespace Aga.Controls.Tree
         public Color HeaderBackColor { get; set; }
         [DefaultValue(typeof(Color), "Empty")]
         public Color HeaderForeColor { get; set; }
+        [DefaultValue(typeof(Color), "")]
+        public Color SelectionBackColor { get; set; }
+        [DefaultValue(typeof(Color), "")]
+        public Color SelectionForeColor { get; set; }
+        [DefaultValue(typeof(Color), "")]
+        public Color InactiveSelectionBackColor { get; set; }
 
 		private Cursor _innerCursor = null;
 

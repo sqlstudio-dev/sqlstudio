@@ -183,7 +183,7 @@ namespace Aga.Controls.Tree.NodeControls
 				focusRect.Width--;
 				focusRect.Height--;
 				if (context.DrawSelection == DrawSelectionMode.None)
-					_focusPen.Color = SystemColors.ControlText;
+					_focusPen.Color = Parent == null ? SystemColors.ControlText : Parent.ForeColor;
 				else
 					_focusPen.Color = SystemColors.InactiveCaption;
 				context.Graphics.DrawRectangle(_focusPen, focusRect);
@@ -203,11 +203,22 @@ namespace Aga.Controls.Tree.NodeControls
 
 		private void CreateBrushes(TreeNodeAdv node, DrawContext context, out Brush backgroundBrush, out Color textColor, out Font font, ref string label)
 		{
-			textColor = Parent == null || (node.IsSelected && Parent.FullRowSelect) ? SystemColors.ControlText : Parent.ForeColor;
+			textColor = Parent == null ? SystemColors.ControlText : Parent.ForeColor;
 			backgroundBrush = null;
 			font = context.Font;
 
-      switch (context.DrawSelection)
+      bool themedSelection = Parent != null && !Parent.SelectionBackColor.IsEmpty && !SystemInformation.HighContrast;
+      if (themedSelection && context.DrawSelection != DrawSelectionMode.None)
+      {
+        textColor = Parent.SelectionForeColor;
+        // The owning tree has already painted full-row selection. Text-only selection
+        // is filled here without allocating a brush that could escape via DrawText.
+        if (context.DrawSelection != DrawSelectionMode.FullRowSelect)
+          using (var brush = new SolidBrush(context.DrawSelection == DrawSelectionMode.Inactive && !Parent.InactiveSelectionBackColor.IsEmpty
+            ? Parent.InactiveSelectionBackColor : Parent.SelectionBackColor))
+            context.Graphics.FillRectangle(brush, context.Bounds);
+      }
+      else switch (context.DrawSelection)
       {
         case DrawSelectionMode.Active:
           if (TreeViewAdv.isWin8OrAbove)

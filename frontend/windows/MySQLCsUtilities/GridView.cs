@@ -151,16 +151,16 @@ namespace MySQL.Controls
       bool dark = Conversions.InDarkMode();
       bool highContrast = Conversions.InHighContrastMode();
       gridColor = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelContentArea, false) : SystemColors.Window;
-      gridAlternateRowColor = dark ? Color.FromArgb(37, 37, 38)
+      gridAlternateRowColor = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelToolbar, false)
         : highContrast ? SystemColors.Window : Color.FromArgb(237, 243, 253);
       Color text = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelContentArea, true) : SystemColors.WindowText;
-      Color selection = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelHeaderFocused, false) : SystemColors.Highlight;
-      Color selectedText = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelHeaderFocused, true) : SystemColors.HighlightText;
+      Color selection = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorSelection, false) : SystemColors.Highlight;
+      Color selectedText = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorSelection, true) : SystemColors.HighlightText;
       Color header = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelToolbar, false) : SystemColors.Control;
 
       BackgroundColor = gridColor;
       ForeColor = text;
-      GridColor = dark ? Color.FromArgb(69, 69, 69) : highContrast ? SystemColors.WindowText : gridColor;
+      GridColor = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorBorder, false) : highContrast ? SystemColors.WindowText : gridColor;
       EnableHeadersVisualStyles = !dark;
       DefaultCellStyle.BackColor = gridColor;
       DefaultCellStyle.ForeColor = text;

@@ -85,6 +85,14 @@ namespace base {
     AppColorTopTabSelectedFocused,
     AppColorTopTabSelectedUnfocused,
     AppColorStatusbar,
+    AppColorControl,
+    AppColorBorder,
+    AppColorSelection,
+    AppColorHover,
+    AppColorPressed,
+    AppColorDisabled,
+    AppColorSplitter,
+    AppColorAccent,
   };
 
   // The platform specific type of color to return (label, window, control etc.). Types not supported directly by a

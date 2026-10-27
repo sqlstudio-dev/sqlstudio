@@ -1,7 +1,10 @@
-param([ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug')
+param(
+  [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
+  [string]$OutputDirectory
+)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-$outputDir = Join-Path $repoRoot "bin\x64\$Configuration"
+$outputDir = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory) } else { Join-Path $repoRoot "bin\x64\$Configuration" }
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $outputExe = Join-Path $outputDir 'ThemeControlsSmoke.exe'
 $references = @('base.wr.dll', 'WBControls.dll', 'MySQLCsUtilities.dll', 'wbpublic.wr.dll', 'Aga.Controls.dll')
