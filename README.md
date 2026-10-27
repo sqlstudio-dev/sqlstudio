@@ -76,8 +76,8 @@ and verification instructions.
 |---|---|
 | Windows 10 / 11 (x64) | ✅ Supported |
 | Windows Server 2019 / 2022 | ✅ Supported |
-| Ubuntu 20.04 / 22.04 / 24.04 | ✅ Supported |
-| Debian 11 / 12 | ✅ Supported |
+| Ubuntu 22.04 / 24.04 / 26.04 / 26.10 | ✅ Supported |
+| Debian 12 / 13 | ✅ Supported |
 | macOS 12 Monterey and later (ARM & Intel) | ✅ Supported |
 | Fedora / RHEL 8+ | 🔄 Community builds |
 
