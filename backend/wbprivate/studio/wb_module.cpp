@@ -218,6 +218,8 @@ int SqlStudioImpl::isOsSupported(const std::string &os) {
     "Ubuntu 24.04",
     "Ubuntu 26.04",
     "Ubuntu 26.10",
+    "Debian 12", // also covers the LTS phase, lsb_release reports the major version only
+    "Debian 13",
     "Fedora release 44",
     "Fedora release 45",
     "Windows Server 2016",
