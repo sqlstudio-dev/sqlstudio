@@ -26,6 +26,9 @@
 #include "wf_base.h"
 #include "wf_view.h"
 #include "wf_utilities.h"
+#include <dwmapi.h>
+
+#pragma comment(lib, "dwmapi.lib")
 
 #include "base/log.h"
 #include "base/string_utilities.h"
@@ -123,6 +126,20 @@ CustomMessageBox::CustomMessageBox() {
 
 //--------------------------------------------------------------------------------------------------
 
+void CustomMessageBox::OnHandleCreated(EventArgs ^ e) {
+  System::Windows::Forms::Form::OnHandleCreated(e);
+
+  if (mforms::App::get()->isDarkModeActive() && !SystemInformation::HighContrast) {
+    BOOL enabled = TRUE;
+    HWND window = static_cast<HWND>(Handle.ToPointer());
+    // Windows 10 20H1+ uses 20; older Windows 10 builds use 19.
+    if (FAILED(DwmSetWindowAttribute(window, 20, &enabled, sizeof(enabled))))
+      DwmSetWindowAttribute(window, 19, &enabled, sizeof(enabled));
+  }
+}
+
+//--------------------------------------------------------------------------------------------------
+
 // Some more task dialog icons, which are not defined in commctrl.h.
 #define TD_SHIELD_BLUE_ICON MAKEINTRESOURCE(-5)
 #define TD_SECURITY_WARNING_ICON MAKEINTRESOURCE(-6)
@@ -135,6 +152,59 @@ mforms::DialogResult CustomMessageBox::ShowInternal(const std::string &title, co
                                                     const std::string &buttonOther, const std::string &checkbox,
                                                     bool &checked) {
   logDebug("Creating and showing custom message box\n");
+
+  if (mforms::App::get()->isDarkModeActive() && !SystemInformation::HighContrast) {
+    CustomMessageBox ^ dialog = gcnew CustomMessageBox();
+    dialog->Text = "SqlStudio";
+    dialog->_messageLabel->Text = CppStringToNative(title + "\n\n" + text);
+    dialog->_button1->Text = CppStringToNative(buttonOK);
+    dialog->_button1->DialogResult = System::Windows::Forms::DialogResult::OK;
+    dialog->_button2->Text = CppStringToNative(buttonCancel);
+    dialog->_button2->DialogResult = System::Windows::Forms::DialogResult::Cancel;
+    dialog->_button3->Text = CppStringToNative(buttonOther);
+    dialog->_button3->DialogResult = System::Windows::Forms::DialogResult::Ignore;
+    dialog->_checkbox->Text = CppStringToNative(checkbox);
+    dialog->_checkbox->Checked = checked;
+
+    if (mainIcon == TD_ERROR_ICON)
+      dialog->_picture->Image = SystemIcons::Error->ToBitmap();
+    else if (mainIcon == TD_WARNING_ICON)
+      dialog->_picture->Image = SystemIcons::Warning->ToBitmap();
+    else
+      dialog->_picture->Image = SystemIcons::Information->ToBitmap();
+    dialog->_picture->SizeMode = PictureBoxSizeMode::CenterImage;
+    dialog->_picture->Size = Drawing::Size(48, 48);
+
+    Color background = Color::FromArgb(30, 30, 30);
+    Color foreground = Color::FromArgb(232, 232, 232);
+    dialog->BackColor = background;
+    dialog->ForeColor = foreground;
+    dialog->_messageLabel->BackColor = background;
+    dialog->_messageLabel->ForeColor = foreground;
+    dialog->_checkbox->BackColor = background;
+    dialog->_checkbox->ForeColor = foreground;
+    dialog->_checkbox->FlatStyle = FlatStyle::Flat;
+    for each (Button ^ button in gcnew array<Button ^>{dialog->_button1, dialog->_button2, dialog->_button3}) {
+      button->FlatStyle = FlatStyle::Flat;
+      button->UseVisualStyleBackColor = false;
+      button->BackColor = Color::FromArgb(60, 60, 60);
+      button->ForeColor = foreground;
+      button->FlatAppearance->BorderColor = Color::FromArgb(90, 90, 90);
+      button->FlatAppearance->MouseOverBackColor = Color::FromArgb(75, 75, 75);
+      button->FlatAppearance->MouseDownBackColor = Color::FromArgb(48, 48, 48);
+      button->Padding = System::Windows::Forms::Padding(12, 6, 12, 6);
+    }
+
+    dialog->Padding = System::Windows::Forms::Padding(20, 24, 20, 18);
+    dialog->ComputeLayout();
+    System::Windows::Forms::DialogResult result = dialog->ShowDialog(dialog->Owner);
+    checked = dialog->_checkbox->Checked;
+    if (result == System::Windows::Forms::DialogResult::Cancel)
+      return mforms::ResultCancel;
+    if (result == System::Windows::Forms::DialogResult::Ignore)
+      return mforms::ResultOther;
+    return mforms::ResultOk;
+  }
 
   TASKDIALOGCONFIG config = {0};
   config.cbSize = sizeof(config);
@@ -507,7 +577,16 @@ void *DispatchControl::RunOnMainThread(const std::function<void *()> &slot, bool
 InvokationResult ^ DispatchControl::RunSlot(SlotWrapper ^ wrapper) {
   logDebug2("Running cancel_slot on main thread\n");
 
-  return gcnew InvokationResult((*wrapper->_slot)());
+  try {
+    return gcnew InvokationResult((*wrapper->_slot)());
+  } catch (System::Exception ^ exception) {
+    // Capture the managed stack on the UI thread before Invoke wraps it and
+    // propagates it back through the native password-request callback.
+    String ^ diagnostic = exception->ToString();
+    logError("UI callback failed: %s\n", NativeToCppString(diagnostic).c_str());
+    System::Diagnostics::Debug::WriteLine(diagnostic);
+    throw;
+  }
 }
 
 //----------------- UtilitiesWrapper ------------------------------------------------------------------
@@ -996,7 +1075,15 @@ void UtilitiesWrapper::forget_password(const std::string &service, const std::st
 //--------------------------------------------------------------------------------------------------
 
 void *UtilitiesWrapper::perform_from_main_thread(const std::function<void *()> &slot, bool wait) {
-  return dispatcher->RunOnMainThread(slot, wait);
+  try {
+    return dispatcher->RunOnMainThread(slot, wait);
+  } catch (System::Exception ^ exception) {
+    // Also record failures in Invoke itself (for example an invalid HWND).
+    String ^ diagnostic = exception->ToString();
+    logError("Main-thread dispatch failed: %s\n", NativeToCppString(diagnostic).c_str());
+    System::Diagnostics::Debug::WriteLine(diagnostic);
+    throw;
+  }
 }
 
 //--------------------------------------------------------------------------------------------------

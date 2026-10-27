@@ -87,6 +87,20 @@ std::string SidebarEntry::getAccessibilityDefaultAction() {
 
 //----------------- SidebarSection -------------------------------------------------------------------------------------
 
+base::Size SidebarSection::getLayoutSize(base::Size proposedSize) {
+  base::Size size = mforms::DrawBox::getLayoutSize(proposedSize);
+  // Reserve icon width plus both paddings in the same coordinates used by repaint.
+  double width = 85;
+  for (const auto &entry : _entries) {
+    if (entry.first->icon == nullptr) continue;
+    base::Size iconSize = mforms::Utilities::getImageSize(entry.first->icon);
+    double required = SIDEBAR_LEFT_PADDING + iconSize.width + SIDEBAR_RIGHT_PADDING;
+    if (required > width) width = required;
+  }
+  size.width = width;
+  return size;
+}
+
 SidebarSection::SidebarSection(HomeScreen *owner) {
   _owner = owner;
   _hotEntry = nullptr;
@@ -332,7 +346,8 @@ HomeScreen::HomeScreen() : AppView(true, "Home", "home", true) {
 
   _sidebarSection = new SidebarSection(this);
   _sidebarSection->set_name("homeScreenSideBar");
-  _sidebarSection->set_size(85, -1);
+  // SidebarSection::getLayoutSize owns the width; a fixed MinimumSize would
+  // override it in the Windows box layout after font autoscaling.
   add(_sidebarSection, false, true);
 
   Box::scoped_connect(signal_resized(), std::bind(&HomeScreen::on_resize, this));

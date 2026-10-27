@@ -21,6 +21,7 @@ param(
     [int]$Jobs = [Math]::Max(1, [Environment]::ProcessorCount),
     [string]$VsInstallPath,
     [string]$BundleDir,
+    [switch]$Rebuild,
     [switch]$DryRun
 )
 
@@ -85,8 +86,10 @@ if (!(Test-Path -LiteralPath (Join-Path $BundleDir 'include') -PathType Containe
     throw "The dependency bundle must contain include and lib directories: $BundleDir"
 }
 
+# Rebuild the application project and its project references, including Aga.Controls.
+$buildTarget = if ($Rebuild) { "/t:SqlStudio:Rebuild" } else { "/t:SqlStudio" }
 $buildArguments = @(
-    $solution, '/t:SqlStudio', "/m:$Jobs", '/nologo', '/verbosity:minimal',
+    $solution, $buildTarget, "/m:$Jobs", '/nologo', '/verbosity:minimal',
     "/p:Configuration=$Configuration", '/p:Platform=x64',
     "/p:PlatformToolset=$toolset", "/p:MSS_3DPARTY_PATH=$BundleDir"
 )

@@ -424,6 +424,7 @@ namespace Aga.Controls.Tree
         }
 
 		private int _rowHeight = 16;
+    private int _requestedRowHeight = 16;
 		[DefaultValue(16), Category("Appearance")]
 		public int RowHeight
 		{
@@ -436,9 +437,8 @@ namespace Aga.Controls.Tree
 				if (value <= 0)
 					throw new ArgumentOutOfRangeException("value");
 
-				_rowHeight = value;
-				_rowLayout.PreferredRowHeight = value;
-				FullUpdate();
+        _requestedRowHeight = value;
+        UpdateFontMetrics();
 			}
 		}
 

@@ -122,9 +122,15 @@ namespace mforms {
     static const int HOME_TITLE_FONT_SIZE = 20;
     static const int HOME_SUBTITLE_FONT_SIZE = 16;
 
+#ifdef _MSC_VER
+    static const int HOME_TILES_TITLE_FONT_SIZE = 18;
+    static const int HOME_SMALL_INFO_FONT_SIZE = 14;
+    static const int HOME_DETAILS_FONT_SIZE = 14;
+#else
     static const int HOME_TILES_TITLE_FONT_SIZE = 16;
     static const int HOME_SMALL_INFO_FONT_SIZE = 12;
     static const int HOME_DETAILS_FONT_SIZE = 12;
+#endif
 
     static const char* TILE_DRAG_FORMAT;
   };

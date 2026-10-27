@@ -91,8 +91,6 @@ namespace MySQL.GUI.SqlStudio.Plugins
     override public void Show()
     {
       base.Show();
-
-      editorPlugin.Show();
     }
 
 

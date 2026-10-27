@@ -1033,6 +1033,38 @@ namespace MySQL.Controls
 
     #region Event handling
 
+    private bool updatingTabMetrics;
+    private void UpdateTabMetrics()
+    {
+      if (updatingTabMetrics || !IsHandleCreated) return;
+      updatingTabMetrics = true;
+      try
+      {
+        if (Font.SizeInPoints < 10.0f)
+          Font = new Font(Font.FontFamily, 10.0f, Font.Style, GraphicsUnit.Point);
+        int height = Math.Max((int)Math.Ceiling(28.0 * DeviceDpi / 96.0),
+          (int)Math.Ceiling(Font.GetHeight(DeviceDpi)) + (int)Math.Ceiling(8.0 * DeviceDpi / 96.0));
+        if (ItemSize.Height != height)
+          ItemSize = new Size(ItemSize.Width, height);
+        AdjustLayoutInfo(null);
+        UpdateScroller();
+        Invalidate();
+      }
+      finally { updatingTabMetrics = false; }
+    }
+
+    protected override void OnFontChanged(EventArgs e)
+    {
+      base.OnFontChanged(e);
+      UpdateTabMetrics();
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+      base.OnDpiChangedAfterParent(e);
+      UpdateTabMetrics();
+    }
+
     protected override void OnResize(EventArgs e)
     {
       base.OnResize(e);
@@ -1047,6 +1079,7 @@ namespace MySQL.Controls
     {
       base.OnHandleCreated(e);
 
+      UpdateTabMetrics();
       RegisterForActivation(this, new EventArgs());
     }
 
@@ -1789,8 +1822,8 @@ namespace MySQL.Controls
       control.Dock = DockStyle.Fill;
       control.Margin = new Padding(0);
       control.Padding = new Padding(0);
-      control.Show();
       TabPages.Add(page);
+      control.Show();
 
       return TabPages.Count - 1;
     }

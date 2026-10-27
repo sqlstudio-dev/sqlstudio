@@ -552,11 +552,16 @@ static void *_ask_for_password_main(const std::string &title, const std::string 
   password_form.set_title(caption);
   password_form.set_name(caption);
 
+  content.set_name("PasswordPromptContent");
+#ifdef _MSC_VER
+  content.set_padding(24);
+#else
   content.set_padding(12);
+#endif
   content.set_row_count(6);
-  content.set_row_spacing(prompt_storage ? 8 : 7);
+  content.set_row_spacing(12);
   content.set_column_count(3);
-  content.set_column_spacing(4);
+  content.set_column_spacing(12);
 
   icon.set_image("message_wb_lock.png");
   content.add(&icon, 0, 1, 0, 6, HFillFlag | VFillFlag);
@@ -567,7 +572,11 @@ static void *_ask_for_password_main(const std::string &title, const std::string 
     description.set_text(title_parts[1]);
   description.set_wrap_text(true);
   description.set_style(BigBoldStyle);
+#ifdef _MSC_VER
+  description.set_size(420, -1);
+#else
   description.set_size(300, -1);
+#endif
   content.add(&description, 1, 3, 0, 1, HFillFlag | HExpandFlag | VFillFlag);
 
   service_description_label.set_text(_("Service:"));
@@ -610,7 +619,8 @@ static void *_ask_for_password_main(const std::string &title, const std::string 
     content.add(&save_password_box, 2, 3, 4, 5, HExpandFlag | HFillFlag);
   }
 
-  button_box.set_spacing(8);
+  button_box.set_spacing(12);
+  button_box.set_padding(0, 12, 0, 0);
   button_box.set_name("Button Bar");
   ok_button.set_text(_("OK"));
   //  ok_button.set_size(75, -1);

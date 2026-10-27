@@ -302,7 +302,7 @@ ToolBarItemWrapper::ToolBarItemWrapper(mforms::ToolBarItem *backend, mforms::Too
 
     case mforms::LabelItem: {
       ToolStripLabel ^ label = ToolBarItemWrapper::Create<ToolStripLabel>(backend, this);
-      label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 10, FontStyle::Regular, GraphicsUnit::Pixel);
+      label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (10) * 72.0f / 96.0f, FontStyle::Regular, GraphicsUnit::Point);
       label->ForeColor = Conversions::GetApplicationColor(ApplicationColor::AppColorPanelToolbar, true);
       item = label;
       break;
@@ -386,7 +386,7 @@ ToolBarItemWrapper::ToolBarItemWrapper(mforms::ToolBarItem *backend, mforms::Too
 
     case mforms::TitleItem: {
       ToolStripLabel ^ label = ToolBarItemWrapper::Create<ToolStripLabel>(backend, this);
-      label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 10, FontStyle::Bold, GraphicsUnit::Pixel);
+      label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (10) * 72.0f / 96.0f, FontStyle::Bold, GraphicsUnit::Point);
       label->ForeColor = ColorTranslator::FromHtml("#333333");
       item = label;
       break;

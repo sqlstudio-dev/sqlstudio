@@ -374,9 +374,53 @@ void FormWrapper::close(mforms::Form *backend) {
 
 //--------------------------------------------------------------------------------------------------
 
+// Password prompt controls are fully assembled before this one-shot styling pass.
+// No handle-created or color-change subscriptions are installed here.
+static void style_password_prompt(Control ^ control, bool dark) {
+  ButtonBase ^ button = dynamic_cast<ButtonBase ^>(control);
+  if (button != nullptr) {
+    if (dark) {
+      button->FlatStyle = FlatStyle::Flat;
+      button->UseVisualStyleBackColor = false;
+      button->BackColor = Color::FromArgb(60, 60, 60);
+      button->ForeColor = Color::FromArgb(224, 224, 224);
+      button->FlatAppearance->BorderColor = Color::FromArgb(90, 90, 90);
+      button->FlatAppearance->MouseOverBackColor = Color::FromArgb(75, 75, 75);
+      button->FlatAppearance->MouseDownBackColor = Color::FromArgb(48, 48, 48);
+      if (dynamic_cast<CheckBox ^>(button) != nullptr) {
+        button->BackColor = Color::FromArgb(30, 30, 30);
+        button->FlatAppearance->CheckedBackColor = Color::FromArgb(60, 60, 60);
+      }
+    }
+    if (dynamic_cast<Button ^>(button) != nullptr) {
+      // PreferredSize includes the actual font so larger DPI text is not clipped.
+      button->Padding = Padding(12, 6, 12, 6);
+      Size preferred = button->GetPreferredSize(Size::Empty);
+      button->MinimumSize = Size(Math::Max(96, preferred.Width), Math::Max(36, preferred.Height));
+    }
+  }
+  for each (Control ^ child in control->Controls)
+    style_password_prompt(child, dark);
+}
+
 void FormWrapper::set_content(mforms::Form *backend, mforms::View *view) {
   Control ^ child = FormWrapper::GetControl(view);
-  FormWrapper::GetControl(backend)->Controls->Add(child);
+  Control ^ form = FormWrapper::GetControl(backend);
+  form->Controls->Add(child);
+
+  // Apply the dialog surface only after its contents have been constructed.
+  // Do not attach color-change/handle callbacks to partially initialized mforms
+  // wrappers or change button rendering styles during handle creation.
+  if (mforms::App::get()->isDarkModeActive() && !SystemInformation::HighContrast) {
+    Color background = Conversions::GetApplicationColor(ApplicationColor::AppColorPanelContentArea, false);
+    Color foreground = Conversions::GetApplicationColor(ApplicationColor::AppColorPanelContentArea, true);
+    form->BackColor = background;
+    form->ForeColor = foreground;
+    child->BackColor = background;
+    child->ForeColor = foreground;
+  }
+  if (child->Name == "PasswordPromptContent")
+    style_password_prompt(child, mforms::App::get()->isDarkModeActive() && !SystemInformation::HighContrast);
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -156,19 +156,19 @@ void LabelWrapper::set_style(mforms::Label *backend, mforms::LabelStyle style) {
   try {
     switch (style) {
       case mforms::NormalStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, FontStyle::Regular, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 9.75f, FontStyle::Regular, GraphicsUnit::Point);
         break;
       case mforms::BoldStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, FontStyle::Bold, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 9.75f, FontStyle::Bold, GraphicsUnit::Point);
         break;
       case mforms::BigStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE + 4, FontStyle::Regular, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (DEFAULT_FONT_SIZE + 4) * 72.0f / 96.0f, FontStyle::Regular, GraphicsUnit::Point);
         break;
       case mforms::BigBoldStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE + 4, FontStyle::Bold, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (DEFAULT_FONT_SIZE + 4) * 72.0f / 96.0f, FontStyle::Bold, GraphicsUnit::Point);
         break;
       case mforms::SmallBoldStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 8, FontStyle::Bold, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (8) * 72.0f / 96.0f, FontStyle::Bold, GraphicsUnit::Point);
         break;
       case mforms::SmallStyle:
         label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 8, FontStyle::Regular, GraphicsUnit::Point);
@@ -177,17 +177,17 @@ void LabelWrapper::set_style(mforms::Label *backend, mforms::LabelStyle style) {
         label->Font = gcnew Font(DEFAULT_SMALL_FONT, 7.5, FontStyle::Regular, GraphicsUnit::Point);
         break;
       case mforms::InfoCaptionStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, label->Font->Size, FontStyle::Regular, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, label->Font->SizeInPoints, FontStyle::Regular, GraphicsUnit::Point);
         break;
       case mforms::BoldInfoCaptionStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, label->Font->Size, FontStyle::Bold, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, label->Font->SizeInPoints, FontStyle::Bold, GraphicsUnit::Point);
         break;
       case mforms::WizardHeadingStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 12.0, FontStyle::Bold, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (12.0) * 72.0f / 96.0f, FontStyle::Bold, GraphicsUnit::Point);
         label->ForeColor = ColorTranslator::FromHtml("#003392");
         break;
       case mforms::SmallHelpTextStyle:
-        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 11, FontStyle::Regular, GraphicsUnit::Pixel);
+        label->Font = gcnew Font(DEFAULT_FONT_FAMILY, (11) * 72.0f / 96.0f, FontStyle::Regular, GraphicsUnit::Point);
         break;
       case mforms::VeryBigStyle:
         label->Font = gcnew Font(DEFAULT_FONT_FAMILY, 13, FontStyle::Regular, GraphicsUnit::Point);

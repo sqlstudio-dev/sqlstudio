@@ -1267,7 +1267,7 @@ void ViewWrapper::Initialize() {
     // ControlTheme leaves custom-painted surfaces to their own renderers.
     ControlTheme::Attach(control);
     control->AutoSize = false;
-    control->Font = gcnew Font(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, FontStyle::Regular, GraphicsUnit::Pixel);
+    control->Font = gcnew Font(DEFAULT_FONT_FAMILY, 9.75f, FontStyle::Regular, GraphicsUnit::Point);
 
     bool hookEvents = is<TabControl>(control) || (Panel::typeid == control->GetType()) || is<TreeViewAdv>(control) ||
                       is<CanvasControl>(control)

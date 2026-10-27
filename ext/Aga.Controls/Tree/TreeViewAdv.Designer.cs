@@ -16,6 +16,11 @@ namespace Aga.Controls.Tree
 			{
 				components.Dispose();
 			}
+      if (disposing)
+      {
+        if (_measureContext.Graphics != null) _measureContext.Graphics.Dispose();
+        if (_measureBitmap != null) _measureBitmap.Dispose();
+      }
 			base.Dispose(disposing);
 		}
 

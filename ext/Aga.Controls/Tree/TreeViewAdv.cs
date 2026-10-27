@@ -29,7 +29,7 @@ namespace Aga.Controls.Tree
 
 		private const int LeftMargin = 7;
 		internal const int ItemDragSensivity = 4;
-		private readonly int _columnHeaderHeight;
+		private int _columnHeaderHeight;
 		private const int DividerWidth = 9;
         private const int DividerCorrectionGap = -2;
 
@@ -45,6 +45,7 @@ namespace Aga.Controls.Tree
 		private ToolTip _toolTip;
 		private System.Windows.Forms.Timer _dragTimer;
 		private DrawContext _measureContext;
+    private Bitmap _measureBitmap;
 		private TreeColumn _hotColumn = null;
 		private IncrementalSearch _search;
 		private List<TreeNodeAdv> _expandingNodes = new List<TreeNodeAdv>();
@@ -206,7 +207,8 @@ namespace Aga.Controls.Tree
 			
 			_measureContext = new DrawContext();
 			_measureContext.Font = Font;
-			_measureContext.Graphics = Graphics.FromImage(new Bitmap(1, 1));
+			_measureBitmap = new Bitmap(1, 1);
+      _measureContext.Graphics = Graphics.FromImage(_measureBitmap);
 
 			Input = new NormalInputState(this);
 			_search = new IncrementalSearch(this);
@@ -493,11 +495,44 @@ namespace Aga.Controls.Tree
 			base.OnLeave(e);
 		}
 
+    private void UpdateFontMetrics()
+    {
+      if (_measureContext.Graphics == null || _rowLayout == null || _controls == null) return;
+      int dpi = Math.Max(96, DeviceDpi);
+      if (_measureBitmap == null || _measureBitmap.HorizontalResolution != dpi)
+      {
+        if (_measureContext.Graphics != null) _measureContext.Graphics.Dispose();
+        if (_measureBitmap != null) _measureBitmap.Dispose();
+        _measureBitmap = new Bitmap(1, 1);
+        _measureBitmap.SetResolution(dpi, dpi);
+        _measureContext.Graphics = Graphics.FromImage(_measureBitmap);
+      }
+      _measureContext.Font = Font;
+      int textHeight = (int)Math.Ceiling(Font.GetHeight(_measureContext.Graphics));
+      int padding = (int)Math.Ceiling(4.0 * dpi / 96.0);
+      _rowHeight = Math.Max(_requestedRowHeight, textHeight + padding);
+      _rowLayout.PreferredRowHeight = _rowHeight;
+      _columnHeaderHeight = Math.Max((int)Math.Ceiling((Application.RenderWithVisualStyles ? 20 : 17) * dpi / 96.0),
+        textHeight + padding);
+      FullUpdate();
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+      base.OnHandleCreated(e);
+      UpdateFontMetrics();
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+      base.OnDpiChangedAfterParent(e);
+      UpdateFontMetrics();
+    }
+
 		protected override void OnFontChanged(EventArgs e)
 		{
 			base.OnFontChanged(e);
-			_measureContext.Font = Font;
-			FullUpdate();
+      UpdateFontMetrics();
 		}
 
 		internal IEnumerable<NodeControlInfo> GetNodeControls(TreeNodeAdv node)

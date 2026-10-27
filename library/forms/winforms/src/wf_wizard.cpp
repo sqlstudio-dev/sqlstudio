@@ -148,7 +148,7 @@ public:
     Controls->Add(title);
     title->AutoSize = false;
     try {
-      title->Font = gcnew Drawing::Font("Tahoma", 12.0, FontStyle::Bold, GraphicsUnit::Pixel);
+      title->Font = gcnew Drawing::Font("Tahoma", (12.0) * 72.0f / 96.0f, FontStyle::Bold, GraphicsUnit::Point);
     } catch (System::ArgumentException ^ e) {
       // Argument exception pops up when the system cannot find the Regular font style (corrupt font).
       logError("WizardWrapper::c_tor setting title font failed. %s\n", e->Message);
@@ -271,7 +271,7 @@ public:
           }
 
           try {
-            label->Font = gcnew Drawing::Font("Tahoma", 11.0, style, GraphicsUnit::Pixel);
+            label->Font = gcnew Drawing::Font("Tahoma", (11.0) * 72.0f / 96.0f, style, GraphicsUnit::Point);
           } catch (System::ArgumentException ^ e) {
             // Argument exception pops up when the system cannot find the Regular font style (corrupt font).
             logError("WizardWrapper::set_step_list setting label font failed. %s\n", e->Message);

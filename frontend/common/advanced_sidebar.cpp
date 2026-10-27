@@ -50,8 +50,8 @@ using namespace mforms;
 
 #ifdef _MSC_VER
 #define SIDEBAR_FONT "Segoe UI"
-#define SIDEBAR_TITLE_FONT_SIZE 11
-#define SIDEBAR_ENTRY_FONT_SIZE 11
+#define SIDEBAR_TITLE_FONT_SIZE 14
+#define SIDEBAR_ENTRY_FONT_SIZE 15
 #else
 #ifdef __APPLE__
 #define SIDEBAR_FONT "Lucida Grande"
@@ -64,7 +64,11 @@ using namespace mforms;
 #endif
 #endif
 
-#define SECTION_ENTRY_HEIGHT 20      // Height of a single section entry.
+#ifdef _MSC_VER
+#define SECTION_ENTRY_HEIGHT 28      // Leave room for the Windows sidebar font.
+#else
+#define SECTION_ENTRY_HEIGHT 20
+#endif
 #define SECTION_ENTRY_SPACING 0      // Vertical distance between two section entries.
 #define SECTION_ENTRY_INDENT 13      // Horizontal distance from the left section border to the entry icon.
 #define SECTION_ENTRY_ICON_SPACING 6 // Horizontal distance between entry icon and text.
@@ -355,7 +359,11 @@ void SidebarSection::create_context_for_layout() {
 #define SECTION_SIDE_SPACING 6   // Horizontal spacing between border and content.
 #define SECTION_BOTTOM_SPACING 7 // Vertical distance from the content to the bottom.
 #define SECTION_HEADER_SPACING 6 // Vertical distance between the heading bottom line and the content top.
-#define SECTION_HEADER_HEIGHT 12 // Height of the section heading.
+#ifdef _MSC_VER
+#define SECTION_HEADER_HEIGHT 18
+#else
+#define SECTION_HEADER_HEIGHT 12
+#endif
 #define SECTION_ICON_SPACING 4   // Horizontal distance between buttons and/or text.
 
 void SidebarSection::layout(cairo_t* cr) {

@@ -55,6 +55,9 @@ namespace MySQL {
       void ComputeLayout();
       void ButtonClick(System::Object ^ sender, EventArgs ^ e);
 
+    protected:
+      virtual void OnHandleCreated(EventArgs ^ e) override;
+
       static mforms::DialogResult ShowInternal(const std::string &title, const std::string &text, PCWSTR mainIcon,
                                                const std::string &buttonOK, const std::string &buttonCancel,
                                                const std::string &buttonOther, const std::string &checkbox,

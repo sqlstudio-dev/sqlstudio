@@ -85,6 +85,7 @@ namespace mforms {
     const int SIDEBAR_ROW_HEIGHT = 50;
     const int SIDEBAR_SPACING = 18; // Vertical space between entries.
 
+    base::Size getLayoutSize(base::Size proposedSize) override;
     SidebarSection(HomeScreen *owner);
     virtual ~SidebarSection();
 

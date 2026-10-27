@@ -145,6 +145,30 @@ namespace MySQL.Controls
 
     #region Event handling
 
+    protected override void OnLayout(LayoutEventArgs e)
+    {
+      // Docked children must leave room for the font actually drawn at this DPI.
+      int textHeight = (int)Math.Ceiling(Font.GetHeight(DeviceDpi));
+      int minimum = textHeight + headerPadding.Vertical + (int)Math.Ceiling(4.0 * DeviceDpi / 96.0);
+      if (Padding.Top < minimum)
+        Padding = new Padding(Padding.Left, minimum, Padding.Right, Padding.Bottom);
+      base.OnLayout(e);
+    }
+
+    protected override void OnFontChanged(EventArgs e)
+    {
+      base.OnFontChanged(e);
+      PerformLayout();
+      Invalidate();
+    }
+
+    protected override void OnDpiChangedAfterParent(EventArgs e)
+    {
+      base.OnDpiChangedAfterParent(e);
+      PerformLayout();
+      Invalidate();
+    }
+
     protected override void OnEnter(EventArgs e)
     {
       base.OnEnter(e);
