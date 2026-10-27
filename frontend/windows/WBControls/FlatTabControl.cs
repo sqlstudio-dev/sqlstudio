@@ -863,17 +863,17 @@ namespace MySQL.Controls
       // account for right and bottom borders which should not be used in drawing.
       r0.Right--;
       r0.Bottom--;
-      Rectangle scrollerRect = new Rectangle(r0.Location, r0.Size);
+	  Rectangle scrollerRect = new Rectangle(r0.Location, r0.Size);
 			using (Brush br = new SolidBrush(SystemColors.Control))
-        g.FillRectangle(br, scrollerRect);
-			
-      // Make a small outer border.
+		g.FillRectangle(br, scrollerRect);
+
+	  // Make a small outer border.
 			using (Pen border = new Pen(SystemColors.ControlDark))
-      {
-        Rectangle rborder = scrollerRect;
-        rborder.Inflate(-1, -1);
-        g.DrawRectangle(border, rborder);
-      }
+	  {
+		Rectangle rborder = scrollerRect;
+		rborder.Inflate(-1, -1);
+		g.DrawRectangle(border, rborder);
+	  }
 
 			int nMiddle = (r0.Width / 2);
 			int nTop = (r0.Height - leftRightImages.ImageSize.Height) / 2 + 1;

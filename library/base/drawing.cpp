@@ -523,10 +523,10 @@ std::string Color::getApplicationColorAsString(ApplicationColor color, bool fore
 
   static const std::pair<std::string, std::string> app_colors_dark[] = {
     std::make_pair("#252526", "#e0e0e0"), std::make_pair("#202020", "#e0e0e0"),
-    std::make_pair("#2d2d30", "#e0e0e0"), std::make_pair("#094771", "#ffffff"),
+    std::make_pair("#2d2d30", "#e0e0e0"), std::make_pair("#3c3c3c", "#ffffff"),
     std::make_pair("#252526", "#e0e0e0"), std::make_pair("#1e1e1e", "#e0e0e0"),
     std::make_pair("#2d2d30", "#b8b8b8"), std::make_pair("#1e1e1e", "#75beff"),
-    std::make_pair("#094771", "#ffffff"), std::make_pair("#37373d", "#e0e0e0"),
+    std::make_pair("#3c3c3c", "#ffffff"), std::make_pair("#37373d", "#e0e0e0"),
     std::make_pair("#202020", "#e0e0e0"),
   };
 

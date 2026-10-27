@@ -143,7 +143,7 @@ namespace MySQL.Controls
         applying = true;
         try
         {
-          bool dark = Conversions.InDarkMode();
+          bool dark = Conversions.InDarkMode() && !SystemInformation.HighContrast;
           if (surface)
           {
             Color background = Conversions.GetApplicationColor(ApplicationColor.AppColorPanelContentArea, false);
@@ -156,7 +156,8 @@ namespace MySQL.Controls
             bool separator = neutralBack && brightness > 0.25f && brightness < 0.8f &&
               (control.Height <= 2 || control.Width <= 2);
             control.BackColor = transparent ? originalBackColor : dark
-              ? (separator ? Color.FromArgb(69, 69, 69) : background)
+              ? (separator ? SystemColors.ControlDark
+                : originalBackColor.IsEmpty || neutralBack ? SystemColors.Control : originalBackColor)
               : (neutralBack && brightness < 0.25f ? SystemColors.Window : originalBackColor);
             bool neutralText = originalForeColor.IsEmpty || originalForeColor.GetSaturation() < 0.1f;
             control.ForeColor = neutralText ? (dark ? foreground : SystemColors.ControlText) : originalForeColor;
@@ -186,7 +187,11 @@ namespace MySQL.Controls
             control.Invalidate();
             return;
           }
-          control.BackColor = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelContentArea, false) : SystemColors.Window;
+          bool input = control is TextBoxBase || control is ComboBox || control is NumericUpDown;
+          control.BackColor = dark
+            ? (input ? SystemColors.Window
+              : SystemColors.Control)
+            : SystemColors.Window;
           control.ForeColor = dark ? Conversions.GetApplicationColor(ApplicationColor.AppColorPanelContentArea, true) : SystemColors.WindowText;
           var combo = control as ComboBox;
           if (combo != null) combo.FlatStyle = dark ? FlatStyle.Flat : comboStyle;
@@ -201,9 +206,9 @@ namespace MySQL.Controls
             }
             else if (dark)
             {
-              tree.GridColor = Color.FromArgb(69, 69, 69);
-              tree.LineColor = Color.FromArgb(89, 89, 89);
-              tree.DragDropMarkColor = Conversions.GetApplicationColor(ApplicationColor.AppColorPanelContentArea, true);
+              tree.GridColor = SystemColors.ControlDark;
+              tree.LineColor = SystemColors.GrayText;
+              tree.DragDropMarkColor = SystemColors.Highlight;
             }
             else
             {
