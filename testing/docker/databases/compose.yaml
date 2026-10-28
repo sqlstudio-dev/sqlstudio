@@ -1,6 +1,30 @@
 name: sqlstudio-databases
 
 services:
+  mysql-8-0:
+    build:
+      context: mysql-8.0
+    image: sqlstudio/mysql:8.0
+    container_name: sqlstudio-mysql-8-0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sqlstudio}
+      MYSQL_USER: ${MYSQL_USER:-sqlstudio}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sqlstudio}
+    ports:
+      - "127.0.0.1:${MYSQL_80_PORT:-33080}:3306"
+    volumes:
+      - mysql_80_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --host=127.0.0.1 --user=root --password=$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - databases
+
   mysql-8-2:
     build:
       context: mysql-8.2
@@ -98,6 +122,7 @@ services:
       - databases
 
 volumes:
+  mysql_80_data:
   mysql_82_data:
   mysql_latest_data:
   mariadb_1011_data:

@@ -259,6 +259,7 @@
     <ClCompile Include="tests\plugins\db.mysql\backend\db_mysql_plugin_specs.cpp" />
     <ClCompile Include="tests\plugins\db.mysql\backend\db_mysql_sql_export_specs.cpp" />
     <ClCompile Include="tests\plugins\db.mysql\backend\model_diff_apply_specs.cpp" />
+    <ClCompile Include="tests\thirdparty\bundle_runtime_specs.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="$(ProjectDir)..\..\backend\wbprivate\studio\metaclasses.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>

@@ -75,6 +75,13 @@ void apply_bounds(CellList % list) {
 
       ViewWrapper::remove_auto_resize(entry->control, AutoResizeMode::ResizeBoth);
       Drawing::Rectangle newBounds = entry->control->Bounds;
+      // Non-filling text controls must still grow when their font or caption
+      // changes. Keeping their construction-time height clips labels at high DPI.
+      Size preferred = entry->control->GetPreferredSize(entry->bounds.Size);
+      if (is<Label>(entry->control) || is<ButtonBase>(entry->control)) {
+        newBounds.Width = Math::Max(newBounds.Width, preferred.Width);
+        newBounds.Height = Math::Max(newBounds.Height, preferred.Height);
+      }
 
       // Resize the control to fill the available space if it is larger than that or
       // the fill flag is set.
@@ -83,6 +90,7 @@ void apply_bounds(CellList % list) {
       if (entry->verticalFill || entry->bounds.Height < newBounds.Height)
         newBounds.Height = entry->bounds.Height;
 
+      newBounds.Size = ViewWrapper::constrain_size(entry->control, newBounds.Size);
       newBounds.X = entry->bounds.Left + (entry->bounds.Width - newBounds.Width) / 2;
       newBounds.Y = entry->bounds.Top + (entry->bounds.Height - newBounds.Height) / 2;
 

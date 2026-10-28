@@ -125,6 +125,7 @@ namespace MySQL {
       static void resize_with_docking(System::Windows::Forms::Control ^ control, System::Drawing::Size &size);
       static void adjust_auto_resize_from_docking(System::Windows::Forms::Control ^ control);
       static bool can_layout(System::Windows::Forms::Control ^ control, String ^ reason);
+      static System::Drawing::Size constrain_size(System::Windows::Forms::Control ^ control, System::Drawing::Size size);
 
       static mforms::View *source_view_from_data(System::Windows::Forms::IDataObject ^ data);
       static mforms::ModifierKey GetModifiers(System::Windows::Forms::Keys keyData);

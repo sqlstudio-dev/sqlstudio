@@ -433,7 +433,10 @@ function Get-ExtractPath([pscustomobject]$Dependency) {
 }
 
 function Get-StampPath([pscustomobject]$Dependency) {
-    return Join-Path $script:StampRoot ((Get-DependencySlug $Dependency) + ".done")
+    # Old ANTLR bundles used /MT[d]. Rebuild them once with the shared CRT;
+    # STL objects allocated in ANTLR are also destroyed by the application.
+    $recipeSuffix = if ($Dependency.Type -eq "antlr4") { ".shared-crt" } else { "" }
+    return Join-Path $script:StampRoot ((Get-DependencySlug $Dependency) + $recipeSuffix + ".done")
 }
 
 function Get-AntlrToolJarFileName([pscustomobject]$Dependency) {
@@ -523,7 +526,10 @@ function Test-DependencyOutputsPresent {
         "antlr4" {
             @(
                 @("include\antlr4-runtime\antlr4-runtime.h"),
-                @("lib\antlr4-runtime.lib", "lib\antlr4-runtime.dll"),
+                @("lib\antlr4-runtime.lib"),
+                @("lib\antlr4-runtime.dll"),
+                @("debug\lib\antlr4-runtime.lib"),
+                @("debug\lib\antlr4-runtime.dll"),
                 @("bin\antlr-4.13.2-complete.jar")
             )
         }
@@ -2075,6 +2081,9 @@ function Build-AntlrRuntime {
     $layout = New-DualBuildLayout "antlr4"
     Ensure-AntlrRuntimeCompatibilityPatch -SourcePath $sourcePath
     $commonArgs = @(
+        # ANTLR defaults to /MT[d], but SqlStudio uses /MD[d]. Objects such
+        # as Vocabulary::getDisplayName's std::string cross this DLL boundary.
+        "-DWITH_STATIC_CRT=OFF",
         "-DBUILD_SHARED_LIBS=ON",
         "-DANTLR4_INSTALL=ON",
         "-DANTLR_BUILD_CPP_TESTS=OFF",

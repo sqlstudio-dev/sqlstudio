@@ -77,15 +77,17 @@ WrapControlLabel::WrapControlLabel() {
 //--------------------------------------------------------------------------------------------------
 
 void WrapControlLabel::Text::set(String ^ value) {
-  __super ::set(value);
+  // Parent layout can run inside the base setter; discard measurements first.
   lastSize = Drawing::Size(-1, -1);
+  __super ::set(value);
 }
 
 //--------------------------------------------------------------------------------------------------
 
 void WrapControlLabel::Font::set(Drawing::Font ^ value) {
-  __super ::set(value);
+  // FontChanged can synchronously trigger the parent layout.
   lastSize = Drawing::Size(-1, -1);
+  __super ::set(value);
 }
 
 //--------------------------------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 param(
   [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
   [string]$OutputDirectory,
-  [ValidateSet("ThemeControlsSmoke", "UiScaleSmoke", "MainFormStartupSmoke")][string]$TestName = "ThemeControlsSmoke"
+  [ValidateSet("ThemeControlsSmoke", "UiScaleSmoke", "MainFormStartupSmoke", "ConnectionDialogSmoke")][string]$TestName = "ThemeControlsSmoke"
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
@@ -10,6 +10,7 @@ $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $outputExe = Join-Path $outputDir "$TestName.exe"
 $references = @('base.wr.dll', 'WBControls.dll', 'MySQLCsUtilities.dll', 'wbpublic.wr.dll', 'Aga.Controls.dll')
 $arguments = @('/nologo', '/platform:x64', '/target:exe', "/out:$outputExe", '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll')
+if ($TestName -eq 'ConnectionDialogSmoke') { $references += 'mforms.wr.dll' }
 if ($TestName -eq 'MainFormStartupSmoke') {
   $references += @('SqlStudio.exe', 'wbprivate.wr.dll', 'mforms.wr.dll')
   # MainForm's pre-init constructor loads the Home icon from the working directory.

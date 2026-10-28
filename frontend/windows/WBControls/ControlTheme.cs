@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Forms;
 using Aga.Controls.Tree;
 using MySQL.SqlStudio;
+using MySQL.Utilities.SysUtils;
 
 namespace MySQL.Controls
 {
@@ -386,6 +387,18 @@ namespace MySQL.Controls
         try
         {
           bool dark = Conversions.InDarkMode() && !SystemInformation.HighContrast;
+          var window = control as Form;
+          if (window != null && window.TopLevel && window.IsHandleCreated)
+          {
+            int enabled = dark ? 1 : 0;
+            try
+            {
+              if (Win32.DwmSetWindowAttribute(window.Handle, Win32.DWMWA_USE_IMMERSIVE_DARK_MODE, ref enabled, sizeof(int)) != 0)
+                Win32.DwmSetWindowAttribute(window.Handle, Win32.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref enabled, sizeof(int));
+            }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+          }
           if (surface)
           {
             Color background = Palette(ApplicationColor.AppColorPanelToolbar);
