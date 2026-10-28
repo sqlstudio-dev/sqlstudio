@@ -133,7 +133,9 @@ sqlstring &sqlstring::operator<<(const std::string &v) {
   if (esc == '!') {
     std::string escaped = escape_backticks(v);
     if ((_format._flags & QuoteOnlyIfNeeded) != 0)
-      append(base::quoteIdentifierIfNeeded(escaped, '`', MySQLVersion::MySQL80)); // XXX: make this configurable.
+      // Without a server version, quote against the newest implemented keyword
+      // set. Extra identifier quoting is also valid on older servers.
+      append(base::quoteIdentifierIfNeeded(escaped, '`', MySQLVersion::MySQL82));
     else
       append(base::quote_identifier(escaped, '`'));
   } else if (esc == '?') {
@@ -168,7 +170,7 @@ sqlstring &sqlstring::operator<<(const char *v) {
       throw std::invalid_argument("Error formatting SQL query: NULL value found for identifier");
     std::string quoted = escape_backticks(v);
     if (quoted == v && (_format._flags & QuoteOnlyIfNeeded))
-      append(quoted);
+      append(base::quoteIdentifierIfNeeded(quoted, '`', MySQLVersion::MySQL82));
     else
       append("`").append(quoted).append("`");
   } else if (esc == '?') {

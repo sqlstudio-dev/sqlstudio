@@ -44,3 +44,24 @@ Run ./testing/windows/RunThemeControlsSmoke.ps1 -OutputDirectory ./bin/x64/Conne
 Validation logs: build/connection-dialog-before.log, build/connection-dialog-after.log, build/connection-theme-regression.log, build/connection-scale-regression.log, and build/connection-startup-regression.log. Existing startup, scaling, and theme smoke suites pass. The running application is not replaced by the isolated validation build.
 
 Final connection-dialog validation: the complete x64 Debug solution build finished with 0 errors and 6 warnings (build/connection-dialog-final-build.log). ConnectionDialogSmoke, ThemeControlsSmoke, UiScaleSmoke, and MainFormStartupSmoke pass against the final binaries. The updated dialog-control dark/light renders were inspected; single-line field stretching was reproduced separately in build/connection-field-height-before.log and is now covered by the passing suite.
+
+## Home welcome first-layout regression
+
+The welcome message is a native Cairo drawing, not an HTML control. Its preferred
+height used to start at 100 pixels and change only during painting. The initial
+layout therefore clipped the description and footer links until a tab switch or
+another layout pass. Layout and painting now share text-baseline measurements;
+preferred height is measured on an offscreen Cairo recording surface before the
+first paint, without changing layout state during painting.
+
+Run `studio.testing.exe --gtest_filter=HomeWelcomeLayout.*:CompactSidebar.*` from the
+repository root so the home icons resolve. The welcome regression checks widths
+1024, 1600 and 2560, unchanged preferred height before/after painting, complete
+footer bounds and link hit testing, and pixel-identical initial and later renders.
+On Windows it exercises both image and native Win32 Cairo surfaces. Before the
+fix, initial height was 100 versus 328 after painting, with all three footer links
+outside the initial viewport.
+
+For a live check, launch the rebuilt application with the welcome message enabled.
+The description and all three links must be visible immediately, with the
+connections section below them, without switching tabs or resizing the window.

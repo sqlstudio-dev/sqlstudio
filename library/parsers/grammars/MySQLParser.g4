@@ -1040,13 +1040,19 @@ queryExpression:
 ;
 
 queryExpressionBody:
-    (
-        queryPrimary
-        | queryExpressionParens UNION_SYMBOL unionOption? (
-            queryPrimary
-            | queryExpressionParens
-        )
-    ) (UNION_SYMBOL unionOption? ( queryPrimary | queryExpressionParens))*
+    queryExpressionTerm (
+        (UNION_SYMBOL | {serverVersion >= 80031}? EXCEPT_SYMBOL) unionOption? queryExpressionTerm
+    )*
+;
+
+// INTERSECT binds more tightly than UNION and EXCEPT.
+queryExpressionTerm:
+    queryExpressionPrimary ({serverVersion >= 80031}? INTERSECT_SYMBOL unionOption? queryExpressionPrimary)*
+;
+
+queryExpressionPrimary:
+    queryPrimary
+    | queryExpressionParens
 ;
 
 queryExpressionParens:
@@ -1516,6 +1522,7 @@ replicationStatement:
         | BEFORE_SYMBOL expr
     )
     | changeMaster
+    | {serverVersion >= 80023}? changeReplicationSource
     | RESET_SYMBOL resetOption (COMMA_SYMBOL resetOption)*
     | {serverVersion > 80000}? RESET_SYMBOL PERSIST_SYMBOL (ifExists identifier)?
     | slave
@@ -1528,6 +1535,8 @@ resetOption:
     option = MASTER_SYMBOL masterResetOptions?
     | {serverVersion < 80000}? option = QUERY_SYMBOL CACHE_SYMBOL
     | option = SLAVE_SYMBOL ALL_SYMBOL? channel?
+    | {serverVersion >= 80022}? option = REPLICA_SYMBOL ALL_SYMBOL? channel?
+    | {serverVersion >= 80200}? option = BINARY_SYMBOL LOGS_SYMBOL AND_SYMBOL GTIDS_SYMBOL masterResetOptions?
 ;
 
 masterResetOptions:
@@ -1543,6 +1552,52 @@ replicationLoad:
 
 changeMaster:
     CHANGE_SYMBOL MASTER_SYMBOL TO_SYMBOL changeMasterOptions channel?
+;
+
+changeReplicationSource:
+    CHANGE_SYMBOL REPLICATION_SYMBOL SOURCE_SYMBOL TO_SYMBOL sourceOption (COMMA_SYMBOL sourceOption)* channel?
+;
+
+sourceOption:
+    SOURCE_HOST_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | NETWORK_NAMESPACE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_BIND_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_USER_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_PASSWORD_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_PORT_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_CONNECT_RETRY_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_RETRY_COUNT_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_DELAY_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_SSL_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_SSL_CA_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_SSL_CAPATH_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_TLS_VERSION_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_SSL_CERT_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_TLS_CIPHERSUITES_SYMBOL EQUAL_OPERATOR masterTlsCiphersuitesDef
+    | SOURCE_SSL_CIPHER_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_SSL_KEY_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_SSL_VERIFY_SERVER_CERT_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_SSL_CRL_SYMBOL EQUAL_OPERATOR textLiteral
+    | SOURCE_SSL_CRLPATH_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_PUBLIC_KEY_PATH_SYMBOL EQUAL_OPERATOR textStringNoLinebreak // Conditionally set in the lexer.
+    | GET_SOURCE_PUBLIC_KEY_SYMBOL EQUAL_OPERATOR ulong_number           // Conditionally set in the lexer.
+    | SOURCE_HEARTBEAT_PERIOD_SYMBOL EQUAL_OPERATOR ulong_number
+    | IGNORE_SERVER_IDS_SYMBOL EQUAL_OPERATOR serverIdList
+    | SOURCE_COMPRESSION_ALGORITHMS_SYMBOL EQUAL_OPERATOR textStringLiteral
+    | SOURCE_ZSTD_COMPRESSION_LEVEL_SYMBOL EQUAL_OPERATOR ulong_number
+    | SOURCE_AUTO_POSITION_SYMBOL EQUAL_OPERATOR ulong_number
+    | PRIVILEGE_CHECKS_USER_SYMBOL EQUAL_OPERATOR privilegeCheckDef
+    | REQUIRE_ROW_FORMAT_SYMBOL EQUAL_OPERATOR ulong_number
+    | REQUIRE_TABLE_PRIMARY_KEY_CHECK_SYMBOL EQUAL_OPERATOR tablePrimaryKeyCheckDef
+    | sourceFileDef
+    | SOURCE_CONNECTION_AUTO_FAILOVER_SYMBOL EQUAL_OPERATOR ulong_number
+;
+
+sourceFileDef:
+    SOURCE_LOG_FILE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | SOURCE_LOG_POS_SYMBOL EQUAL_OPERATOR ulonglong_number
+    | RELAY_LOG_FILE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+    | RELAY_LOG_POS_SYMBOL EQUAL_OPERATOR ulong_number
 ;
 
 changeMasterOptions:
@@ -1649,6 +1704,23 @@ filterDbPairList:
 slave:
     START_SYMBOL SLAVE_SYMBOL slaveThreadOptions? (UNTIL_SYMBOL slaveUntilOptions)? slaveConnectionOptions channel?
     | STOP_SYMBOL SLAVE_SYMBOL slaveThreadOptions? channel?
+    | {serverVersion >= 80022}? START_SYMBOL REPLICA_SYMBOL slaveThreadOptions?
+        (UNTIL_SYMBOL replicaUntilOptions)? slaveConnectionOptions channel?
+    | {serverVersion >= 80022}? STOP_SYMBOL REPLICA_SYMBOL slaveThreadOptions? channel?
+;
+
+replicaUntilOptions:
+    (masterFileDef
+        | SOURCE_LOG_FILE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+        | SOURCE_LOG_POS_SYMBOL EQUAL_OPERATOR ulonglong_number
+        | RELAY_LOG_FILE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+        | RELAY_LOG_POS_SYMBOL EQUAL_OPERATOR ulong_number
+        | (SQL_BEFORE_GTIDS_SYMBOL | SQL_AFTER_GTIDS_SYMBOL) EQUAL_OPERATOR textString
+        | SQL_AFTER_MTS_GAPS_SYMBOL)
+    (COMMA_SYMBOL (SOURCE_LOG_FILE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+        | SOURCE_LOG_POS_SYMBOL EQUAL_OPERATOR ulonglong_number
+        | RELAY_LOG_FILE_SYMBOL EQUAL_OPERATOR textStringNoLinebreak
+        | RELAY_LOG_POS_SYMBOL EQUAL_OPERATOR ulong_number))*
 ;
 
 slaveUntilOptions:
@@ -2101,6 +2173,8 @@ showStatement:
         | showCommandType? value = COLUMNS_SYMBOL (FROM_SYMBOL | IN_SYMBOL) tableRef inDb? likeOrWhere?
         | (BINARY_SYMBOL | MASTER_SYMBOL) value = LOGS_SYMBOL
         | value = SLAVE_SYMBOL (HOSTS_SYMBOL | STATUS_SYMBOL nonBlocking channel?)
+        | {serverVersion >= 80022}? value = REPLICA_SYMBOL STATUS_SYMBOL channel?
+        | {serverVersion >= 80022}? value = REPLICAS_SYMBOL
         | value = (BINLOG_SYMBOL | RELAYLOG_SYMBOL) EVENTS_SYMBOL (
             IN_SYMBOL textString
         )? (FROM_SYMBOL ulonglong_number)? limitClause? channel?
@@ -2129,6 +2203,7 @@ showStatement:
         | value = GRANTS_SYMBOL (FOR_SYMBOL user)?
         | value = GRANTS_SYMBOL FOR_SYMBOL user USING_SYMBOL userList
         | value = MASTER_SYMBOL STATUS_SYMBOL
+        | {serverVersion >= 80200}? BINARY_SYMBOL value = LOG_SYMBOL STATUS_SYMBOL
         | value = CREATE_SYMBOL (
             object = DATABASE_SYMBOL ifNotExists? schemaRef
             | object = EVENT_SYMBOL eventRef
@@ -2577,6 +2652,9 @@ fulltextOptions:
 runtimeFunctionCall:
     // Function names that are keywords.
     name = CHAR_SYMBOL OPEN_PAR_SYMBOL exprList (USING_SYMBOL charsetName)? CLOSE_PAR_SYMBOL
+    | {serverVersion >= 80021}? name = JSON_VALUE_SYMBOL OPEN_PAR_SYMBOL expr COMMA_SYMBOL textStringLiteral
+        (RETURNING_SYMBOL jsonValueReturnType)?
+        (jsonValueResponse ON_SYMBOL EMPTY_SYMBOL)? (jsonValueResponse ON_SYMBOL ERROR_SYMBOL)? CLOSE_PAR_SYMBOL
     | name = CURRENT_USER_SYMBOL parentheses?
     | name = DATE_SYMBOL exprWithParentheses
     | name = DAY_SYMBOL exprWithParentheses
@@ -2742,6 +2820,26 @@ thenExpression:
 
 elseExpression:
     ELSE_SYMBOL expr
+;
+
+jsonValueReturnType:
+    FLOAT_SYMBOL standardFloatOptions?
+    | DOUBLE_SYMBOL PRECISION_SYMBOL?
+    | DECIMAL_SYMBOL floatOptions?
+    | SIGNED_SYMBOL INT_SYMBOL?
+    | UNSIGNED_SYMBOL INT_SYMBOL?
+    | DATE_SYMBOL
+    | TIME_SYMBOL typeDatetimePrecision?
+    | DATETIME_SYMBOL typeDatetimePrecision?
+    | {serverVersion >= 80022}? YEAR_SYMBOL
+    | CHAR_SYMBOL fieldLength? charsetWithOptBinary?
+    | JSON_SYMBOL
+;
+
+jsonValueResponse:
+    NULL_SYMBOL
+    | ERROR_SYMBOL
+    | DEFAULT_SYMBOL signedLiteral
 ;
 
 castType:
@@ -4540,6 +4638,42 @@ identifierKeywordsUnambiguous:
         | STREAM_SYMBOL
         | TIMESTAMP_SYMBOL
         | TIME_SYMBOL
+    )
+    | (
+        JSON_VALUE_SYMBOL
+        | LOG_SYMBOL
+        | GTIDS_SYMBOL
+        | RETURNING_SYMBOL
+        | REPLICA_SYMBOL
+        | REPLICAS_SYMBOL
+        | GET_SOURCE_PUBLIC_KEY_SYMBOL
+        | SOURCE_AUTO_POSITION_SYMBOL
+        | SOURCE_BIND_SYMBOL
+        | SOURCE_COMPRESSION_ALGORITHMS_SYMBOL
+        | SOURCE_CONNECTION_AUTO_FAILOVER_SYMBOL
+        | SOURCE_CONNECT_RETRY_SYMBOL
+        | SOURCE_DELAY_SYMBOL
+        | SOURCE_HEARTBEAT_PERIOD_SYMBOL
+        | SOURCE_HOST_SYMBOL
+        | SOURCE_LOG_FILE_SYMBOL
+        | SOURCE_LOG_POS_SYMBOL
+        | SOURCE_PASSWORD_SYMBOL
+        | SOURCE_PORT_SYMBOL
+        | SOURCE_PUBLIC_KEY_PATH_SYMBOL
+        | SOURCE_RETRY_COUNT_SYMBOL
+        | SOURCE_SSL_CAPATH_SYMBOL
+        | SOURCE_SSL_CA_SYMBOL
+        | SOURCE_SSL_CERT_SYMBOL
+        | SOURCE_SSL_CIPHER_SYMBOL
+        | SOURCE_SSL_CRLPATH_SYMBOL
+        | SOURCE_SSL_CRL_SYMBOL
+        | SOURCE_SSL_KEY_SYMBOL
+        | SOURCE_SSL_SYMBOL
+        | SOURCE_SSL_VERIFY_SERVER_CERT_SYMBOL
+        | SOURCE_TLS_CIPHERSUITES_SYMBOL
+        | SOURCE_TLS_VERSION_SYMBOL
+        | SOURCE_USER_SYMBOL
+        | SOURCE_ZSTD_COMPRESSION_LEVEL_SYMBOL
     )
 ;
 

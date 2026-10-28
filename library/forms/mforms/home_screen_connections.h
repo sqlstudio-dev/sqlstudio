@@ -59,7 +59,13 @@ namespace mforms {
     void updateIcons();
 
   private:
-    int _totalHeight = 100; // Arbitrary initial value, til our computation is done.
+    struct TextLayout {
+      int headingBaseline = 100;
+      std::vector<int> lineBaselines;
+      int linksBaseline;
+    };
+
+    TextLayout layoutText(cairo_t *cr) const;
 
     HomeScreen *_owner;
     HomeAccessibleButton _closeHomeScreenButton;

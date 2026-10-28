@@ -653,12 +653,9 @@ void MySQLEditor::setServerVersion(GrtVersionRef version) {
         }
         break;
 
-      case 8:
-        switch (version->minorNumber()) {
-          case 0:
-            lang = mforms::LanguageMySQL80;
-            break;
-        }
+      default:
+        if (bec::is_supported_mysql_version_at_least(version, 8, 0))
+          lang = mforms::LanguageMySQL80;
         break;
     }
   }

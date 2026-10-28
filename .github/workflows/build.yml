@@ -264,7 +264,7 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: "26.0"
       # The last python.org installer of Python 3.12, which the Xcode project
-      # embeds (build/fixup_python_paths.sh).
+      # embeds (build/mac/fixup_python_paths.sh).
       PYTHON_VERSION: 3.12.10
       PYTHON_PKG_SHA256: 8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4
       HOMEBREW_NO_AUTO_UPDATE: 1
