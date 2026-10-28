@@ -67,21 +67,18 @@ bool MySQLBaseLexer::isIdentifier(size_t type) const {
     return true;
 
   std::string symbol = getVocabulary().getSymbolicName(type).data();
-  const std::string suffix = "_SYMBOL";
-  if (symbol.size() <= suffix.size() || symbol.compare(symbol.size() - suffix.size(), suffix.size(), suffix) != 0)
-    return false;
-  symbol.resize(symbol.size() - suffix.size());
-  auto version = MySQLSymbolInfo::numberToVersion(serverVersion);
-  return MySQLSymbolInfo::isKeyword(symbol, version) && !MySQLSymbolInfo::isReservedKeyword(symbol, version);
+  if (!symbol.empty() && !MySQLSymbolInfo::isReservedKeyword(symbol, MySQLSymbolInfo::numberToVersion(serverVersion)))
+    return true;
+
+  return false;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
 
 size_t MySQLBaseLexer::keywordFromText(std::string const& name) {
-  // Keyword tables and ANTLR symbolic names use uppercase ASCII.
+  // (My)SQL only uses ASCII chars for keywords so we can do a simple downcase here for comparison.
   std::string transformed;
-  std::transform(name.begin(), name.end(), std::back_inserter(transformed),
-                 [](unsigned char c) { return std::toupper(c); });
+  std::transform(name.begin(), name.end(), std::back_inserter(transformed), ::tolower);
 
   if (!MySQLSymbolInfo::isKeyword(transformed, MySQLSymbolInfo::numberToVersion(serverVersion)))
     return INVALID_INDEX - 1; // INVALID_INDEX alone can be interpreted as EOF.
@@ -95,7 +92,7 @@ size_t MySQLBaseLexer::keywordFromText(std::string const& name) {
   }
 
   // Here we know for sure we got a keyword.
-  auto symbol = _symbols.find(transformed + "_SYMBOL");
+  auto symbol = _symbols.find(transformed);
   if (symbol == _symbols.end())
     return INVALID_INDEX - 1;
   return symbol->second;
@@ -543,10 +540,8 @@ MySQLQueryType MySQLBaseLexer::determineQueryType() {
 
       switch (token->getType()) {
         case MySQLLexer::SERVER_SYMBOL:
-        case MySQLLexer::BINARY_SYMBOL:
           return QtResetMaster;
         case MySQLLexer::SLAVE_SYMBOL:
-        case MySQLLexer::REPLICA_SYMBOL:
           return QtResetSlave;
         default:
           return QtReset;
@@ -652,8 +647,7 @@ MySQLQueryType MySQLBaseLexer::determineQueryType() {
           return QtShowAuthors;
 
         case MySQLLexer::BINARY_SYMBOL:
-          token = nextDefaultChannelToken();
-          return token->getType() == MySQLLexer::LOG_SYMBOL ? QtShowMasterStatus : QtShowBinaryLogs;
+          return QtShowBinaryLogs;
 
         case MySQLLexer::BINLOG_SYMBOL:
           return QtShowBinlogEvents;
@@ -796,11 +790,7 @@ MySQLQueryType MySQLBaseLexer::determineQueryType() {
         case MySQLLexer::PROFILES_SYMBOL:
           return QtShowProfiles;
 
-        case MySQLLexer::REPLICAS_SYMBOL:
-          return QtShowSlaveHosts;
-
-        case MySQLLexer::SLAVE_SYMBOL:
-        case MySQLLexer::REPLICA_SYMBOL: {
+        case MySQLLexer::SLAVE_SYMBOL: {
           token = nextDefaultChannelToken();
           if (token->getType() == Token::EOF)
             return QtAmbiguous;

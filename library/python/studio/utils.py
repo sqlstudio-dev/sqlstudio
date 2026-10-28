@@ -215,11 +215,9 @@ class Version:
         return self.compare(other) <= 0
 
     def is_supported_mysql_version(self):
-        # Keep in sync with base::MySQLSymbolInfo::isSupportedServerVersion.
-        return ((self.majorNumber == 5 and self.minorNumber in (6, 7)) or
-                (self.majorNumber == 8 and 0 <= self.minorNumber <= 4) or
-                (self.majorNumber == 9 and 0 <= self.minorNumber <= 7) or
-                (self.majorNumber == 26 and self.minorNumber in (7, 10)))
+        if (self.majorNumber == 5 and self.minorNumber in (1, 5, 6, 7)) or (self.majorNumber == 8 and self.minorNumber == 0):
+            return True
+        return False
 
     def is_supported_mysql_version_at_least(self, major, minor = None, release=-1):
         assert type(major) == int or isinstance(major, Version)
@@ -232,10 +230,10 @@ class Version:
         # if the version required is older (<) than 5.6, then any server that matches is fine
         # if the version required is newer (>=) than 5.6, then we can only guarantee that known servers versions have some specific feature
         
-        required = Version(major, minor, release)
-        if major < 5 or (major == 5 and minor < 6):
-            return self >= required
-        return self.is_supported_mysql_version() and self >= required
+        if (major == 5 and minor >= 6) or (major == 8 and minor == 0):
+            return self.is_supported_mysql_version() and self >= Version(major, minor, release)
+        else:
+            return self > Version(major, minor, release)
 
 import threading
 import queue

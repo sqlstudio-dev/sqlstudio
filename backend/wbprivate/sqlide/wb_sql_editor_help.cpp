@@ -560,9 +560,6 @@ static std::unordered_map<size_t, std::string> supportedOperatorsAndKeywords = {
   { MySQLLexer::OR_SYMBOL, "OR" },
   { MySQLLexer::SPATIAL_SYMBOL, "SPATIAL" },
   { MySQLLexer::UNION_SYMBOL, "UNION" },
-  { MySQLLexer::INTERSECT_SYMBOL, "INTERSECT" },
-  { MySQLLexer::EXCEPT_SYMBOL, "EXCEPT" },
-  { MySQLLexer::JSON_VALUE_SYMBOL, "JSON_VALUE" },
   { MySQLLexer::XOR_SYMBOL, "XOR" },
 };
 
@@ -586,9 +583,6 @@ static std::unordered_map<size_t, std::string> tokenToTopic = {
   { MySQLLexer::KEYS_SYMBOL, "SHOW INDEX" },
   { MySQLLexer::LOGS_SYMBOL, "SHOW BINARY LOGS" },
   { MySQLLexer::MASTER_SYMBOL, "SHOW MASTER STATUS" },
-  { MySQLLexer::LOG_SYMBOL, "SHOW BINARY LOG STATUS" },
-  { MySQLLexer::REPLICA_SYMBOL, "SHOW REPLICA STATUS" },
-  { MySQLLexer::REPLICAS_SYMBOL, "SHOW REPLICAS" },
   { MySQLLexer::OPEN_SYMBOL, "SHOW OPEN TABLES" },
   { MySQLLexer::PLUGIN_SYMBOL, "SHOW PLUGIN" },
   { MySQLLexer::PLUGINS_SYMBOL, "SHOW PLUGINS" },
@@ -676,8 +670,6 @@ static std::unordered_map<size_t, std::string> contextToTopic = {
   { MySQLParser::RuleAlterUser, "ALTER USER" },
   { MySQLParser::RuleCaseStatement, "CASE STATEMENT" },
   { MySQLParser::RuleChangeMaster, "CHANGE MASTER TO" },
-  { MySQLParser::RuleChangeReplicationSource, "CHANGE REPLICATION SOURCE TO" },
-  { MySQLParser::RuleSourceOption, "CHANGE REPLICATION SOURCE TO" },
 
   { MySQLParser::RuleDropDatabase, "DROP DATABASE" },
   { MySQLParser::RuleDropEvent, "DROP EVENT" },
@@ -957,10 +949,6 @@ std::string DbSqlEditorContextHelp::helpTopicFromPosition(HelpContext *helpConte
           return "RESET MASTER";
         if (isToken(optionContext->option, MySQLLexer::SLAVE_SYMBOL))
           return "RESET SLAVE";
-        if (isToken(optionContext->option, MySQLLexer::REPLICA_SYMBOL))
-          return "RESET REPLICA";
-        if (isToken(optionContext->option, MySQLLexer::BINARY_SYMBOL))
-          return "RESET BINARY LOGS AND GTIDS";
         return "RESET";
       }
 
@@ -1042,8 +1030,8 @@ std::string DbSqlEditorContextHelp::helpTopicFromPosition(HelpContext *helpConte
       }
 
       case MySQLParser::RuleSlave:
-        if (context->children.size() >= 2)
-          return base::toupper(context->children[0]->getText() + " " + context->children[1]->getText());
+        if (!context->children.empty())
+          return base::toupper(context->children[0]->getText()) + " SLAVE";
         break;
 
       case MySQLParser::RuleDataType: {

@@ -345,15 +345,3 @@ set_target_properties(wbtests-bin PROPERTIES
 # ── CTest integration ──────────────────────────────────────────────────────
 enable_testing()
 add_test(NAME SqlStudioTests COMMAND wbtests-bin --gtest_color=yes)
-
-# Focused compatibility checks, runnable without the GUI test fixture.
-add_executable(mysql-compatibility-tests
-  test-suite/core/wb_references.cpp
-  test-suite/tests/library/parsers/mysql_version_compatibility_specs.cpp)
-target_include_directories(mysql-compatibility-tests PRIVATE
-  $<TARGET_PROPERTY:wbtests-bin,INCLUDE_DIRECTORIES>
-  ${GTEST_INCLUDE_DIRS} ${MySQLCppConn_INCLUDE_DIRS})
-target_link_libraries(mysql-compatibility-tests PRIVATE
-  ${GTEST_LIBRARIES} wbpublic parsers wbbase grt
-  ${MySQLCppConn_LIBRARIES} ${ANTLR4_LIBRARIES} ${GLIB_LIBRARIES})
-add_test(NAME MySQLCompatibility COMMAND mysql-compatibility-tests)

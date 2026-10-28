@@ -319,10 +319,8 @@ class WbAdminServerStatus(mforms.Box):
 
         repl_error = None
         res = None
-        modern_replication = (self.ctrl_be.target_version and
-                              self.ctrl_be.target_version.is_supported_mysql_version_at_least(8, 0, 22))
         try:
-            res = self.ctrl_be.exec_query("SHOW REPLICA STATUS" if modern_replication else "SHOW SLAVE STATUS")
+            res = self.ctrl_be.exec_query("SHOW SLAVE STATUS")
         except QueryError as e:
             if e.error == 1227:
                 repl_error = "Insufficient privileges to view replica status"
@@ -330,8 +328,8 @@ class WbAdminServerStatus(mforms.Box):
                 repl_error = "Error querying status: %s" % str(e)
         repl = {}
         if res and res.nextRow():
-            repl["Slave_IO_State"] = res.stringByName("Replica_IO_State" if modern_replication else "Slave_IO_State")
-            repl["Master_Host"] = res.stringByName("Source_Host" if modern_replication else "Master_Host")
+            for field in ["Slave_IO_State", "Master_Host"]:
+                repl[field] = res.stringByName(field)
 
         disk_space = "unable to retrieve"
         if self.ctrl_be.server_control and info.get("datadir"):

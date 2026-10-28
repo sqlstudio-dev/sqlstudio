@@ -25,7 +25,6 @@
 
 #include "db_helpers.h"
 #include "base/string_utilities.h"
-#include "base/symbol-info.h"
 #include "grtpp_util.h"
 #include "base/log.h"
 
@@ -140,7 +139,22 @@ MySQLVersion bec::versionToEnum(const GrtVersionRef &version) {
   if (!version.is_valid() || version->majorNumber() == -1)
     return MySQLVersion::Unknown;
 
-  return MySQLSymbolInfo::numberToVersion(version_to_int(version));
+  if (version->majorNumber() >= 8)
+    return MySQLVersion::MySQL80;
+
+  if (version->majorNumber() != 5)
+    return MySQLVersion::Unknown;
+
+  switch (version->minorNumber()) {
+    case 6:
+      return MySQLVersion::MySQL56;
+
+    case 7:
+      return MySQLVersion::MySQL57;
+
+    default:
+      return MySQLVersion::Unknown;
+  }
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -254,7 +268,8 @@ bool bec::version_greater(GrtVersionRef a, GrtVersionRef b) {
 /** Checks if the given server version numbers is in the set of supported MySQL servers
  */
 bool bec::is_supported_mysql_version(int mysql_major, int mysql_minor, int mysql_release) {
-  return base::MySQLSymbolInfo::isSupportedServerVersion(mysql_major, mysql_minor);
+  return ((mysql_major == 5 && (mysql_minor == 6 || mysql_minor == 7)) ||
+          (mysql_major == 8 && mysql_minor == 0));
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -287,7 +302,7 @@ bool bec::is_supported_mysql_version_at_least(int mysql_major, int mysql_minor, 
   // value possible
   unsigned int available = mysql_major * 100000 + mysql_minor * 1000 + (mysql_release < 0 ? 999 : mysql_release);
 
-  if (major < 5 || (major == 5 && minor < 6)) {
+  if (major < 5 || (major == 5 && minor < 6) || (major == 8 && minor == 0)) {
     return (required <= available);
   } else if (is_supported_mysql_version(mysql_major, mysql_minor, mysql_release)) {
     return (required <= available);
