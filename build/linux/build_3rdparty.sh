@@ -536,6 +536,60 @@ run_build_override() {
     "$fn" "$@"
 }
 
+# ── openssl ───────────────────────────────────────────────────────────────
+# MySQL 8.0 builds only against OpenSSL 1.1 / 3. On distros that ship
+# OpenSSL 4 (Ubuntu 26.10 and later) OpenSSL 3 is built into its own prefix,
+# so its headers and libssl.so never shadow the system OpenSSL the
+# application and the other libraries link against. Only the runtime
+# libraries are copied into lib/ to be shipped with the package.
+OPENSSL3_PREFIX="${BUNDLE_DIR}/openssl3"
+
+system_openssl_major() {
+    sed -n 's/^#[[:space:]]*define[[:space:]]\{1,\}OPENSSL_VERSION_MAJOR[[:space:]]\{1,\}\([0-9]\{1,\}\).*/\1/p' \
+        /usr/include/openssl/opensslv.h 2>/dev/null | head -n 1
+}
+
+# WITH_SSL value for mysql-server and mysql-connector-cpp.
+mysql_with_ssl() {
+    if [[ -d "${OPENSSL3_PREFIX}/lib" ]]; then
+        echo "${OPENSSL3_PREFIX}"
+    else
+        echo "system"
+    fi
+}
+
+build_override_openssl() {
+    local source_dir="$1" build_dir="$2"
+    local major; major="$(system_openssl_major)"
+
+    if [[ -z "$major" || "$major" -lt 4 ]]; then
+        info "System OpenSSL ${major:-?} is supported by MySQL — skipping bundled OpenSSL"
+        return 0
+    fi
+
+    info "Build system: ${C_GREEN}Configure${C_RESET} ${C_YELLOW}(OpenSSL 3 — system has OpenSSL ${major})${C_RESET}"
+    mkdir -p "$build_dir"
+    pushd "$build_dir" > /dev/null
+
+    run_cmd "configure (openssl)" \
+        "${source_dir}/Configure" \
+        --prefix="${OPENSSL3_PREFIX}" \
+        --openssldir="${OPENSSL3_PREFIX}/ssl" \
+        --libdir=lib \
+        shared no-tests no-docs
+
+    run_cmd "make (openssl)" \
+        make -j"${JOBS}"
+
+    run_cmd "make install (openssl)" \
+        make install_sw
+
+    popd > /dev/null
+
+    cp -a "${OPENSSL3_PREFIX}/lib/libssl.so.3" "${OPENSSL3_PREFIX}/lib/libcrypto.so.3" "${BUNDLE_LIB}/"
+    ok "OpenSSL 3 runtime copied to ${C_DIM}${BUNDLE_LIB}/${C_RESET}"
+}
+
 # ── mysql-server ──────────────────────────────────────────────────────────
 # Build only the client library, CLI tools, and authentication plugins.
 # Skips the full server, router, unit tests, man pages, etc.
@@ -569,7 +623,7 @@ build_override_mysql_server() {
         -DWITH_INNODB_MEMCACHED=OFF \
         -DDOWNLOAD_BOOST=ON \
         -DWITH_BOOST="${mysql_boost_dir}" \
-        -DWITH_SSL=system \
+        -DWITH_SSL="$(mysql_with_ssl)" \
         -DWITH_ZLIB=bundled \
         -DWITH_LZ4=bundled \
         -DWITH_ZSTD=bundled \
@@ -627,7 +681,7 @@ build_override_mysql_connector_cpp() {
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DMYSQL_DIR="${BUNDLE_DIR}" \
         -DWITH_JDBC=ON \
-        -DWITH_SSL=system
+        -DWITH_SSL="$(mysql_with_ssl)"
 
     run_cmd "cmake build (connector-cpp)" \
         cmake --build "$build_dir" -- -j"${JOBS}"

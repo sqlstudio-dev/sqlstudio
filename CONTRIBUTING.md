@@ -52,17 +52,19 @@ configured, and avoid unrelated repository-wide formatting changes.
 
 Every pull request to `develop` or `master`, and every push to them, runs the
 **Build** workflow (`.github/workflows/build.yml`). For each supported Linux
-distribution (Ubuntu 22.04 and 24.04, Debian 12 and 13) it:
+distribution (Ubuntu 22.04, 24.04, 26.04 and 26.10, Debian 12 and 13) it:
 
 1. builds SqlStudio in a clean container of that distribution, because each one
    ships different library versions (libpython, GTK, ...),
 2. packages the result as a `.deb` with `build/linux/make_deb.sh`,
 3. installs the package in another clean container and checks that every
-   binary and library resolves its shared libraries and that the bundled
-   pyodbc module (used by the migration plugins) imports,
+   binary and library resolves its shared libraries, that the bundled
+   pyodbc module (used by the migration plugins) imports and that the bundled
+   MySQL client connects to a MySQL server over TLS,
 4. checks the package with that distribution's `lintian` (errors fail),
 5. starts the application on a virtual display (`build/linux/smoke_test.sh`)
-   and fails if it crashes, shows no main window, or logs a Python traceback.
+   and fails if it crashes, shows no main window, logs a Python traceback, or
+   reports the distribution as unsupported.
 
 On macOS (Apple Silicon, macOS 26 and later) the workflow builds
 `SqlStudio.app` with Xcode, copies every library it loads into it

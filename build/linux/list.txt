@@ -11,7 +11,12 @@
 # Adjust versions and URLs to match the exact releases your build requires.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# ── MySQL Server (built first — provides libmysqlclient, mysql, mysqldump) ───
+# ── OpenSSL 3 (only where the system has OpenSSL 4, which MySQL 8.0 does not
+#    support, e.g. Ubuntu 26.10; skipped elsewhere — must precede mysql-server) ─
+
+openssl|3.5.9|https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz
+
+# ── MySQL Server (provides libmysqlclient, mysql, mysqldump) ─────────────────
 
 mysql-server|8.0.42|https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.42.tar.gz
 
