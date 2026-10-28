@@ -280,8 +280,8 @@ if (IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/internal)
     install(FILES build/sql-studio-commercial.mime DESTINATION ${WB_INSTALL_SHARED_DIR}/mime-info RENAME sql-studio.mime)
 else()
     install(FILES README.md License.txt DESTINATION ${WB_INSTALL_DOC_DIR}-community)
-    install(FILES build/sql-studio-community.sharedmimeinfo DESTINATION ${WB_INSTALL_SHARED_DIR}/mime/packages RENAME sql-studio.xml)
-    install(FILES build/sql-studio-community.mime DESTINATION ${WB_INSTALL_SHARED_DIR}/mime-info RENAME sql-studio.mime)
+    install(FILES build/linux/sql-studio-community.sharedmimeinfo DESTINATION ${WB_INSTALL_SHARED_DIR}/mime/packages RENAME sql-studio.xml)
+    install(FILES build/linux/sql-studio-community.mime DESTINATION ${WB_INSTALL_SHARED_DIR}/mime-info RENAME sql-studio.mime)
 endif()
 
 
