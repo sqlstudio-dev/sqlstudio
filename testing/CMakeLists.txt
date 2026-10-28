@@ -113,6 +113,7 @@ set(TEST_LIBRARY_CDBC_SPECS
 # library/forms
 set(TEST_LIBRARY_FORMS_SPECS
   test-suite/tests/library/forms/code_editor_specs.cpp
+  test-suite/tests/library/forms/home_welcome_specs.cpp
   test-suite/tests/library/forms/utilities_specs.cpp
 )
 
