@@ -19,6 +19,7 @@ namespace MySQL.Controls
     public static void Attach(Control control)
     {
       if (control == null || control.IsDisposed) return;
+      UiScale.Attach(control);
       bindings.GetValue(control, item => new Binding(item));
       foreach (Control child in control.Controls)
         Attach(child);
@@ -225,7 +226,8 @@ namespace MySQL.Controls
 
       private void PaintDisabledText(object sender, PaintEventArgs e)
       {
-        if (control.Enabled || !Conversions.InDarkMode() || SystemInformation.HighContrast) return;
+        if (!Conversions.InDarkMode() || SystemInformation.HighContrast) return;
+        if (control.Enabled && !(control is CheckBox) && !(control is RadioButton)) return;
         var button = control as ButtonBase;
         if (button == null || button.Image != null) return;
         // WinForms uses embossed system colors for disabled labels. Paint the
@@ -240,14 +242,14 @@ namespace MySQL.Controls
         if (radio != null) checkAlignment = radio.CheckAlign;
         if (check != null || radio != null)
         {
-          int glyphSize = (int)Math.Ceiling(13 * e.Graphics.DpiX / 96f);
+          int glyphSize = (int)Math.Ceiling(13 * UiScale.LayoutScale * e.Graphics.DpiX / 96f);
           int glyphWidth = glyphSize + (int)Math.Ceiling(4 * e.Graphics.DpiX / 96f);
           bool right = checkAlignment == ContentAlignment.TopRight || checkAlignment == ContentAlignment.MiddleRight || checkAlignment == ContentAlignment.BottomRight;
           if (control.RightToLeft == RightToLeft.Yes) right = !right;
           var glyph = new Rectangle(right ? bounds.Right - glyphSize - 1 : bounds.Left, (bounds.Height - glyphSize) / 2, glyphSize, glyphSize);
           if (checkAlignment == ContentAlignment.TopLeft || checkAlignment == ContentAlignment.TopCenter || checkAlignment == ContentAlignment.TopRight) glyph.Y = bounds.Top;
           if (checkAlignment == ContentAlignment.BottomLeft || checkAlignment == ContentAlignment.BottomCenter || checkAlignment == ContentAlignment.BottomRight) glyph.Y = bounds.Bottom - glyphSize;
-          using (var pen = new Pen(Palette(ApplicationColor.AppColorDisabled, true)))
+          using (var pen = new Pen(Palette(control.Enabled ? ApplicationColor.AppColorControl : ApplicationColor.AppColorDisabled, true)))
           {
             if (radio != null) e.Graphics.DrawEllipse(pen, glyph);
             else e.Graphics.DrawRectangle(pen, glyph);
@@ -256,11 +258,11 @@ namespace MySQL.Controls
           if (marked)
           {
             glyph.Inflate(-3, -3);
-            using (var brush = new SolidBrush(Palette(ApplicationColor.AppColorDisabled, true)))
+            using (var brush = new SolidBrush(Palette(control.Enabled ? ApplicationColor.AppColorControl : ApplicationColor.AppColorDisabled, true)))
             {
               if (radio != null) e.Graphics.FillEllipse(brush, glyph);
               else if (check.CheckState == CheckState.Indeterminate) e.Graphics.FillRectangle(brush, glyph);
-              else using (var pen = new Pen(Palette(ApplicationColor.AppColorDisabled, true), Math.Max(1, e.Graphics.DpiX / 96f)))
+              else using (var pen = new Pen(Palette(control.Enabled ? ApplicationColor.AppColorControl : ApplicationColor.AppColorDisabled, true), Math.Max(1, e.Graphics.DpiX / 96f)))
                 e.Graphics.DrawLines(pen, new[] { new Point(glyph.Left, glyph.Top + glyph.Height / 2), new Point(glyph.Left + glyph.Width / 3, glyph.Bottom), new Point(glyph.Right, glyph.Top) });
             }
           }
@@ -276,7 +278,8 @@ namespace MySQL.Controls
         if (alignment == ContentAlignment.TopRight || alignment == ContentAlignment.MiddleRight || alignment == ContentAlignment.BottomRight) flags |= TextFormatFlags.Right;
         if (alignment == ContentAlignment.MiddleLeft || alignment == ContentAlignment.MiddleCenter || alignment == ContentAlignment.MiddleRight) flags |= TextFormatFlags.VerticalCenter;
         if (alignment == ContentAlignment.BottomLeft || alignment == ContentAlignment.BottomCenter || alignment == ContentAlignment.BottomRight) flags |= TextFormatFlags.Bottom;
-        TextRenderer.DrawText(e.Graphics, control.Text, control.Font, bounds, Palette(ApplicationColor.AppColorDisabled, true), flags);
+        if (control.Focused) ControlPaint.DrawFocusRectangle(e.Graphics, bounds, control.ForeColor, control.BackColor);
+        TextRenderer.DrawText(e.Graphics, control.Text, control.Font, bounds, Palette(control.Enabled ? ApplicationColor.AppColorControl : ApplicationColor.AppColorDisabled, true), flags);
       }
 
       private void StateChanged(object sender, EventArgs e) { if (initialized) UpdateColors(); }

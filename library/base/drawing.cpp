@@ -742,3 +742,8 @@ void Color::save_custom_colors(std::map<std::string, std::string> &colors) {
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+
+// Configured on the UI thread before constructing application views.
+static float application_ui_zoom = 1.0f;
+void base::UiMetrics::set_zoom(float zoom) { application_ui_zoom = std::max(1.0f, std::min(2.0f, zoom)); }
+float base::UiMetrics::control_scale() { return application_ui_zoom; }

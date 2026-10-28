@@ -133,7 +133,10 @@ namespace MySQL.GUI.SqlStudio
     [STAThread]
     static void Main(string[] Args)
     {
-      // Enable High DPI awareness as early as possible, before any Windows Forms initialization.
+      Application.EnableVisualStyles();
+      Application.SetCompatibleTextRenderingDefault(false);
+      // The application configuration opts WinForms into per-monitor metrics.
+      // Retain the native fallback for older Windows versions.
       DpiHelper.EnableHighDpi();
 
       // Connect the application to console to have proper output there if requested.
@@ -160,8 +163,6 @@ namespace MySQL.GUI.SqlStudio
 
       PrintInitialLogInfo();
 
-      Application.EnableVisualStyles();
-      Application.SetCompatibleTextRenderingDefault(false);
 
       // Hook into the exception handling to establish our own handling.
       AppDomain currentDomain = AppDomain.CurrentDomain; // CLR

@@ -6,6 +6,8 @@ using MySQL;
 using MySQL.Controls;
 using MySQL.Utilities;
 
+[assembly: System.Runtime.Versioning.TargetFramework(".NETFramework,Version=v4.8")]
+
 internal static class ThemeControlsSmoke
 {
   private sealed class TestGrid : GridView
@@ -76,6 +78,7 @@ internal static class ThemeControlsSmoke
     {
       // Exercise the real designer hierarchy without creating a backend or connecting to a database.
       type.GetMethod("InitializeComponent", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(editor, null);
+      var designSize = editor.ClientSize;
       ControlTheme.Attach(editor);
       foreach (string eventName in new[] { "Load", "Shown" })
       {
@@ -89,10 +92,20 @@ internal static class ThemeControlsSmoke
       editor.Show();
       CreateHandles(editor);
       Application.DoEvents();
+      Check(editor.Width < designSize.Width * UiScale.LayoutScale * editor.DeviceDpi / 96f * 1.2f, "Layout must not fit content before its host receives application zoom");
+      var stableSize = editor.ClientSize;
+      for (int pass = 0; pass < 4; ++pass) UiScale.Apply(editor);
+      Check(editor.ClientSize == stableSize, "Preferred layout fitting must not inflate dialogs on repeated passes");
       foreach (var scheme in new[] { ColorScheme.ColorSchemeDark, ColorScheme.ColorSchemeStandardWin8, ColorScheme.ColorSchemeDark })
       {
         SetTheme(scheme);
         bool dark = scheme == ColorScheme.ColorSchemeDark;
+        var nameField = editor.Controls.Find("nameTextBox", true)[0];
+        var schemaCaption = editor.Controls.Find("label4", true)[0];
+        Check(nameField.Right <= schemaCaption.Left, "Table name must not overlap schema caption");
+        var autoIncrement = editor.Controls.Find("aiCheckBox", true)[0];
+        int textWidth = TextRenderer.MeasureText(autoIncrement.Text, autoIncrement.Font, System.Drawing.Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width;
+        Check(autoIncrement.Width >= textWidth + UiScale.Pixels(13 + 4, editor.DeviceDpi), "Checkbox text fits beside enlarged glyph");
         foreach (string name in new[] { "nameTextBox", "optComments", "optEngine", "optCharset", "optCollation", "headingLayoutPanel", "columnCharsetCollationPanel", "columnCommentTextBox", "columnsTreeView" })
         {
           var matches = editor.Controls.Find(name, true);
@@ -106,6 +119,29 @@ internal static class ThemeControlsSmoke
           bitmap.Save(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "theme-table-editor-" + (dark ? "dark" : "light") + ".png"));
         }
       }
+      using (var host = new Form { ClientSize = new System.Drawing.Size(900, 600), ShowInTaskbar = false,
+        StartPosition = FormStartPosition.Manual, Location = new System.Drawing.Point(-20000, -20000) })
+      using (var document = new UserControl { Dock = DockStyle.Fill })
+      {
+        // Reparenting changes focus; this fixture has no database backend.
+        var field = editor.Controls.Find("nameTextBox", true)[0];
+        var leave = type.GetMethod("nameTextBox_Leave", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        field.Leave -= (EventHandler)Delegate.CreateDelegate(typeof(EventHandler), editor, leave);
+        UiScale.AttachApplication(host);
+        UiScale.SetDocumentMinimumSize(document, designSize);
+        while (editor.Controls.Count > 0) editor.Controls[0].Parent = document;
+        host.Controls.Add(document);
+        host.Show(); Application.DoEvents(); UiScale.Apply(host);
+        Check(document.AutoScroll && document.AutoScrollMinSize.Width > document.ClientSize.Width, "Docked editor exposes horizontal scrolling");
+        var scrollSize = document.AutoScrollMinSize;
+        for (int pass = 0; pass < 4; ++pass) UiScale.Apply(host);
+        Check(document.AutoScrollMinSize == scrollSize, "Document minimum size does not compound after reparenting");
+        host.ClientSize = new System.Drawing.Size(700, 500);
+        Application.DoEvents(); UiScale.Apply(host);
+        var nameField = document.Controls.Find("nameTextBox", true)[0];
+        var schemaCaption = document.Controls.Find("label4", true)[0];
+        Check(nameField.Right <= schemaCaption.Left, "Narrow docked editor scrolls instead of overlapping fields");
+      }
     }
   }
 
@@ -116,6 +152,7 @@ internal static class ThemeControlsSmoke
     {
       if (SystemInformation.HighContrast)
         throw new Exception("Run the light/dark control checks with Windows High Contrast disabled.");
+      Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
       Application.EnableVisualStyles();
       string logDirectory = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "theme-test-logs");
       System.IO.Directory.CreateDirectory(logDirectory);
@@ -293,7 +330,7 @@ internal static class ThemeControlsSmoke
       SetTheme(ColorScheme.ColorSchemeDark);
       SetTheme(ColorScheme.ColorSchemeStandardWin8);
       CheckTableEditorLayout();
-      Console.WriteLine("PASS: native System-style buttons on document.Show, deferred HWND changes, real Table Editor layout, administration surfaces, labels, buttons, System palette, late updates, grids, fields, rendering, state preservation, handle recreation, and disposal.");
+      Console.WriteLine("PASS: native System-style buttons on document.Show, deferred HWND changes, real Table Editor layout/reparenting/scrolling, administration surfaces, labels, buttons, System palette, late updates, grids, fields, rendering, state preservation, handle recreation, and disposal.");
       return 0;
     }
     catch (Exception error)

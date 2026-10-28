@@ -22,7 +22,8 @@ namespace Aga.Controls.Tree.NodeControls
 		{
 			Image image = GetIcon(node);
 			if (image != null)
-				return image.Size;
+				return new Size((int)Math.Ceiling(image.Width * (Parent == null ? 1f : Parent.GlyphScale)),
+          (int)Math.Ceiling(image.Height * (Parent == null ? 1f : Parent.GlyphScale)));
 			else
 				return Size.Empty;
 		}
@@ -35,7 +36,7 @@ namespace Aga.Controls.Tree.NodeControls
 				Rectangle r = GetBounds(node, context);
         // ml: center icon vertically.
         r.Y += (context.Bounds.Height - r.Height) / 2;
-				context.Graphics.DrawImage(image, r.Location);
+				context.Graphics.DrawImage(image, new Rectangle(r.Location, MeasureSize(node, context)));
 			}
 		}
 

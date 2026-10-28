@@ -202,6 +202,7 @@
     <ClCompile Include="tests\library\base\commandlineparser_specs.cpp" />
     <ClCompile Include="tests\library\base\config_file_specs.cpp" />
     <ClCompile Include="tests\library\base\drawing_specs.cpp" />
+    <ClCompile Include="tests\library\forms\home_sidebar_specs.cpp" />
     <ClCompile Include="tests\library\base\fileutilities_specs.cpp" />
     <ClCompile Include="tests\library\base\sqlstring_specs.cpp" />
     <ClCompile Include="tests\library\base\stringutilities_specs.cpp" />

@@ -2120,11 +2120,11 @@ mforms::View *PreferencesForm::create_fonts_and_colors_page() {
     frame->set_title(_("UI Scale"));
     mforms::Box *hbox = mforms::manage(new mforms::Box(true));
     hbox->add(new_label(_("Application scale:"), "Application Scale"), false, false);
-    mforms::Selector *selector = new_selector_option("WindowsUIScale", "100%:100,150%:150");
+    mforms::Selector *selector = new_selector_option("WindowsUIScale", "100%:100,125%:125,150%:150,175%:175,200%:200");
     selector->set_size(150, -1);
     hbox->add(selector, false, false);
 
-    mforms::Label *help = new_label(_("Scales Windows Forms controls only. Restart SqlStudio to apply."), "", false, true);
+    mforms::Label *help = new_label(_("100% uses compact system-sized text and controls. Larger values add zoom to Windows DPI scaling. Restart SqlStudio to apply."), "", false, true);
     hbox->add(help, true, false);
     help->set_size(300, -1);
 

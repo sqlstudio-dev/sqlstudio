@@ -67,7 +67,7 @@ namespace mforms {
     std::string getAccessibilityDefaultAction() override;
   };
 
-  class SidebarSection : public mforms::DrawBox {
+  class MFORMS_EXPORT SidebarSection : public mforms::DrawBox {
   private:
     HomeScreen *_owner;
 
@@ -77,13 +77,22 @@ namespace mforms {
     SidebarEntry *_activeEntry; // For the context menu.
 
     base::Color _indicatorColor;
+    int sidebarMetric(int value);
 
   public:
+  #ifdef _MSC_VER
+    const int SIDEBAR_LEFT_PADDING = 8;
+    const int SIDEBAR_TOP_PADDING = 8;
+    const int SIDEBAR_RIGHT_PADDING = 8;
+    const int SIDEBAR_ROW_HEIGHT = 40;
+    const int SIDEBAR_SPACING = 8;
+  #else
     const int SIDEBAR_LEFT_PADDING = 18;
     const int SIDEBAR_TOP_PADDING = 18; // The vertical offset of the first shortcut entry.
     const int SIDEBAR_RIGHT_PADDING = 25;
     const int SIDEBAR_ROW_HEIGHT = 50;
     const int SIDEBAR_SPACING = 18; // Vertical space between entries.
+  #endif
 
     SidebarSection(HomeScreen *owner);
     virtual ~SidebarSection();

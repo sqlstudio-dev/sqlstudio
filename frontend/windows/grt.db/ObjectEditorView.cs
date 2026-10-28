@@ -72,6 +72,7 @@ namespace MySQL.GUI.SqlStudio.Plugins
 
       if (editorPlugin != null)
       {
+        MySQL.Controls.UiScale.SetDocumentMinimumSize(this, editorPlugin.ClientSize);
         // That's quite an ugly hack. Relocate all controls from one DockablePlugin to the other.
         while (editorPlugin.Controls.Count > 0)
           editorPlugin.Controls[0].Parent = this;

@@ -77,6 +77,7 @@ public
     static void RefreshSystemColorScheme();
 
     static void SetColorScheme(ColorScheme newScheme);
+    static void SetUiZoom(float zoom);
   };
 
 } // namespace MySQL

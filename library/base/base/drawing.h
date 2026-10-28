@@ -197,6 +197,13 @@ namespace base {
     HSVColor(const Color &rgb);
   };
 
+  // Shared application zoom for native drawing; monitor DPI is supplied by the view.
+  class BASELIBRARY_PUBLIC_FUNC UiMetrics {
+  public:
+    static void set_zoom(float zoom);
+    static float control_scale();
+  };
+
   class BASELIBRARY_PUBLIC_FUNC OSConstants {
   public:
     static std::string defaultFontName();
