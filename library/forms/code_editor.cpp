@@ -945,7 +945,9 @@ void CodeEditor::loadConfiguration(SyntaxHighlighterLanguage language) {
         version = MySQLVersion::MySQL57;
         break;
       default:
-        version = MySQLVersion::MySQL80;
+        // Highlight the implemented modern vocabulary. The ANTLR parser
+        // independently checks availability against the exact server version.
+        version = MySQLVersion::MySQL82;
         break;
     }
 

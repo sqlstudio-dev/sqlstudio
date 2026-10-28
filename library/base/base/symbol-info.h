@@ -33,12 +33,18 @@
 
 namespace base {
 
-// Currently supported MySQL versions.
+// SQL symbol snapshots, not the list of supported server releases.
+// MySQL8021 means vocabulary introduced in 8.0.21 (likewise 8022/8023/8031).
 enum class MySQLVersion {
   Unknown,
   MySQL56,
   MySQL57,
   MySQL80,
+  MySQL8021,
+  MySQL8022,
+  MySQL8023,
+  MySQL8031,
+  MySQL82,
 };
 
 class BASELIBRARY_PUBLIC_FUNC MySQLSymbolInfo {
@@ -50,6 +56,7 @@ public:
   static bool isKeyword(std::string const& identifier, MySQLVersion version);
 
   static MySQLVersion numberToVersion(long version);
+  static bool isSupportedServerVersion(int major, int minor);
 };
 
 }
