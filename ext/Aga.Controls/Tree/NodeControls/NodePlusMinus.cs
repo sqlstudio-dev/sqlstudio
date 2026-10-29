@@ -27,7 +27,8 @@ namespace Aga.Controls.Tree.NodeControls
 
 		public override Size MeasureSize(TreeNodeAdv node, DrawContext context)
 		{
-			return new Size(Width, Width);
+			int width = (int)Math.Ceiling(Width * (Parent == null ? 1f : Parent.GlyphScale));
+      return new Size(width, width);
 		}
 
 		public override void Draw(TreeNodeAdv node, DrawContext context)
@@ -35,7 +36,8 @@ namespace Aga.Controls.Tree.NodeControls
 			if (node.CanExpand)
 			{
 				Rectangle r = context.Bounds;
-				int dy = (int)Math.Round((float)(r.Height - ImageSize) / 2);
+				int size = (int)Math.Ceiling(ImageSize * (Parent == null ? 1f : Parent.GlyphScale));
+        int dy = (int)Math.Round((float)(r.Height - size) / 2);
 				if (Application.RenderWithVisualStyles)
 				{
 					VisualStyleRenderer renderer;
@@ -43,7 +45,7 @@ namespace Aga.Controls.Tree.NodeControls
 						renderer = new VisualStyleRenderer(VisualStyleElement.TreeView.Glyph.Opened);
 					else
 						renderer = new VisualStyleRenderer(VisualStyleElement.TreeView.Glyph.Closed);
-					renderer.DrawBackground(context.Graphics, new Rectangle(r.X, r.Y + dy, ImageSize, ImageSize));
+					renderer.DrawBackground(context.Graphics, new Rectangle(r.X, r.Y + dy, size, size));
 				}
 				else
 				{
@@ -52,7 +54,7 @@ namespace Aga.Controls.Tree.NodeControls
 						img = _minus;
 					else
 						img = _plus;
-					context.Graphics.DrawImageUnscaled(img, new Point(r.X, r.Y + dy));
+					context.Graphics.DrawImage(img, new Rectangle(r.X, r.Y + dy, size, size));
 				}
 			}
 		}

@@ -68,6 +68,7 @@ bool MenuWrapper::create(mforms::Menu *backend) {
   MformsMenuStrip ^ menuStrip = MenuWrapper::Create<MformsMenuStrip>(backend, wrapper);
   menuStrip->backend = backend;
   menuStrip->AutoSize = true;
+  UiScale::Attach(menuStrip);
 
   switch (base::Color::get_active_scheme()) {
     case base::ColorSchemeCustom:

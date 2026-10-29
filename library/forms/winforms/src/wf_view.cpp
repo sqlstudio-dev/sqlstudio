@@ -1177,10 +1177,22 @@ void ViewWrapper::adjust_auto_resize_from_docking(Control ^ control) {
 /**
  * Quick check if it makes sense to start layouting the given control.
  */
+System::Drawing::Size ViewWrapper::constrain_size(Control ^ control, System::Drawing::Size size) {
+  // DeferWindowPos bypasses Control.SetBoundsCore, including its size limits.
+  // Apply the same constraints before passing native layout bounds to Windows.
+  Size maximum = control->MaximumSize;
+  if (maximum.Width > 0) size.Width = Math::Min(size.Width, maximum.Width);
+  if (maximum.Height > 0) size.Height = Math::Min(size.Height, maximum.Height);
+  size.Width = Math::Max(size.Width, control->MinimumSize.Width);
+  size.Height = Math::Max(size.Height, control->MinimumSize.Height);
+  return size;
+}
+
 bool ViewWrapper::can_layout(Control ^ control, String ^ reason) {
   // Limit layouting to certain property changes.
   if (reason != nullptr) {
-    if (reason != "Padding" && reason != "Bounds" && reason != "Visible" && reason != "Parent")
+    if (reason != "Padding" && reason != "Bounds" && reason != "Visible" && reason != "Parent" &&
+        reason != "Font" && reason != "Text" && reason != "MinimumSize" && reason != "MaximumSize")
       return false;
   }
 
@@ -1263,10 +1275,7 @@ void ViewWrapper::Initialize() {
 
   // Can be null, e.g. for non-control objects like dialogs.
   if (control != nullptr) {
-    //ControlTheme::Attach(control);
-    //if ((is<Panel>(control) && !is<HeaderPanel>(control)) || is<Label>(control) ||
-    //    is<ButtonBase>(control) || is<GroupBox>(control))
-    //  ControlTheme::AttachSurface(control);
+    ControlTheme::Attach(control);
     control->AutoSize = false;
     control->Font = gcnew Font(DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, FontStyle::Regular, GraphicsUnit::Pixel);
 

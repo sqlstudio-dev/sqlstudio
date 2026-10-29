@@ -66,4 +66,4 @@ echo "Updating Info.plist"
 sed -e "/<key>CFBundleShortVersionString<\/key>/N;s/.*\n.*<\/string>/	<key>CFBundleShortVersionString<\/key>@	<string>$major.$minor.$release$dot_release_type<\/string>/" -e 'y/@/\n/' -i.bak Info.plist
 
 echo "Updating sql-studio.spec.in"
-sed -e "s/--define='version.*'/--define='version $major.$minor.$release_number'/" -i.bak build/sql-studio.spec.in
+sed -e "s/--define='version.*'/--define='version $major.$minor.$release_number'/" -i.bak build/linux/sql-studio.spec.in

@@ -480,11 +480,7 @@ static ColorScheme resolve_scheme(ColorScheme scheme) {
   return scheme;
 }
 
-static std::pair<std::string, std::string> custom_colors[] = {
-  std::make_pair("", ""), std::make_pair("", ""), std::make_pair("", ""), std::make_pair("", ""),
-  std::make_pair("", ""), std::make_pair("", ""), std::make_pair("", ""), std::make_pair("", ""),
-  std::make_pair("", ""), std::make_pair("", ""), std::make_pair("", ""),
-};
+static std::pair<std::string, std::string> custom_colors[AppColorAccent + 1];
 
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -505,6 +501,14 @@ std::string Color::getApplicationColorAsString(ApplicationColor color, bool fore
     std::make_pair("#ffe9b6", "#000000"), // AppColorTopTabSelectedFocused
     std::make_pair("#4a6184", "#ffffff"), // AppColorTopTabSelectedUnfocused
     std::make_pair("#283752", "#ffffff"), // AppColorStatusbar
+    std::make_pair("#f0f0f0", "#282828"), // AppColorControl
+    std::make_pair("#cccedb", "#cccedb"), // AppColorBorder
+    std::make_pair("#0078d7", "#ffffff"), // AppColorSelection
+    std::make_pair("#d1e2f2", "#282828"), // AppColorHover
+    std::make_pair("#a9cdeb", "#282828"), // AppColorPressed
+    std::make_pair("#f0f0f0", "#6d6d6d"), // AppColorDisabled
+    std::make_pair("#cccedb", "#cccedb"), // AppColorSplitter
+    std::make_pair("#007acc", "#ffffff"), // AppColorAccent
   };
 
   static const std::pair<std::string, std::string> app_colors_win8[] = {
@@ -512,6 +516,14 @@ std::string Color::getApplicationColorAsString(ApplicationColor color, bool fore
     std::make_pair("#0178d0", "#ffffff"), std::make_pair("#f5f5f7", "#282828"), std::make_pair("#ffffff", "#282828"),
     std::make_pair("#e7e7e8", "#282828"), std::make_pair("#ffffff", "#0c6fc2"), std::make_pair("#0178d0", "#ffffff"),
     std::make_pair("#cdd0d6", "#ffffff"), std::make_pair("#efeff2", "#404040"),
+    std::make_pair("#f0f0f0", "#282828"), // AppColorControl
+    std::make_pair("#cccedb", "#cccedb"), // AppColorBorder
+    std::make_pair("#0078d7", "#ffffff"), // AppColorSelection
+    std::make_pair("#d1e2f2", "#282828"), // AppColorHover
+    std::make_pair("#a9cdeb", "#282828"), // AppColorPressed
+    std::make_pair("#f0f0f0", "#6d6d6d"), // AppColorDisabled
+    std::make_pair("#cccedb", "#cccedb"), // AppColorSplitter
+    std::make_pair("#007acc", "#ffffff"), // AppColorAccent
   };
 
   static const std::pair<std::string, std::string> app_colors_win8_alternate[] = {
@@ -519,15 +531,31 @@ std::string Color::getApplicationColorAsString(ApplicationColor color, bool fore
     std::make_pair("#0178d0", "#ffffff"), std::make_pair("#f5f5f7", "#282828"), std::make_pair("#ffffff", "#282828"),
     std::make_pair("#e7e7e8", "#282828"), std::make_pair("#ffffff", "#0c6fc2"), std::make_pair("#0178d0", "#ffffff"),
     std::make_pair("#cdd0d6", "#ffffff"), std::make_pair("#679bd3", "#404040"),
+    std::make_pair("#f0f0f0", "#282828"), // AppColorControl
+    std::make_pair("#cccedb", "#cccedb"), // AppColorBorder
+    std::make_pair("#0078d7", "#ffffff"), // AppColorSelection
+    std::make_pair("#d1e2f2", "#282828"), // AppColorHover
+    std::make_pair("#a9cdeb", "#282828"), // AppColorPressed
+    std::make_pair("#f0f0f0", "#6d6d6d"), // AppColorDisabled
+    std::make_pair("#cccedb", "#cccedb"), // AppColorSplitter
+    std::make_pair("#007acc", "#ffffff"), // AppColorAccent
   };
 
   static const std::pair<std::string, std::string> app_colors_dark[] = {
     std::make_pair("#252526", "#e0e0e0"), std::make_pair("#202020", "#e0e0e0"),
-    std::make_pair("#2d2d30", "#e0e0e0"), std::make_pair("#094771", "#ffffff"),
+    std::make_pair("#2d2d30", "#e0e0e0"), std::make_pair("#3c3c3c", "#ffffff"),
     std::make_pair("#252526", "#e0e0e0"), std::make_pair("#1e1e1e", "#e0e0e0"),
     std::make_pair("#2d2d30", "#b8b8b8"), std::make_pair("#1e1e1e", "#75beff"),
-    std::make_pair("#094771", "#ffffff"), std::make_pair("#37373d", "#e0e0e0"),
+    std::make_pair("#3c3c3c", "#ffffff"), std::make_pair("#37373d", "#e0e0e0"),
     std::make_pair("#202020", "#e0e0e0"),
+    std::make_pair("#333337", "#e0e0e0"), // AppColorControl
+    std::make_pair("#454545", "#454545"), // AppColorBorder
+    std::make_pair("#094771", "#ffffff"), // AppColorSelection
+    std::make_pair("#3e3e40", "#ffffff"), // AppColorHover
+    std::make_pair("#005a9e", "#ffffff"), // AppColorPressed
+    std::make_pair("#2d2d30", "#909090"), // AppColorDisabled
+    std::make_pair("#3f3f46", "#3f3f46"), // AppColorSplitter
+    std::make_pair("#007acc", "#ffffff"), // AppColorAccent
   };
 
   static const std::pair<std::string, std::string> app_colors_high_contrast[] = {
@@ -543,6 +571,14 @@ std::string Color::getApplicationColorAsString(ApplicationColor color, bool fore
     std::make_pair("#000000", "#ffffff"), // AppColorTopTabSelectedFocused
     std::make_pair("#C0C0C0", "#000000"), // AppColorTopTabSelectedUnfocused
     std::make_pair("#808080", "#000000"), // AppColorStatusbar
+    std::make_pair("#f0f0f0", "#282828"), // AppColorControl
+    std::make_pair("#cccedb", "#cccedb"), // AppColorBorder
+    std::make_pair("#0078d7", "#ffffff"), // AppColorSelection
+    std::make_pair("#d1e2f2", "#282828"), // AppColorHover
+    std::make_pair("#a9cdeb", "#282828"), // AppColorPressed
+    std::make_pair("#f0f0f0", "#6d6d6d"), // AppColorDisabled
+    std::make_pair("#cccedb", "#cccedb"), // AppColorSplitter
+    std::make_pair("#007acc", "#ffffff"), // AppColorAccent
   };
 
   base::MutexLock lock(*color_mutex);
@@ -550,11 +586,10 @@ std::string Color::getApplicationColorAsString(ApplicationColor color, bool fore
   switch (active_scheme) {
     case ColorSchemeDark:
       return foreground ? app_colors_dark[color].second : app_colors_dark[color].first;
-    case ColorSchemeCustom:
-      if (foreground)
-        return custom_colors[color].second;
-      else
-        return custom_colors[color].first;
+    case ColorSchemeCustom: {
+      const auto &value = foreground ? custom_colors[color].second : custom_colors[color].first;
+      return value.empty() ? (foreground ? app_colors_win8[color].second : app_colors_win8[color].first) : value;
+    }
 
     case ColorSchemeStandardWin7:
       if (foreground)
@@ -640,7 +675,15 @@ void Color::load_custom_colors(const std::map<std::string, std::string> &colors)
     {"bottom-tab-selected", AppColorBottomTabSelected},
     {"top-tab-selected-focused", AppColorTopTabSelectedFocused},
     {"top-selected-unfocused", AppColorTopTabSelectedUnfocused},
-    {"statusbar", AppColorStatusbar}
+    {"statusbar", AppColorStatusbar},
+    {"control", AppColorControl},
+    {"border", AppColorBorder},
+    {"selection", AppColorSelection},
+    {"hover", AppColorHover},
+    {"pressed", AppColorPressed},
+    {"disabled", AppColorDisabled},
+    {"splitter", AppColorSplitter},
+    {"accent", AppColorAccent}
   };
 
   // Syntax example: "CustomColor:panel-header:fore", "#ffffff".
@@ -651,16 +694,16 @@ void Color::load_custom_colors(const std::map<std::string, std::string> &colors)
     if (parts.size() < 3 || parts[0] != "CustomColor")
       continue;
 
-    Color color = Color::parse(parts[2]);
+    Color color = Color::parse(iterator->second);
     if (!color.is_valid())
       continue;
 
     std::map<std::string, int>::const_iterator location = app_color_map.find(parts[1]);
     if (location != app_color_map.end()) {
       if (parts[2] == "fore")
-        custom_colors[location->second].second = parts[2];
+        custom_colors[location->second].second = iterator->second;
       else
-        custom_colors[location->second].first = parts[2];
+        custom_colors[location->second].first = iterator->second;
     }
   }
 }
@@ -679,32 +722,28 @@ void Color::save_custom_colors(std::map<std::string, std::string> &colors) {
     {"bottom-tab-selected", AppColorBottomTabSelected},
     {"top-tab-selected-focused", AppColorTopTabSelectedFocused},
     {"top-selected-unfocused", AppColorTopTabSelectedUnfocused},
-    {"statusbar", AppColorStatusbar}
+    {"statusbar", AppColorStatusbar},
+    {"control", AppColorControl},
+    {"border", AppColorBorder},
+    {"selection", AppColorSelection},
+    {"hover", AppColorHover},
+    {"pressed", AppColorPressed},
+    {"disabled", AppColorDisabled},
+    {"splitter", AppColorSplitter},
+    {"accent", AppColorAccent}
   };
 
   colors.clear();
-  colors["CustomColor:main-tab:back"] = custom_colors[AppColorMainTab].first;
-  colors["CustomColor:main-tab:fore"] = custom_colors[AppColorMainTab].second;
-  colors["CustomColor:main:back"] = custom_colors[AppColorMainBackground].first;
-  colors["CustomColor:main:fore"] = custom_colors[AppColorMainBackground].second;
-  colors["CustomColor:panel-header:back"] = custom_colors[AppColorPanelHeader].first;
-  colors["CustomColor:panel-header:fore"] = custom_colors[AppColorPanelHeader].second;
-  colors["CustomColor:panel-header-focuse:back"] = custom_colors[AppColorPanelHeaderFocused].first;
-  colors["CustomColor:panel-header-focuse:fore"] = custom_colors[AppColorPanelHeaderFocused].second;
-  colors["CustomColor:panel-toolbar:back"] = custom_colors[AppColorPanelToolbar].first;
-  colors["CustomColor:panel-toolbar:fore"] = custom_colors[AppColorPanelToolbar].second;
-  colors["CustomColor:panel-content:back"] = custom_colors[AppColorPanelContentArea].first;
-  colors["CustomColor:panel-content:fore"] = custom_colors[AppColorPanelContentArea].second;
-  colors["CustomColor:tab-unselected:back"] = custom_colors[AppColorTabUnselected].first;
-  colors["CustomColor:tab-unselected:fore"] = custom_colors[AppColorTabUnselected].second;
-  colors["CustomColor:bottom-tab-selected:back"] = custom_colors[AppColorBottomTabSelected].first;
-  colors["CustomColor:bottom-tab-selected:fore"] = custom_colors[AppColorBottomTabSelected].second;
-  colors["CustomColor:top-tab-selected-focused:back"] = custom_colors[AppColorTopTabSelectedFocused].first;
-  colors["CustomColor:top-tab-selected-focused:fore"] = custom_colors[AppColorTopTabSelectedFocused].second;
-  colors["CustomColor:top-selected-unfocused:back"] = custom_colors[AppColorTopTabSelectedUnfocused].first;
-  colors["CustomColor:top-selected-unfocused:fore"] = custom_colors[AppColorTopTabSelectedUnfocused].second;
-  colors["CustomColor:statusbar:back"] = custom_colors[AppColorStatusbar].first;
-  colors["CustomColor:statusbar:fore"] = custom_colors[AppColorStatusbar].second;
+  for (const auto &entry : app_color_map) {
+    colors["CustomColor:" + entry.first + ":back"] = custom_colors[entry.second].first;
+    colors["CustomColor:" + entry.first + ":fore"] = custom_colors[entry.second].second;
+  }
+
 }
 
 //----------------------------------------------------------------------------------------------------------------------
+
+// Configured on the UI thread before constructing application views.
+static float application_ui_zoom = 1.0f;
+void base::UiMetrics::set_zoom(float zoom) { application_ui_zoom = std::max(1.0f, std::min(2.0f, zoom)); }
+float base::UiMetrics::control_scale() { return application_ui_zoom; }

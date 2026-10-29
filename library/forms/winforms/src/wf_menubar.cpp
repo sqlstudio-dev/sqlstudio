@@ -165,6 +165,7 @@ bool MenuBarWrapper::create_menu_bar(mforms::MenuBar *backend) {
     }
   }
   menu->Font = menu->DefaultFont;
+  UiScale::Attach(menu);
 
   return true;
 }
@@ -174,6 +175,7 @@ bool MenuBarWrapper::create_menu_bar(mforms::MenuBar *backend) {
 bool MenuBarWrapper::create_context_menu(mforms::ContextMenu *backend) {
   MenuBarWrapper *wrapper = new MenuBarWrapper(backend);
   MformsContextMenuStrip ^ strip = Create<MformsContextMenuStrip>(backend, wrapper);
+  UiScale::Attach(strip);
 
   strip->AllowDrop = false;
   strip->AllowItemReorder = false;

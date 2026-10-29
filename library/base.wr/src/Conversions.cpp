@@ -93,3 +93,5 @@ void Conversions::RefreshSystemColorScheme() {
 }
 
 //--------------------------------------------------------------------------------------------------
+
+void Conversions::SetUiZoom(float zoom) { base::UiMetrics::set_zoom(zoom); }

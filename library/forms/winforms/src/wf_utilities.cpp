@@ -27,6 +27,9 @@
 #include "wf_view.h"
 #include "wf_utilities.h"
 
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+
 #include "base/log.h"
 #include "base/string_utilities.h"
 #include "base/log.h"
@@ -45,10 +48,22 @@ using namespace System::Windows::Forms;
 using namespace System::Drawing;
 using namespace System::Media;
 
+using namespace MySQL::Controls;
 using namespace MySQL::Forms;
 using namespace MySQL::Utilities;
 
 using namespace System::Collections::Generic;
+
+static void apply_dark_caption(System::Windows::Forms::Form ^ form) {
+  if (form == nullptr || !form->IsHandleCreated)
+    return;
+
+  BOOL enabled = TRUE;
+  HWND window = static_cast<HWND>(form->Handle.ToPointer());
+  // Windows 10 20H1+ uses 20; older builds use 19.
+  if (FAILED(DwmSetWindowAttribute(window, 20, &enabled, sizeof(enabled))))
+    DwmSetWindowAttribute(window, 19, &enabled, sizeof(enabled));
+}
 
 //--------------------------------------------------------------------------------------------------
 
@@ -135,6 +150,63 @@ mforms::DialogResult CustomMessageBox::ShowInternal(const std::string &title, co
                                                     const std::string &buttonOther, const std::string &checkbox,
                                                     bool &checked) {
   logDebug("Creating and showing custom message box\n");
+
+  if (mforms::App::get()->isDarkModeActive() && !SystemInformation::HighContrast) {
+    CustomMessageBox ^ dialog = gcnew CustomMessageBox();
+    dialog->Text = "SqlStudio";
+    dialog->_messageLabel->Text = CppStringToNative(title + "\n\n" + text);
+    dialog->_button1->Text = CppStringToNative(buttonOK);
+    dialog->_button1->DialogResult = System::Windows::Forms::DialogResult::OK;
+    dialog->_button2->Text = CppStringToNative(buttonCancel);
+    dialog->_button2->DialogResult = System::Windows::Forms::DialogResult::Cancel;
+    dialog->_button3->Text = CppStringToNative(buttonOther);
+    dialog->_button3->DialogResult = System::Windows::Forms::DialogResult::Ignore;
+    dialog->_checkbox->Text = CppStringToNative(checkbox);
+    dialog->_checkbox->Checked = checked;
+
+    if (mainIcon == TD_ERROR_ICON)
+      dialog->_picture->Image = SystemIcons::Error->ToBitmap();
+    else if (mainIcon == TD_WARNING_ICON)
+      dialog->_picture->Image = SystemIcons::Warning->ToBitmap();
+    else
+      dialog->_picture->Image = SystemIcons::Information->ToBitmap();
+    dialog->_picture->SizeMode = PictureBoxSizeMode::CenterImage;
+    dialog->_picture->Size = Drawing::Size(48, 48);
+
+    Color background = Conversions::GetApplicationColor(ApplicationColor::AppColorPanelContentArea, false);
+    Color foreground = Conversions::GetApplicationColor(ApplicationColor::AppColorPanelContentArea, true);
+    Color buttonBackColor = Conversions::GetApplicationColor(ApplicationColor::AppColorPanelToolbar, false);
+    Color buttonBorderColor = ControlPaint::Dark(buttonBackColor);
+    dialog->BackColor = background;
+    dialog->ForeColor = foreground;
+    dialog->_messageLabel->BackColor = background;
+    dialog->_messageLabel->ForeColor = foreground;
+    dialog->_checkbox->BackColor = background;
+    dialog->_checkbox->ForeColor = foreground;
+    dialog->_checkbox->FlatStyle = FlatStyle::Flat;
+    for each (Button ^ button in gcnew array<Button ^>{dialog->_button1, dialog->_button2, dialog->_button3}) {
+      button->FlatStyle = FlatStyle::Flat;
+      button->UseVisualStyleBackColor = false;
+      button->BackColor = buttonBackColor;
+      button->ForeColor = foreground;
+      button->FlatAppearance->BorderColor = buttonBorderColor;
+      button->FlatAppearance->MouseOverBackColor = ControlPaint::Light(buttonBackColor);
+      button->FlatAppearance->MouseDownBackColor = ControlPaint::Dark(buttonBackColor);
+      button->Padding = System::Windows::Forms::Padding(12, 6, 12, 6);
+    }
+
+    dialog->Padding = System::Windows::Forms::Padding(20, 24, 20, 18);
+    dialog->ComputeLayout();
+    IntPtr dialogHandle = dialog->Handle;
+    apply_dark_caption(dialog);
+    System::Windows::Forms::DialogResult result = dialog->ShowDialog(dialog->Owner);
+    checked = dialog->_checkbox->Checked;
+    if (result == System::Windows::Forms::DialogResult::Cancel)
+      return mforms::ResultCancel;
+    if (result == System::Windows::Forms::DialogResult::Ignore)
+      return mforms::ResultOther;
+    return mforms::ResultOk;
+  }
 
   TASKDIALOGCONFIG config = {0};
   config.cbSize = sizeof(config);

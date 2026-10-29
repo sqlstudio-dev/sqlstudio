@@ -137,6 +137,15 @@ namespace Aga.Controls.Tree
             using (SolidBrush brush = new SolidBrush(SystemColors.Highlight))
               e.Graphics.FillRectangle(brush, focusRect);
           }
+          else if (!SelectionBackColor.IsEmpty)
+          {
+            bool active = context.DrawSelection == DrawSelectionMode.Active;
+            using (var brush = new SolidBrush(active || InactiveSelectionBackColor.IsEmpty ? SelectionBackColor : InactiveSelectionBackColor))
+              e.Graphics.FillRectangle(brush, focusRect);
+            if (context.DrawFocus || (Focused && CurrentNode == node))
+              ControlPaint.DrawFocusRectangle(e.Graphics, focusRect, SelectionForeColor, SelectionBackColor);
+            context.DrawSelection = DrawSelectionMode.FullRowSelect;
+          }
           else
           {
             RectangleF bounds = focusRect;

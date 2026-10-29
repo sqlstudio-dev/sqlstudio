@@ -95,6 +95,11 @@ void apply_bounds(ControlList % list, bool horizontal) {
       // or the computed size is smaller than the current size.
       ViewWrapper::remove_auto_resize(entry->control, AutoResizeMode::ResizeBoth);
       Drawing::Rectangle newBounds = entry->control->Bounds;
+      if (is<Label>(entry->control) || is<ButtonBase>(entry->control)) {
+        Size preferred = entry->control->GetPreferredSize(entry->bounds.Size);
+        newBounds.Width = Math::Max(newBounds.Width, preferred.Width);
+        newBounds.Height = Math::Max(newBounds.Height, preferred.Height);
+      }
 
       if (horizontal) {
         // Workaround: usually, scaling a button vertically does not produce good results.
@@ -109,6 +114,8 @@ void apply_bounds(ControlList % list, bool horizontal) {
         if (entry->fills || entry->bounds.Height < newBounds.Height)
           newBounds.Height = entry->bounds.Height;
       }
+
+      newBounds.Size = ViewWrapper::constrain_size(entry->control, newBounds.Size);
 
       // Get the resulting control size and adjust the offset for following controls and the
       // middle alignment (for controls that don't resize).
@@ -297,9 +304,9 @@ System::Drawing::Size HorizontalGtkBoxLayout::ComputeLayout(LayoutBox ^ box, Sys
       // We fix flat buttons for now as they can come with images only. Normal buttons usually have text.
       if (is<Button>(entry->control)) {
         Button ^ button = (Button ^)entry->control;
-        if (button->FlatStyle == FlatStyle::Flat)
+        if (button->FlatStyle == FlatStyle::Flat && String::IsNullOrEmpty(button->Text))
           entry->bounds = Drawing::Rectangle::Inflate(entry->bounds, -3, -3);
-        else {
+        else if (String::IsNullOrEmpty(button->Text)) {
           // If a smaller size than the preferred size is set for a button use this instead.
           if (button->MinimumSize.Height > 0 && button->MinimumSize.Height < control->PreferredSize.Height)
             entry->bounds.Height = button->MinimumSize.Height;

@@ -50,7 +50,8 @@ namespace Aga.Controls.Tree.NodeControls
 
 		public override Size MeasureSize(TreeNodeAdv node, DrawContext context)
 		{
-			return new Size(ImageSize, ImageSize);
+			int size = (int)Math.Ceiling(ImageSize * (Parent == null ? 1f : Parent.GlyphScale));
+      return new Size(size, size);
 		}
 
 		public override void Draw(TreeNodeAdv node, DrawContext context)
@@ -66,7 +67,7 @@ namespace Aga.Controls.Tree.NodeControls
 					renderer = new VisualStyleRenderer(VisualStyleElement.Button.CheckBox.CheckedNormal);
 				else
 					renderer = new VisualStyleRenderer(VisualStyleElement.Button.CheckBox.UncheckedNormal);
-				renderer.DrawBackground(context.Graphics, new Rectangle(bounds.X, bounds.Y, ImageSize, ImageSize));
+				renderer.DrawBackground(context.Graphics, new Rectangle(bounds.Location, MeasureSize(node, context)));
 			}
 			else
 			{
@@ -77,7 +78,7 @@ namespace Aga.Controls.Tree.NodeControls
 					img = _check;
 				else
 					img = _uncheck;
-				context.Graphics.DrawImage(img, bounds.Location);
+				context.Graphics.DrawImage(img, new Rectangle(bounds.Location, MeasureSize(node, context)));
 			}
 		}
 
