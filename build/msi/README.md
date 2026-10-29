@@ -10,11 +10,16 @@ The `http://wixtoolset.org/schemas/v4/wxs` namespace is also used by WiX 7.
 - Windows with the .NET 8 SDK or newer.
 - .NET Framework 4.8 on the build machine and target machines. Reference
   assemblies are restored via NuGet. This matches the current Windows frontend.
-- A complete staged application distribution. Packaging does not build SqlStudio
-  or populate missing files listed in `source/sql_studio_fragment.xml`.
+- A complete staged application distribution, such as the unpacked portable
+  .zip from `build/zip/make_zip.ps1` (it includes the Visual C++ runtime).
+  Packaging does not build SqlStudio. Every file in the distribution is
+  installed: `source/sql_studio_fragment.xml` lists only the files that need
+  hand-authored entries (SqlStudio.exe with its file associations, the README
+  and license) and harvests the rest at build time with a `Files` element.
 - WiX 7 EULA acceptance. Review the
   [WiX OSMF terms and acceptance instructions](https://docs.firegiant.com/wix/osmf/).
-  Acceptance is not enabled in the checked-in projects.
+  The CI workflow accepts them with `-p:AcceptEula=wix7`; the checked-in
+  projects do not, so a local build needs the same property.
 
 ## Build with the SDK
 

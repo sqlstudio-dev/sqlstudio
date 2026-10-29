@@ -52,16 +52,37 @@ configured, and avoid unrelated repository-wide formatting changes.
 
 Every pull request to `develop` or `master`, and every push to them, runs the
 **Build** workflow (`.github/workflows/build.yml`). For each supported Linux
-distribution (Ubuntu 22.04 and 24.04, Debian 12 and 13) it:
+distribution (Ubuntu 22.04, 24.04, 26.04 and 26.10, Debian 12 and 13) it:
 
 1. builds SqlStudio in a clean container of that distribution, because each one
    ships different library versions (libpython, GTK, ...),
 2. packages the result as a `.deb` with `build/linux/make_deb.sh`,
 3. installs the package in another clean container and checks that every
-   binary and library resolves its shared libraries,
+   binary and library resolves its shared libraries, that the bundled
+   pyodbc module (used by the migration plugins) imports and that the bundled
+   MySQL client connects to a MySQL server over TLS,
 4. checks the package with that distribution's `lintian` (errors fail),
 5. starts the application on a virtual display (`build/linux/smoke_test.sh`)
-   and fails if it crashes, shows no main window, or logs a Python traceback.
+   and fails if it crashes, shows no main window, logs a Python traceback, or
+   reports the distribution as unsupported.
+
+On macOS (Apple Silicon, macOS 26 and later) the workflow builds
+`SqlStudio.app` with Xcode, copies every library it loads into it
+(`build/mac/bundle_app.py`) and packages it as a `.dmg`. A separate job
+installs the `.dmg` on a fresh runner with Homebrew and the system-wide Python
+hidden, checks that all library references stay inside the app, that the
+signature is intact and that pyodbc imports, and runs the smoke test
+(`build/mac/smoke_test.sh`).
+
+On Windows (x64) the workflow builds the whole solution with the v143 toolset
+and packages it twice: as a portable `.zip` that carries the Visual C++
+runtime (`build/zip/make_zip.ps1`), and as an `.msi` built from that `.zip`
+(`build/msi`). A separate job unpacks the `.zip` on a fresh runner with the
+runner's Python taken off `PATH`, checks that every DLL resolves
+(`build/windows/check_dll_deps.ps1`) and that pyodbc imports, and runs the
+smoke test (`build/windows/smoke_test.ps1`). It then installs the `.msi`
+silently, runs the same checks on the installed copy, and checks that an
+uninstall removes it.
 
 The packages and the smoke test results (screenshot and logs) are attached to
 the workflow run as artifacts for 14 days. To try a package by hand, see
@@ -70,9 +91,15 @@ the workflow run as artifacts for 14 days. To try a package by hand, see
 The third-party libraries (MySQL client, Connector/C++, GDAL, ANTLR runtime,
 ...) take a long time to build, so they are cached per distribution and
 rebuilt only when `build/linux/list.txt`, `build/linux/build_3rdparty.sh` or
-`build/linux/install_deps.sh` change. A pull request can use caches saved by
+`build/linux/install_deps.sh` change (on Windows: `build/windows/libs.txt`,
+`build/windows/build_3rdparty.ps1` or the toolset). A pull request can use caches saved by
 its own earlier runs or on its target branch, so the first run after such a
 change takes longer.
+
+A daily `Cleanup` workflow deletes the caches of closed pull requests and the
+artifacts of older runs of each pull request, keeping only the newest one. It
+can also be started by hand from the Actions tab; by default it then only
+lists what it would delete.
 
 ## Pull Request Guidelines
 

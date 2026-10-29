@@ -161,7 +161,6 @@ library/parsers/mysql/MySQLLexer*
 RE:testing/python/test_results_.*\.txt(\.[0-9])?
 wb-build
 library/parsers/antlr
-.vscode
 *.[Vv][Cc].db
 *.[Vv][Cc].opendb
 .vs/
@@ -230,3 +229,10 @@ docker/databases/.env
 # Local build leftovers
 build/CMakeCache.txt
 build/*.log
+
+# Third-party bundles for the Xcode build (build/mac/prepare_3rdparty_ce.sh)
+/3rd-party-ce/
+/3rd-party-se/
+/build/xcode/
+ext/endless.editor/web/node_modules
+ext/endless.editor/web/dist

@@ -44,7 +44,11 @@ param(
     [string]$Generator = "auto",
     [ValidateSet("latest", "2026", "2022")]
     [string]$VisualStudio = "latest",
-    [string]$VsInstallPath
+    [string]$VsInstallPath,
+    # MSVC toolset for every library; "auto" takes the newest one installed.
+    # The application has to be built with the same or a newer toolset.
+    [ValidateSet("auto", "v143", "v145")]
+    [string]$PlatformToolset = "auto"
 )
 
 Set-StrictMode -Version 3.0
@@ -75,6 +79,7 @@ $script:SelectedOnly = @($Only | Where-Object { -not [string]::IsNullOrWhiteSpac
 $script:ActiveProcesses = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 $script:VsPath = $null
 $script:ResolvedGenerator = $Generator
+$script:ResolvedToolset = $null
 
 function Stop-AllActiveProcesses {
     $procs = @($script:ActiveProcesses)
@@ -788,15 +793,26 @@ function Enter-VsBuildEnvironment {
     $vsPath = Get-VSInstallPath
     $script:VsPath = $vsPath
     $script:ResolvedGenerator = Resolve-CMakeGenerator -ResolvedVsPath $vsPath
+    $script:ResolvedToolset = if ($PlatformToolset -ne "auto") { $PlatformToolset } else { Resolve-VsPlatformToolset -ResolvedVsPath $vsPath }
     $vcVars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
     if (-not (Test-Path -LiteralPath $vcVars)) {
         throw "vcvarsall.bat was not found under $vsPath"
     }
+    # The compiler version of the toolset, so that nmake, meson and other
+    # builds outside MSBuild use the same compiler as the CMake builds.
+    $vcVarsArgs = "x64"
+    $toolsVersionFile = Join-Path $vsPath ("VC\Auxiliary\Build\Microsoft.VCToolsVersion.{0}.default.txt" -f $script:ResolvedToolset)
+    if (Test-Path -LiteralPath $toolsVersionFile -PathType Leaf) {
+        $vcVarsArgs += " -vcvars_ver=" + (Get-Content -LiteralPath $toolsVersionFile -TotalCount 1).Trim()
+    }
+    elseif ($PlatformToolset -ne "auto") {
+        throw "The $PlatformToolset toolset is not installed under $vsPath"
+    }
 
-    Write-Info "Loading Visual Studio build environment from $vsPath"
+    Write-Info "Loading Visual Studio build environment from $vsPath ($($script:ResolvedToolset), vcvarsall $vcVarsArgs)"
     Push-Location (Split-Path -Parent $vcVars)
     try {
-        cmd /c "`"$vcVars`" x64 >nul && set" | ForEach-Object {
+        cmd /c "`"$vcVars`" $vcVarsArgs >nul && set" | ForEach-Object {
             if ($_ -match "=") {
                 $parts = $_ -split "=", 2
                 [Environment]::SetEnvironmentVariable($parts[0], $parts[1], "Process")
@@ -1669,7 +1685,7 @@ function Invoke-CMakeInstallPair {
     $configureReleaseArgs = @(
         "-S", $SourcePath,
         "-B", $Layout.BuildRelease,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($Layout.StageRelease)"
     ) + $CommonArguments
@@ -1685,7 +1701,7 @@ function Invoke-CMakeInstallPair {
     $configureDebugArgs = @(
         "-S", $SourcePath,
         "-B", $Layout.BuildDebug,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($Layout.StageDebug)"
     ) + $CommonArguments
@@ -1863,6 +1879,13 @@ except ModuleNotFoundError:
             def __ge__(self, other):
                 return self._cmp_key() >= other._cmp_key()
 '@
+    if (-not (Test-Path -LiteralPath $gdbusCodegenUtilsPath -PathType Leaf)) {
+        # glib is a meson subproject that "meson setup" would fetch only after
+        # this point. Fetch it now so the patch below reaches it. Only glib:
+        # parallel downloads of all subprojects can fail on Windows with
+        # "Resource deadlock avoided" from meson's lock file.
+        Invoke-LoggedCommand -Label "cairo meson subprojects download glib" -FilePath "meson" -Arguments @("subprojects", "download", "--sourcedir", $sourcePath, "glib") -WorkingDirectory $sourcePath | Out-Null
+    }
     if (Test-Path -LiteralPath $gdbusCodegenUtilsPath -PathType Leaf) {
         $gdbusCodegenUtilsContent = Get-Content -LiteralPath $gdbusCodegenUtilsPath -Raw
         $patchedGdbusCodegenUtilsContent = $gdbusCodegenUtilsContent -replace 'import distutils\.version', $gdbusCodegenCompatImport
@@ -2061,7 +2084,7 @@ function Build-AntlrRuntime {
     $configureReleaseArgs = @(
         "-S", $cmakeRoot,
         "-B", $layout.BuildRelease,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($layout.StageRelease)"
     ) + $commonArgs
@@ -2081,7 +2104,7 @@ function Build-AntlrRuntime {
     $configureDebugArgs = @(
         "-S", $cmakeRoot,
         "-B", $layout.BuildDebug,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($layout.StageDebug)"
     ) + $commonArgs
@@ -2182,7 +2205,7 @@ function Build-Proj {
     $configureReleaseArgs = @(
         "-S", $sourcePath,
         "-B", $layout.BuildRelease,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($layout.StageRelease)"
     ) + $commonArgs
@@ -2201,7 +2224,7 @@ function Build-Proj {
     $configureDebugArgs = @(
         "-S", $sourcePath,
         "-B", $layout.BuildDebug,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($layout.StageDebug)"
     ) + $commonArgs
@@ -2266,7 +2289,7 @@ function Build-Gdal {
     $configureReleaseArgs = @(
         "-S", $sourcePath,
         "-B", $layout.BuildRelease,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($layout.StageRelease)"
     ) + $commonArgs
@@ -2285,7 +2308,7 @@ function Build-Gdal {
     $configureDebugArgs = @(
         "-S", $sourcePath,
         "-B", $layout.BuildDebug,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DCMAKE_INSTALL_PREFIX=$($layout.StageDebug)"
     ) + $commonArgs
@@ -2661,7 +2684,7 @@ function Build-Python {
     }
 
     Ensure-PythonSourceArchiveCompatibilityPatch -SourcePath $sourcePath
-    $pythonPlatformToolset = Resolve-VsPlatformToolset -ResolvedVsPath $script:VsPath
+    $pythonPlatformToolset = $script:ResolvedToolset
     Set-Content -LiteralPath (Join-Path $pcBuild "MSBuild.rsp") -Value ("/p:PlatformToolset={0}" -f $pythonPlatformToolset)
 
     $msbuildExe = Get-Command "MSBuild.exe" -ErrorAction SilentlyContinue
@@ -2781,7 +2804,7 @@ function Build-MySQLServer {
 
     $commonArgs = @(
         "-S", $sourcePath,
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DBISON_EXECUTABLE=$bisonExe",
         "-DDOWNLOAD_BOOST=1",
@@ -2827,6 +2850,13 @@ function Build-MySQLServer {
     Copy-FirstMatch -SearchRoot $stageRel -Patterns $mysqlHeaderPatterns -Destination (Join-Path $script:BundleDir "include") -AllowMany | Out-Null
     Copy-FirstMatch -SearchRoot $sourcePath -Patterns $mysqlHeaderPatterns -Destination (Join-Path $script:BundleDir "include") -AllowMany | Out-Null
     Copy-FirstMatch -SearchRoot $buildRel -Patterns @("mysql_version.h", "mysqld_error.h", "errmsg.h") -Destination (Join-Path $script:BundleDir "include") -AllowMany | Out-Null
+    # mysql.h and mysql_com.h include these; they are part of the client
+    # headers a CMake install would provide.
+    foreach ($header in @("my_command.h", "my_compress.h", "my_list.h")) {
+        foreach ($destination in @($mysqlIncludeDir, (Join-Path $script:BundleDir "include"))) {
+            Copy-Item -LiteralPath (Join-Path $sourcePath "include\$header") -Destination (Join-Path $destination $header) -Force
+        }
+    }
 
     $releaseSearchRoots = @($stageRel, (Join-Path $buildRel "library_output_directory"), (Join-Path $buildRel "archive_output_directory"), (Join-Path $buildRel "runtime_output_directory"), $buildRel)
     $debugSearchRoots = @($stageDbg, (Join-Path $buildDbg "library_output_directory"), (Join-Path $buildDbg "archive_output_directory"), (Join-Path $buildDbg "runtime_output_directory"), $buildDbg)
@@ -2883,7 +2913,7 @@ function Build-ConnectorCpp {
 
     $commonArgs = @(
         "-S", (Join-Path $sourcePath "jdbc"),
-        "-G", $script:ResolvedGenerator,
+        "-G", $script:ResolvedGenerator, "-T", $script:ResolvedToolset,
         "-A", "x64",
         "-DWITH_TESTS=OFF",
         "-DMYSQL_INCLUDE_DIR=$mysqlHeaders",
@@ -3228,6 +3258,8 @@ function Main {
         Initialize-BundleLayout
         $script:VsPath = Get-VSInstallPath
         $script:ResolvedGenerator = Resolve-CMakeGenerator -ResolvedVsPath $script:VsPath
+        $script:ResolvedToolset = if ($PlatformToolset -ne "auto") { $PlatformToolset } else { Resolve-VsPlatformToolset -ResolvedVsPath $script:VsPath }
+        Write-Info ("Toolset          : {0}" -f $script:ResolvedToolset)
 
         if ($Clean) {
             Write-Section "Cleaning"

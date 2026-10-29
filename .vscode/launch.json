@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "SqlStudio (GDB, Linux)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/../sqlstudio-install/bin/sql-studio-bin",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "stopAtEntry": false,
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "Build SqlStudio Linux",
+      "setupCommands": [
+        {
+          "text": "set debuginfod enabled off",
+          "ignoreFailures": true
+        },
+        {
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "text": "set exec-wrapper /bin/bash \"${workspaceFolder}/.vscode/sqlstudio-gdb-wrapper.sh\""
+        },
+        {
+          "description": "Diagnose unexpected application shutdown",
+          "text": "-break-insert -f wb::WBContextUI::request_quit"
+        },
+        {
+          "description": "Catch process exit if shutdown bypasses request_quit",
+          "text": "-break-insert -f exit"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+name: Cleanup
+
+# Pull requests from forks get a read-only token, so their own runs cannot
+# remove anything. This scheduled job runs with write access instead and frees
+# space taken by pull request builds:
+#   - caches saved by pull requests that are closed (each bundle is ~1.6 GB and
+#     the repository has a 10 GB cache limit);
+#   - artifacts of older Build runs of a pull request, keeping only the newest
+#     completed run of each pull request branch.
+# Builds of develop and master are not touched.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Only list what would be deleted'
+        type: boolean
+        default: true
+
+permissions:
+  actions: write
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+    steps:
+      - name: Delete caches of closed pull requests
+        run: |
+          freed=0
+          while read -r id ref size; do
+            pr=${ref#refs/pull/}
+            pr=${pr%%/*}
+            state=$(gh api "repos/$REPO/pulls/$pr" --jq .state)
+            [ "$state" = closed ] || continue
+            echo "PR #$pr ($state): cache $id, $((size / 1048576)) MB"
+            [ "$DRY_RUN" = true ] || gh cache delete "$id" -R "$REPO"
+            freed=$((freed + size))
+          done < <(gh cache list -R "$REPO" --limit 1000 --json id,ref,sizeInBytes \
+                     --jq '.[] | select(.ref | test("^refs/pull/[0-9]+/")) | "\(.id) \(.ref) \(.sizeInBytes)"')
+          echo "Caches of closed pull requests: $((freed / 1048576)) MB" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete artifacts of superseded pull request builds
+        run: |
+          # Completed Build runs triggered by pull requests, newest first. Runs
+          # from forks carry no pull request number, so they are grouped by the
+          # head repository and branch instead.
+          gh api --paginate \
+            "repos/$REPO/actions/workflows/build.yml/runs?event=pull_request&status=completed&per_page=100" \
+            --jq '.workflow_runs[] | "\(.id) \(.head_repository.full_name // "deleted"):\(.head_branch)"' \
+            | sort -k1,1nr > runs.txt
+
+          # Every run except the newest one of its branch is superseded.
+          awk 'seen[$2]++ { print $1 }' runs.txt | sort -u > superseded.txt
+
+          freed=0
+          while read -r id run size name; do
+            grep -qx "$run" superseded.txt || continue
+            echo "run $run: $name, $((size / 1048576)) MB"
+            [ "$DRY_RUN" = true ] || gh api -X DELETE "repos/$REPO/actions/artifacts/$id"
+            freed=$((freed + size))
+          done < <(gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+                     --jq '.artifacts[] | select(.expired | not) | "\(.id) \(.workflow_run.id) \(.size_in_bytes) \(.name)"')
+          echo "Artifacts of superseded pull request builds: $((freed / 1048576)) MB" | tee -a "$GITHUB_STEP_SUMMARY"

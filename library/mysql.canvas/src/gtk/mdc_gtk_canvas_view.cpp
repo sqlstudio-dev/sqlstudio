@@ -31,6 +31,24 @@
 
 using namespace mdc;
 
+namespace {
+// GTK owns presentation, clipping and device scaling. Direct XCopyArea calls
+// bypass its draw frame and can paint over neighbouring widgets.
+class GtkBufferedCanvasView : public BufferedXlibCanvasView {
+public:
+  using BufferedXlibCanvasView::BufferedXlibCanvasView;
+
+  void end_repaint() override {
+    cairo_surface_flush(cairo_get_target(cairoctx()->get_cr()));
+  }
+
+  void scroll_to(const base::Point &offset) override {
+    // The Xlib implementation scrolls by copying pixels in the native window.
+    CanvasView::scroll_to(offset);
+  }
+};
+}
+
 std::string mdc::detect_opengl_version() {
   int major, minor;
   Display *dpy = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
@@ -78,11 +96,8 @@ void GtkCanvas::create_canvas() {
                                   gdk_x11_visual_get_xvisual(get_visual()->gobj()), get_width(), get_height());
       break;
     case XlibCanvasType:
-      _canvas = new XlibCanvasView(dpy, gdk_x11_window_get_xid(get_bin_window()->gobj()),
-                                   gdk_x11_visual_get_xvisual(get_visual()->gobj()), get_width(), get_height());
-      break;
     case BufferedXlibCanvasType:
-      _canvas = new BufferedXlibCanvasView(
+      _canvas = new GtkBufferedCanvasView(
         dpy, gdk_x11_window_get_xid(get_bin_window()->gobj()), gdk_x11_visual_get_xvisual(get_visual()->gobj()),
         gdk_visual_get_depth(gdk_window_get_visual(get_bin_window()->gobj())), get_width(), get_height());
       break;
@@ -322,6 +337,12 @@ bool GtkCanvas::redraw(::Cairo::RefPtr< ::Cairo::Context> context) {
     double x1, y1, x2, y2;
     context->get_clip_extents(x1, y1, x2, y2);
     _canvas->repaint(x1, y1, x2 - x1, y2 - y1);
+    if (_canvas_type != OpenGLCanvasType) {
+      context->save();
+      cairo_set_source_surface(context->cobj(), cairo_get_target(_canvas->cairoctx()->get_cr()), 0, 0);
+      context->paint();
+      context->restore();
+    }
     gettimeofday(&tv2, NULL);
 
     static const char *debug_canvas = getenv("DEBUG_CANVAS");

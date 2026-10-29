@@ -1059,6 +1059,43 @@ REQUIRE_TABLE_PRIMARY_KEY_CHECK_SYMBOL:
 STREAM_SYMBOL:                   S T R E A M                                 {serverVersion >= 80019}?; // MYSQL
 OFF_SYMBOL:                      O F F                                       {serverVersion >= 80019}?; // SQL-1999-R
 
+// Keywords added after the original MySQL 8.0 grammar.
+JSON_VALUE_SYMBOL: J S O N '_' V A L U E {serverVersion >= 80021}?;
+RETURNING_SYMBOL: R E T U R N I N G {serverVersion >= 80021}?;
+REPLICA_SYMBOL: R E P L I C A {serverVersion >= 80022}?;
+REPLICAS_SYMBOL: R E P L I C A S {serverVersion >= 80022}?;
+GET_SOURCE_PUBLIC_KEY_SYMBOL: G E T '_' S O U R C E '_' P U B L I C '_' K E Y {serverVersion >= 80023}?;
+SOURCE_AUTO_POSITION_SYMBOL: S O U R C E '_' A U T O '_' P O S I T I O N {serverVersion >= 80023}?;
+SOURCE_BIND_SYMBOL: S O U R C E '_' B I N D {serverVersion >= 80023}?;
+SOURCE_COMPRESSION_ALGORITHMS_SYMBOL: S O U R C E '_' C O M P R E S S I O N '_' A L G O R I T H M S {serverVersion >= 80023}?;
+SOURCE_CONNECTION_AUTO_FAILOVER_SYMBOL: S O U R C E '_' C O N N E C T I O N '_' A U T O '_' F A I L O V E R {serverVersion >= 80023}?;
+SOURCE_CONNECT_RETRY_SYMBOL: S O U R C E '_' C O N N E C T '_' R E T R Y {serverVersion >= 80023}?;
+SOURCE_DELAY_SYMBOL: S O U R C E '_' D E L A Y {serverVersion >= 80023}?;
+SOURCE_HEARTBEAT_PERIOD_SYMBOL: S O U R C E '_' H E A R T B E A T '_' P E R I O D {serverVersion >= 80023}?;
+SOURCE_HOST_SYMBOL: S O U R C E '_' H O S T {serverVersion >= 80023}?;
+SOURCE_LOG_FILE_SYMBOL: S O U R C E '_' L O G '_' F I L E {serverVersion >= 80023}?;
+SOURCE_LOG_POS_SYMBOL: S O U R C E '_' L O G '_' P O S {serverVersion >= 80023}?;
+SOURCE_PASSWORD_SYMBOL: S O U R C E '_' P A S S W O R D {serverVersion >= 80023}?;
+SOURCE_PORT_SYMBOL: S O U R C E '_' P O R T {serverVersion >= 80023}?;
+SOURCE_PUBLIC_KEY_PATH_SYMBOL: S O U R C E '_' P U B L I C '_' K E Y '_' P A T H {serverVersion >= 80023}?;
+SOURCE_RETRY_COUNT_SYMBOL: S O U R C E '_' R E T R Y '_' C O U N T {serverVersion >= 80023}?;
+SOURCE_SSL_CAPATH_SYMBOL: S O U R C E '_' S S L '_' C A P A T H {serverVersion >= 80023}?;
+SOURCE_SSL_CA_SYMBOL: S O U R C E '_' S S L '_' C A {serverVersion >= 80023}?;
+SOURCE_SSL_CERT_SYMBOL: S O U R C E '_' S S L '_' C E R T {serverVersion >= 80023}?;
+SOURCE_SSL_CIPHER_SYMBOL: S O U R C E '_' S S L '_' C I P H E R {serverVersion >= 80023}?;
+SOURCE_SSL_CRLPATH_SYMBOL: S O U R C E '_' S S L '_' C R L P A T H {serverVersion >= 80023}?;
+SOURCE_SSL_CRL_SYMBOL: S O U R C E '_' S S L '_' C R L {serverVersion >= 80023}?;
+SOURCE_SSL_KEY_SYMBOL: S O U R C E '_' S S L '_' K E Y {serverVersion >= 80023}?;
+SOURCE_SSL_SYMBOL: S O U R C E '_' S S L {serverVersion >= 80023}?;
+SOURCE_SSL_VERIFY_SERVER_CERT_SYMBOL: S O U R C E '_' S S L '_' V E R I F Y '_' S E R V E R '_' C E R T {serverVersion >= 80023}?;
+SOURCE_TLS_CIPHERSUITES_SYMBOL: S O U R C E '_' T L S '_' C I P H E R S U I T E S {serverVersion >= 80023}?;
+SOURCE_TLS_VERSION_SYMBOL: S O U R C E '_' T L S '_' V E R S I O N {serverVersion >= 80023}?;
+SOURCE_USER_SYMBOL: S O U R C E '_' U S E R {serverVersion >= 80023}?;
+SOURCE_ZSTD_COMPRESSION_LEVEL_SYMBOL: S O U R C E '_' Z S T D '_' C O M P R E S S I O N '_' L E V E L {serverVersion >= 80023}?;
+INTERSECT_SYMBOL: I N T E R S E C T {serverVersion >= 80031}?;
+LOG_SYMBOL: L O G {serverVersion >= 80200}?;
+GTIDS_SYMBOL: G T I D S {serverVersion >= 80200}?;
+
 // $antlr-format groupedAlignments on, alignTrailers off, alignLexerCommands on
 
 // Additional tokens which are mapped to existing tokens.

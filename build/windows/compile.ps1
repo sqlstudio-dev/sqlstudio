@@ -86,7 +86,7 @@ Usage:
   powershell -NoProfile -File .\build\windows\compile.ps1 [-Action <name>] [options]
 
 Actions:
-  build            Build the SqlStudio solution target.
+  build            Build the whole SqlStudio solution.
   build-unittest   Build the application and the native test-suite executable.
   run-unittest     Build if needed, prepare runtime files, and run test-suite.exe.
   run-coverage     Build if needed, prepare runtime files, and run test-suite.exe under OpenCppCoverage.
@@ -377,7 +377,9 @@ function Prepare-RuntimeOutput {
 }
 
 function Build-Studio {
-    Invoke-MSBuildSolutionTarget -TargetName "SqlStudio"
+    # The whole solution: the SqlStudio target alone leaves out the GRT
+    # modules, plugins, Python bindings and helper tools it loads at run time.
+    Invoke-MSBuildSolutionTarget -TargetName "Build"
 }
 
 function Build-UnitTests {

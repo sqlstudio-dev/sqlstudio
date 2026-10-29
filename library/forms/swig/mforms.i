@@ -137,7 +137,7 @@ static void show_python_exception()
   std::string result;
 
   /* See if we can get a full traceback */
-  moduleName = PyString_FromString("traceback");
+  moduleName = PyUnicode_FromString("traceback");
   pythonModule = PyImport_Import(moduleName);
   Py_DECREF(moduleName);
 
@@ -606,11 +606,11 @@ inline boost::function<void (mforms::TextEntryAction)> pycall_void_entryaction_f
   if (PyUnicode_Check($input))
   {
     PyObject *tmp = PyUnicode_AsUTF8String($input);
-    $1 = new std::string(PyString_AsString(tmp));
+    $1 = new std::string(PyBytes_AsString(tmp));
     Py_DECREF(tmp);
   }
-  else if (PyString_Check($input))
-    $1 = new std::string(PyString_AsString($input));
+  else if (PyBytes_Check($input))
+    $1 = new std::string(PyBytes_AsString($input));
   else
   {
     PyErr_SetString(PyExc_TypeError, "not a string");
@@ -635,11 +635,11 @@ inline boost::function<void (mforms::TextEntryAction)> pycall_void_entryaction_f
       if (PyUnicode_Check(item))
       {
         PyObject *tmp = PyUnicode_AsUTF8String(item);
-        $1->push_back(PyString_AsString(tmp));
+        $1->push_back(PyBytes_AsString(tmp));
         Py_DECREF(tmp);
       }
-      else if (PyString_Check(item))
-        $1->push_back(PyString_AsString(item));
+      else if (PyBytes_Check(item))
+        $1->push_back(PyBytes_AsString(item));
       else
       {
         delete $1;
@@ -656,7 +656,7 @@ inline boost::function<void (mforms::TextEntryAction)> pycall_void_entryaction_f
    $result = PyList_New(0);
    for (std::vector<int>::const_iterator iter = $1.begin(); iter != $1.end(); ++iter)
    {
-     PyList_Append($result, PyInt_FromLong(*iter));
+     PyList_Append($result, PyLong_FromLong(*iter));
    }
 }
 
@@ -664,7 +664,7 @@ inline boost::function<void (mforms::TextEntryAction)> pycall_void_entryaction_f
    $result = PyList_New(0);
    for (std::vector<size_t>::const_iterator iter = $1.begin(); iter != $1.end(); ++iter)
    {
-     PyList_Append($result, PyInt_FromLong(*iter));
+     PyList_Append($result, PyLong_FromLong(*iter));
    }
 }
 
@@ -674,7 +674,7 @@ inline boost::function<void (mforms::TextEntryAction)> pycall_void_entryaction_f
     for (int c= PyList_Size($input), i= 0; i < c; i++)
     {
       PyObject *item = PyList_GetItem($input, i);
-      $1->push_back(PyInt_AsLong(item));
+      $1->push_back(PyLong_AsLong(item));
     }
   }
   else
@@ -698,11 +698,11 @@ inline boost::function<void (mforms::TextEntryAction)> pycall_void_entryaction_f
       if (PyUnicode_Check(item))
       {
         PyObject *tmp = PyUnicode_AsUTF8String(item);
-        $1->push_back(PyString_AsString(tmp));
+        $1->push_back(PyBytes_AsString(tmp));
         Py_DECREF(tmp);
       }
-      else if (PyString_Check(item))
-        $1->push_back(PyString_AsString(item));
+      else if (PyBytes_Check(item))
+        $1->push_back(PyBytes_AsString(item));
       else
       {
         delete $1;
@@ -833,8 +833,8 @@ namespace std {
       PyObject *item = PyList_GetItem($input, i);
       if (PyFloat_Check(item))
         $1.push_back(PyFloat_AsDouble(item));
-      else if (PyInt_Check(item))
-        $1.push_back(PyInt_AsLong(item));
+      else if (PyLong_Check(item))
+        $1.push_back(PyLong_AsLong(item));
       else
       {
         SWIG_exception_fail(SWIG_TypeError, "expected list of doubles");

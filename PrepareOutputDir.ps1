@@ -55,7 +55,8 @@ try {
     $python = Join-Path $bundle 'Python'
     $pythonLib = Join-Path $python 'lib'
     $debugSuffix = ''
-    $pythonExcludes = @('_ctypes_test*.pyd')
+    # CPython's test modules, and _tkinter, which needs Tcl/Tk that is not shipped.
+    $pythonExcludes = @('_ctypes_test*.pyd', '_test*.pyd', 'xxlimited*.pyd', '_tkinter*.pyd')
     if ($ConfigurationName -eq 'Debug') { $debugSuffix = '_d' }
     else { $pythonExcludes += '*_d.*' }
     [void][System.IO.Directory]::CreateDirectory($target)
@@ -118,6 +119,10 @@ try {
     Copy-Files "$python\pyodbc*$debugSuffix.pyd" "$target\python\site-packages" -ExcludeFiles $pythonExcludes
     Copy-Files "$python\pyodbc$debugSuffix*.pyd" "$target\python\site-packages" -ExcludeFiles $pythonExcludes
     Copy-Files "$python\*sqlite3*$debugSuffix.dll" "$target\python\DLLs" -ExcludeFiles $pythonExcludes
+    # OpenSSL as built by CPython, for _ssl and _hashlib; Python loads it from
+    # the directory of the extension module.
+    Copy-Files "$python\libcrypto-3.dll" "$target\python\DLLs"
+    Copy-Files "$python\libssl-3.dll" "$target\python\DLLs"
     Copy-Files "$python\Libs\site-packages\*.pyd" "$target\python\site-packages" -Recurse
 
     Write-Info 'Copy runtime libraries (including libxml2, PROJ, GDAL and zlib) ...'
@@ -176,8 +181,9 @@ try {
         'migration\backend', 'migration\dbcopy', 'wb.bugreport', 'wb.query.analysis', 'wb.updater\backend', 'wb.sqlide')) {
         Copy-Files "$root\plugins\$plugin\*.py" "$target\modules"
     }
-    $licenseSuffix = '-commercial'
-    if ($ConfigurationName -eq 'Release_OSS') { $licenseSuffix = '' }
+    # Commercial builds ship the -commercial variants when the tree has them.
+    $licenseSuffix = ''
+    if ($ConfigurationName -ne 'Release_OSS' -and (Test-Path -LiteralPath "$root\README-commercial.md")) { $licenseSuffix = '-commercial' }
     Copy-Files "$root\README$licenseSuffix.md" $target
     Copy-Files "$root\license$licenseSuffix.txt" $target
 

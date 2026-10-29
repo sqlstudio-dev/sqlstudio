@@ -576,7 +576,7 @@ build_override_mysql_server() {
         -DWITH_INNODB_MEMCACHED=OFF \
         -DDOWNLOAD_BOOST=ON \
         -DWITH_BOOST="${mysql_boost_dir}" \
-        -DWITH_SSL=system \
+        -DWITH_SSL="$(brew --prefix openssl@3)" \
         -DWITH_ZLIB=bundled \
         -DWITH_LZ4=bundled \
         -DWITH_ZSTD=bundled \
@@ -634,7 +634,7 @@ build_override_mysql_connector_cpp() {
         -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DMYSQL_DIR="${BUNDLE_DIR}" \
         -DWITH_JDBC=ON \
-        -DWITH_SSL=system
+        -DWITH_SSL="$(brew --prefix openssl@3)"
 
     run_cmd "cmake build (connector-cpp)" \
         cmake --build "$build_dir" -- -j"${JOBS}"
@@ -964,6 +964,15 @@ process_dep() {
     fi
 
     $DOWNLOAD_ONLY && return 0
+
+    # JAR tools are installed directly; they do not need extraction or compilation.
+    local artifact="${BUNDLE_SOURCE}/$(archive_name "$idx")"
+    if [[ "$artifact" == *.jar ]]; then
+        mkdir -p "${BUNDLE_BIN}"
+        cp -f "$artifact" "${BUNDLE_BIN}/$(basename "$artifact")"
+        ok "Installed JAR → ${C_DIM}${BUNDLE_BIN}/$(basename "$artifact")${C_RESET}"
+        return 0
+    fi
 
     # ── extract ───────────────────────────────────────────────────────
     extract_archive "$idx"

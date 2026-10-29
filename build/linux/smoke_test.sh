@@ -2,7 +2,8 @@
 #
 # Smoke test for an installed SqlStudio: starts it on a virtual X display with
 # a fresh user profile, waits for the main window and checks that the
-# application is still running a while later without Python errors.
+# application is still running a while later without Python errors and that it
+# recognises the operating system as supported.
 #
 # Needs: xvfb, xdotool, x11-utils, dbus-x11, imagemagick.
 #
@@ -79,6 +80,14 @@ logs=("$OUT_DIR/console.log")
 [[ -f $HOME/.mysql/studio/log/wb.log ]] && logs+=("$HOME/.mysql/studio/log/wb.log")
 if grep -n 'Traceback' "${logs[@]}"; then
     fail "Python errors in the application output"
+fi
+
+# The app is meant to recognise every distro CI builds a package for
+# (isOsSupported() in backend/wbprivate/studio/wb_module.cpp). Its warning
+# dialog has no window title on a display without a window manager, so check
+# the log.
+if grep -n 'OS not found on supported OS list' "${logs[@]}"; then
+    fail "the application reports an unsupported operating system"
 fi
 
 # Errors logged by the application itself are reported but not fatal: some

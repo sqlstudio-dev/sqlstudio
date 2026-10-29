@@ -2735,16 +2735,6 @@
 		D0437C002B1F433E00114F67 /* Python.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E4E66F425D697060060A2FA /* Python.framework */; };
 		D0437C012B1F434B00114F67 /* Python.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E4E66F425D697060060A2FA /* Python.framework */; };
 		D0437C022B1F435700114F67 /* Python.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8E4E66F425D697060060A2FA /* Python.framework */; };
-		D0C16BAE2CD22242004A912E /* mysql_native_password.so in Resources */ = {isa = PBXBuildFile; fileRef = D0C16BAD2CD22242004A912E /* mysql_native_password.so */; };
-		D0C16BAF2CD22282004A912E /* mysql_native_password.so in Copy Files (dylibs) */ = {isa = PBXBuildFile; fileRef = D0C16BAD2CD22242004A912E /* mysql_native_password.so */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		D0C16BB22CD259CA004A912E /* authentication_webauthn_client.so in Resources */ = {isa = PBXBuildFile; fileRef = D0C16BB12CD259CA004A912E /* authentication_webauthn_client.so */; };
-		D0C16BB42CD259D9004A912E /* authentication_openid_connect_client.so in Resources */ = {isa = PBXBuildFile; fileRef = D0C16BB32CD259D9004A912E /* authentication_openid_connect_client.so */; };
-		D0C16BB62CD259EA004A912E /* authentication_oci_client.so in Resources */ = {isa = PBXBuildFile; fileRef = D0C16BB52CD259EA004A912E /* authentication_oci_client.so */; };
-		D0C16BB82CD259F9004A912E /* authentication_ldap_sasl_client.so in Resources */ = {isa = PBXBuildFile; fileRef = D0C16BB72CD259F9004A912E /* authentication_ldap_sasl_client.so */; };
-		D0C16BB92CD25A14004A912E /* authentication_webauthn_client.so in Copy Files (dylibs) */ = {isa = PBXBuildFile; fileRef = D0C16BB12CD259CA004A912E /* authentication_webauthn_client.so */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		D0C16BBA2CD25A1D004A912E /* authentication_openid_connect_client.so in Copy Files (dylibs) */ = {isa = PBXBuildFile; fileRef = D0C16BB32CD259D9004A912E /* authentication_openid_connect_client.so */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		D0C16BBB2CD25A23004A912E /* authentication_oci_client.so in Copy Files (dylibs) */ = {isa = PBXBuildFile; fileRef = D0C16BB52CD259EA004A912E /* authentication_oci_client.so */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
-		D0C16BBC2CD25A28004A912E /* authentication_ldap_sasl_client.so in Copy Files (dylibs) */ = {isa = PBXBuildFile; fileRef = D0C16BB72CD259F9004A912E /* authentication_ldap_sasl_client.so */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		ED0955E1177374690051CF28 /* page_restore.png in Resources */ = {isa = PBXBuildFile; fileRef = ED0955DE177374690051CF28 /* page_restore.png */; };
 		ED0955E2177374690051CF28 /* title_backup.png in Resources */ = {isa = PBXBuildFile; fileRef = ED0955DF177374690051CF28 /* title_backup.png */; };
 		ED0955E3177374690051CF28 /* title_restore.png in Resources */ = {isa = PBXBuildFile; fileRef = ED0955E0177374690051CF28 /* title_restore.png */; };
@@ -3963,7 +3953,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				D0C16BAF2CD22282004A912E /* mysql_native_password.so in Copy Files (dylibs) */,
 				27DD507620B56D8D00A8F17A /* libwbssh.dylib in Copy Files (dylibs) */,
 				27183E891DA54E0100257580 /* libmtemplate.dylib in Copy Files (dylibs) */,
 				27E0E23015517BAE0073FD6F /* libparsers.dylib in Copy Files (dylibs) */,
@@ -3988,10 +3977,6 @@
 				27189E72209B30EA002EC0D4 /* libssl.3.dylib in Copy Files (dylibs) */,
 				27189E63209B2D21002EC0D4 /* libvsqlitepp.3.dylib in Copy Files (dylibs) */,
 				8E4E698F25D6A63B0060A2FA /* Python.framework in Copy Files (dylibs) */,
-				D0C16BBC2CD25A28004A912E /* authentication_ldap_sasl_client.so in Copy Files (dylibs) */,
-				D0C16BB92CD25A14004A912E /* authentication_webauthn_client.so in Copy Files (dylibs) */,
-				D0C16BBA2CD25A1D004A912E /* authentication_openid_connect_client.so in Copy Files (dylibs) */,
-				D0C16BBB2CD25A23004A912E /* authentication_oci_client.so in Copy Files (dylibs) */,
 			);
 			name = "Copy Files (dylibs)";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -6745,11 +6730,6 @@
 		8EF64AAA225F69BE00AA8BD1 /* wb_model_file_specs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wb_model_file_specs.cpp; sourceTree = "<group>"; };
 		8EF64AAE2260D05F00AA8BD1 /* wb_context_specs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wb_context_specs.cpp; sourceTree = "<group>"; };
 		8EF64AB82267563200AA8BD1 /* wb_lowlevel_specs.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = wb_lowlevel_specs.cpp; sourceTree = "<group>"; };
-		D0C16BAD2CD22242004A912E /* mysql_native_password.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = mysql_native_password.so; path = "3rd-party-ce/lib/plugin/mysql_native_password.so"; sourceTree = "<group>"; };
-		D0C16BB12CD259CA004A912E /* authentication_webauthn_client.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = authentication_webauthn_client.so; path = "3rd-party-ce/lib/plugin/authentication_webauthn_client.so"; sourceTree = "<group>"; };
-		D0C16BB32CD259D9004A912E /* authentication_openid_connect_client.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = authentication_openid_connect_client.so; path = "3rd-party-ce/lib/plugin/authentication_openid_connect_client.so"; sourceTree = "<group>"; };
-		D0C16BB52CD259EA004A912E /* authentication_oci_client.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = authentication_oci_client.so; path = "3rd-party-ce/lib/plugin/authentication_oci_client.so"; sourceTree = "<group>"; };
-		D0C16BB72CD259F9004A912E /* authentication_ldap_sasl_client.so */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.bundle"; name = authentication_ldap_sasl_client.so; path = "3rd-party-ce/lib/plugin/authentication_ldap_sasl_client.so"; sourceTree = "<group>"; };
 		ED0955DE177374690051CF28 /* page_restore.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = page_restore.png; path = images/admin/page_restore.png; sourceTree = "<group>"; };
 		ED0955DF177374690051CF28 /* title_backup.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = title_backup.png; path = images/admin/title_backup.png; sourceTree = "<group>"; };
 		ED0955E0177374690051CF28 /* title_restore.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = title_restore.png; path = images/admin/title_restore.png; sourceTree = "<group>"; };
@@ -9615,11 +9595,6 @@
 		2B750F9E0E8796310003120A /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
-				D0C16BB72CD259F9004A912E /* authentication_ldap_sasl_client.so */,
-				D0C16BB52CD259EA004A912E /* authentication_oci_client.so */,
-				D0C16BB32CD259D9004A912E /* authentication_openid_connect_client.so */,
-				D0C16BB12CD259CA004A912E /* authentication_webauthn_client.so */,
-				D0C16BAD2CD22242004A912E /* mysql_native_password.so */,
 				27D6EE392099D8DC0050B26B /* libantlr4-runtime.dylib */,
 				27D6EE362099D8210050B26B /* libcairo.2.dylib */,
 				27189E70209B30DC002EC0D4 /* libcrypto.3.dylib */,
@@ -13494,7 +13469,6 @@
 				2B263A4B0E9402DD00933149 /* collapsing_panel_grid_details2.png in Resources */,
 				2B263A4C0E9402DD00933149 /* collapsing_panel_grid_large_icons.png in Resources */,
 				2B263A4D0E9402DD00933149 /* collapsing_panel_grid_large_icons2.png in Resources */,
-				D0C16BAE2CD22242004A912E /* mysql_native_password.so in Resources */,
 				2B263A4E0E9402DD00933149 /* collapsing_panel_grid_small_icons.png in Resources */,
 				2B263A4F0E9402DD00933149 /* collapsing_panel_grid_small_icons2.png in Resources */,
 				2B263A500E9402DD00933149 /* collapsing_panel_header_bg.png in Resources */,
@@ -13578,7 +13552,6 @@
 				2B263A7F0E9402DD00933149 /* db.Routine.many.32x32.png in Resources */,
 				2BF90F041979C3310029E1F9 /* ps_switcher_default_hoover.png in Resources */,
 				27D9641F1CC0D85600C0E2CF /* JS_Datatype_Bin@2x.png in Resources */,
-				D0C16BB82CD259F9004A912E /* authentication_ldap_sasl_client.so in Resources */,
 				2B263A800E9402DD00933149 /* db.RoutineGroup.16x16.png in Resources */,
 				2B02FEF6183E771B00770CC0 /* rubber.png in Resources */,
 				2BF90EFE1979C3310029E1F9 /* ps_switcher_custom_hoover.png in Resources */,
@@ -13651,12 +13624,10 @@
 				2B263AB90E9402DD00933149 /* GrtObject.many_32x32.png in Resources */,
 				2B263ABA0E9402DD00933149 /* GrtStoredNote.48x48.png in Resources */,
 				2B263ABB0E9402DD00933149 /* GrtStoredNote.add.48x48.png in Resources */,
-				D0C16BB42CD259D9004A912E /* authentication_openid_connect_client.so in Resources */,
 				2B263ABD0E9402DD00933149 /* header_bar_blue.png in Resources */,
 				2B263ABE0E9402DD00933149 /* header_bar_gray.png in Resources */,
 				2B263ABF0E9402DD00933149 /* header_bar_orange.png in Resources */,
 				2B263AC00E9402DD00933149 /* history.png in Resources */,
-				D0C16BB22CD259CA004A912E /* authentication_webauthn_client.so in Resources */,
 				27F2E9991A65CE7D00BD2996 /* ac_routine.png in Resources */,
 				2B263AC30E9402DD00933149 /* layers.png in Resources */,
 				2B263AC60E9402DD00933149 /* message_confirm.png in Resources */,
@@ -14307,7 +14278,6 @@
 				2BD42037198034A60061895B /* admin_config_wizard@2x.png in Resources */,
 				27F2E9891A65CE7D00BD2996 /* ac_column.png in Resources */,
 				2B1434A2179DDDE7002217CF /* qe_sql-editor-tb-icon_word-wrap-off.png in Resources */,
-				D0C16BB62CD259EA004A912E /* authentication_oci_client.so in Resources */,
 				2B1434A3179DDDE7002217CF /* qe_sql-editor-tb-icon_word-wrap-off@2x.png in Resources */,
 				44DCA26E21E627C400DEC031 /* wb_rel_11_nonid_dark.png in Resources */,
 				2B1434A4179DDDE7002217CF /* qe_sql-editor-tb-icon_word-wrap-on.png in Resources */,
@@ -14374,7 +14344,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "#!/bin/bash\n\nexecfile=${BUILT_PRODUCTS_DIR}/${EXECUTABLE_PATH}\nNEWLIBPATH=${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\nPLUGINPATH=${BUILT_PRODUCTS_DIR}/${PLUGINS_FOLDER_PATH}\nEXEPATH=${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}\nPYTHONMODULESPATH=${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/libraries\n\nRES_SOURCE_PATH_CE=${SRCROOT}/3rd-party-ce\nRES_SOURCE_PATH_SE=${SRCROOT}/3rd-party-se\n\nNEWTARGETPATH=\"@executable_path/../Frameworks\"\nRELNEWTARGETPATH=\"@loader_path/../Frameworks\"\n\nfixer=$SRCROOT/build/fixup_dylib_paths.sh\npythonfixer=$SRCROOT/build/fixup_python_paths.sh\n\n# copy file if it doesnt exist or is newer\nfunction copy() {\n    from=$1\n    to=$2/`basename $from`\n    if [ ! -f $to ] || [ $from -nt $to ]; then\n        cp -f $from $to\n    fi\n}\n\nfunction copySymlink() {\n    fromPath=$1\n    fromDir=`dirname $fromPath`\n    destName=`readlink $fromPath`\n    while [ -L \"$fromDir/$destName\" ]\n    do\n        destName=`readlink $fromDir/$destName`\n    done\n    destPath=$2/$destName\n    if [ ! -f $fromPath ] || [ $fromPath -nt $destPath ]; then\n        cp -f $fromPath $destPath\n    fi\n}\n\n\necho \"Copy special 3rd party libraries into bundle\"\nrm -f ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/License*.txt\nrm -f ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/README*.txt\n\ncopy ${RES_SOURCE_PATH_SE}/bin/ogrinfo ${EXEPATH}\ncopy ${RES_SOURCE_PATH_SE}/bin/ogr2ogr ${EXEPATH}\n\necho \"Copy symlink'ed destinations into bundle\"\ncopySymlink ${RES_SOURCE_PATH_SE}/lib/libproj.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_SE}/lib/libssh.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_SE}/lib/libzip.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_SE}/lib/libmysqlcppconn.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_SE}/lib/libgdal.dylib ${NEWLIBPATH}\n\n# Use commercial libs if wba_audit module is present\nif [ -d ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/plugins/wba_audit ]; then\n    echo \"Copying libraries for standard edition\"\n    copy ${RES_SOURCE_PATH_SE}/lib/mysql/libmysqlclient.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_SE}/lib/mysql/libmysqlclient.*.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_SE}/bin/mysql ${EXEPATH}\n    copy ${RES_SOURCE_PATH_SE}/bin/mysqldump ${EXEPATH}\n\n    copy ${RES_SOURCE_PATH_SE}/lib/libsqlite3.so ${NEWLIBPATH}\n\n    copy ${SRCROOT}/License-commercial.txt ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n    copy ${SRCROOT}/README-commercial.md ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\nelse\n    echo \"Copying libraries for community edition\"\n    copy ${RES_SOURCE_PATH_SE}/lib/mysql/libmysqlclient.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_CE}/lib/mysql/libmysqlclient.*.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_CE}/bin/mysql ${EXEPATH}\n    copy ${RES_SOURCE_PATH_CE}/bin/mysqldump ${EXEPATH}\n\n    copy ${RES_SOURCE_PATH_CE}/lib/libsqlite3.so ${NEWLIBPATH}\n\n    copy ${SRCROOT}/License.txt ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n    copy ${SRCROOT}/README.md ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\nfi\n\n\n# Pre-compile Python module\necho \"Pre-compiling Python code\"\npython3 -m compileall ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\npython3 -O -m compileall ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n\necho \"Adjusting paths\"\n$fixer $execfile\n$fixer ${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}/wbcopytables\n$fixer $NEWLIBPATH/libwbbase.dylib\n#$fixer $NEWLIBPATH/libgrt.dylib\n#$fixer $NEWLIBPATH/libwbprivate.be.dylib\n#$fixer $NEWLIBPATH/libwbpublic.be.dylib\n\n# Fix frameworks\nfor libpath in \"$NEWLIBPATH/*.framework\"; do\n    $fixer \"$libpath/*\"\ndone\n\n# Fix python modules\nfor libpath in \"$PYTHONMODULESPATH/*.so\"; do\n    CHANGEPATHS='(@executable_path/../Frameworks|/usr/local)' $fixer $libpath\ndone\n\necho \"Adjusting python paths\"\n$pythonfixer $execfile\n$pythonfixer ${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}/wbcopytables\n$pythonfixer $NEWLIBPATH/libwbbase.dylib\n$pythonfixer $NEWLIBPATH/libgrt.dylib\n$pythonfixer $NEWLIBPATH/libwbprivate.be.dylib\n$pythonfixer $NEWLIBPATH/libwbpublic.be.dylib\n\n# Fix frameworks\nfor libpath in \"$NEWLIBPATH/*.framework\"; do\n    $pythonfixer \"$libpath/*\"\ndone\n\n# Fix python modules\nfor libpath in \"$PYTHONMODULESPATH/*.so\"; do\n    $pythonfixer $libpath\ndone\n\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libwbbase.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libgrt.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libwbprivate.be.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libwbpublic.be.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/_mforms.so\n$pythonfixer ${BUILT_PRODUCTS_DIR}/_cairo.so\n";
+			shellScript = "#!/bin/bash\n\nexecfile=${BUILT_PRODUCTS_DIR}/${EXECUTABLE_PATH}\nNEWLIBPATH=${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\nPLUGINPATH=${BUILT_PRODUCTS_DIR}/${PLUGINS_FOLDER_PATH}\nEXEPATH=${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}\nPYTHONMODULESPATH=${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/libraries\n\nRES_SOURCE_PATH_CE=${SRCROOT}/3rd-party-ce\nRES_SOURCE_PATH_SE=${SRCROOT}/3rd-party-se\n\nNEWTARGETPATH=\"@executable_path/../Frameworks\"\nRELNEWTARGETPATH=\"@loader_path/../Frameworks\"\n\nfixer=$SRCROOT/build/fixup_dylib_paths.sh\npythonfixer=$SRCROOT/build/fixup_python_paths.sh\n\n# copy file if it doesnt exist or is newer\nfunction copy() {\n    from=$1\n    to=$2/`basename $from`\n    if [ ! -f $to ] || [ $from -nt $to ]; then\n        cp -f $from $to\n    fi\n}\n\nfunction copySymlink() {\n    # Copy the library a (possibly absolute or chained) symlink points to,\n    # named after its install name, which is what binaries reference:\n    # libgdal.dylib -> libgdal.36.dylib.\n    fromPath=`readlink -f $1`\n    destPath=$2/`otool -D $fromPath | tail -1 | xargs basename`\n    if [ ! -f $destPath ] || [ $fromPath -nt $destPath ]; then\n        cp -f $fromPath $destPath\n    fi\n}\n\n\necho \"Copy special 3rd party libraries into bundle\"\nrm -f ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/License*.txt\nrm -f ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/README*.txt\n\ncopy ${RES_SOURCE_PATH_CE}/bin/ogrinfo ${EXEPATH}\ncopy ${RES_SOURCE_PATH_CE}/bin/ogr2ogr ${EXEPATH}\n\necho \"Copy symlink'ed destinations into bundle\"\ncopySymlink ${RES_SOURCE_PATH_CE}/lib/libproj.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_CE}/lib/libssh.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_CE}/lib/libzip.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_CE}/lib/libmysqlcppconn.dylib ${NEWLIBPATH}\ncopySymlink ${RES_SOURCE_PATH_CE}/lib/libgdal.dylib ${NEWLIBPATH}\n\n# Use commercial libs if wba_audit module is present\nif [ -d ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/plugins/wba_audit ]; then\n    echo \"Copying libraries for standard edition\"\n    copy ${RES_SOURCE_PATH_SE}/lib/mysql/libmysqlclient.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_SE}/lib/mysql/libmysqlclient.*.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_SE}/bin/mysql ${EXEPATH}\n    copy ${RES_SOURCE_PATH_SE}/bin/mysqldump ${EXEPATH}\n\n    copy ${RES_SOURCE_PATH_SE}/lib/libsqlite3.so ${NEWLIBPATH}\n\n    copy ${SRCROOT}/License-commercial.txt ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n    copy ${SRCROOT}/README-commercial.md ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\nelse\n    echo \"Copying libraries for community edition\"\n    copy ${RES_SOURCE_PATH_CE}/lib/mysql/libmysqlclient.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_CE}/lib/mysql/libmysqlclient.*.dylib ${NEWLIBPATH}\n    copy ${RES_SOURCE_PATH_CE}/bin/mysql ${EXEPATH}\n    copy ${RES_SOURCE_PATH_CE}/bin/mysqldump ${EXEPATH}\n\n    copy ${RES_SOURCE_PATH_CE}/lib/libsqlite3.so ${NEWLIBPATH}\n\n    copy ${SRCROOT}/License.txt ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n    copy ${SRCROOT}/README.md ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\nfi\n\n\n# Pre-compile Python module\necho \"Pre-compiling Python code\"\npython3 -m compileall ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\npython3 -O -m compileall ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\n\necho \"Adjusting paths\"\n$fixer $execfile\n$fixer ${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}/wbcopytables\n$fixer $NEWLIBPATH/libwbbase.dylib\n#$fixer $NEWLIBPATH/libgrt.dylib\n#$fixer $NEWLIBPATH/libwbprivate.be.dylib\n#$fixer $NEWLIBPATH/libwbpublic.be.dylib\n\n# Fix frameworks\nfor libpath in \"$NEWLIBPATH/*.framework\"; do\n    $fixer \"$libpath/*\"\ndone\n\n# Fix python modules\nfor libpath in \"$PYTHONMODULESPATH/*.so\"; do\n    CHANGEPATHS='(@executable_path/../Frameworks|/usr/local)' $fixer $libpath\ndone\n\necho \"Adjusting python paths\"\n$pythonfixer $execfile\n$pythonfixer ${BUILT_PRODUCTS_DIR}/${EXECUTABLE_FOLDER_PATH}/wbcopytables\n$pythonfixer $NEWLIBPATH/libwbbase.dylib\n$pythonfixer $NEWLIBPATH/libgrt.dylib\n$pythonfixer $NEWLIBPATH/libwbprivate.be.dylib\n$pythonfixer $NEWLIBPATH/libwbpublic.be.dylib\n\n# Fix frameworks\nfor libpath in \"$NEWLIBPATH/*.framework\"; do\n    $pythonfixer \"$libpath/*\"\ndone\n\n# Fix python modules\nfor libpath in \"$PYTHONMODULESPATH/*.so\"; do\n    $pythonfixer $libpath\ndone\n\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libwbbase.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libgrt.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libwbprivate.be.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/libwbpublic.be.dylib\n$pythonfixer ${BUILT_PRODUCTS_DIR}/_mforms.so\n$pythonfixer ${BUILT_PRODUCTS_DIR}/_cairo.so\n";
 			showEnvVarsInLog = 0;
 		};
 		2731DE7521A2D4E4002EEE8A /* Copy some binaries */ = {
@@ -14420,9 +14390,23 @@
 			files = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/library/parsers/grammars/MySQLLexer.g4",
+				"$(SRCROOT)/library/parsers/grammars/MySQLParser.g4",
 			);
 			name = "Regenerate ANTLR parsers if necessary";
 			outputPaths = (
+				"$(SRCROOT)/library/parsers/mysql/MySQLLexer.cpp",
+				"$(SRCROOT)/library/parsers/mysql/MySQLLexer.h",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParser.cpp",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParser.h",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserBaseListener.cpp",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserBaseListener.h",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserBaseVisitor.cpp",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserBaseVisitor.h",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserListener.cpp",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserListener.h",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserVisitor.cpp",
+				"$(SRCROOT)/library/parsers/mysql/MySQLParserVisitor.h",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
@@ -14444,7 +14428,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"Generating swig wrapper...\"\n\nIFS=' ' read -ra header_paths_arr <<< \"$HEADER_SEARCH_PATHS\"\nheader_path_string=\"\"\nfor arg in ${header_paths_arr[@]}; do\n  header_path_string+=\"-I$arg \"\ndone\n\ncd library/forms/swig\n\n# Remove the file or it won't get regenerated.\nrm -f cairo_wrap.cxx\n\n/usr/local/bin/swig ${header_path_string} -DCAIRO_HAS_PNG_FUNCTIONS=1 -w312 -fvirtual -fcompact -c++ -DSWIG_PYTHON_LEGACY_BOOL -python cairo.i\n\n# hack the generated file to fix some warnings\nsed -e 's/PyErr_Format(PyExc_RuntimeError, mesg);/PyErr_Format(PyExc_RuntimeError, \"%s\", mesg);/' cairo_wrap.cxx > cairo_wrap.tmp\nmv -f cairo_wrap.tmp cairo_wrap.cxx\n";
+			shellScript = "# Xcode runs scripts with a minimal PATH; Homebrew lives in /opt/homebrew\n# on Apple Silicon and /usr/local on Intel.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\necho \"Generating swig wrapper...\"\n\nIFS=' ' read -ra header_paths_arr <<< \"$HEADER_SEARCH_PATHS\"\nheader_path_string=\"\"\nfor arg in ${header_paths_arr[@]}; do\n  header_path_string+=\"-I$arg \"\ndone\n\ncd library/forms/swig\n\n# Remove the file or it won't get regenerated.\nrm -f cairo_wrap.cxx\n\nswig ${header_path_string} -DCAIRO_HAS_PNG_FUNCTIONS=1 -w312 -fvirtual -fcompact -c++ -DSWIG_PYTHON_LEGACY_BOOL -python cairo.i\n\n# hack the generated file to fix some warnings\nsed -e 's/PyErr_Format(PyExc_RuntimeError, mesg);/PyErr_Format(PyExc_RuntimeError, \"%s\", mesg);/' cairo_wrap.cxx > cairo_wrap.tmp\nmv -f cairo_wrap.tmp cairo_wrap.cxx\n";
 			showEnvVarsInLog = 0;
 		};
 		2B4B52EB122F102000F1EA6B /* Copy Other Resource Data Folders */ = {
@@ -14479,7 +14463,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"Generating swig wrapper...\"\n\nIFS=' ' read -ra header_paths_arr <<< \"$HEADER_SEARCH_PATHS\"\nheader_path_string=\"\"\nfor arg in ${header_paths_arr[@]}; do\nheader_path_string+=\"-I$arg \"\ndone\n\ncd \"${SRCROOT}/library/forms/swig\"\n\n# Remove the file or it won't get regenerated.\nrm -f mforms_wrap.cxx\n\n/usr/local/bin/swig -I../../../3rd-party-ce/include -w401,402,509 -fvirtual -fcompact -c++ -DSWIG_PYTHON_LEGACY_BOOL -python mforms.i\n\n# hack the generated file to fix some warnings\nsed -e 's/PyErr_Format(PyExc_RuntimeError, mesg);/PyErr_Format(PyExc_RuntimeError, \"%s\", mesg);/' mforms_wrap.cxx > mforms_wrap.tmp\nmv -f mforms_wrap.tmp mforms_wrap.cxx\n";
+			shellScript = "# Xcode runs scripts with a minimal PATH; Homebrew lives in /opt/homebrew\n# on Apple Silicon and /usr/local on Intel.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\n\necho \"Generating swig wrapper...\"\n\nIFS=' ' read -ra header_paths_arr <<< \"$HEADER_SEARCH_PATHS\"\nheader_path_string=\"\"\nfor arg in ${header_paths_arr[@]}; do\nheader_path_string+=\"-I$arg \"\ndone\n\ncd \"${SRCROOT}/library/forms/swig\"\n\n# Remove the file or it won't get regenerated.\nrm -f mforms_wrap.cxx\n\nswig -I../../../3rd-party-ce/include -w401,402,509 -fvirtual -fcompact -c++ -DSWIG_PYTHON_LEGACY_BOOL -python mforms.i\n\n# hack the generated file to fix some warnings\nsed -e 's/PyErr_Format(PyExc_RuntimeError, mesg);/PyErr_Format(PyExc_RuntimeError, \"%s\", mesg);/' mforms_wrap.cxx > mforms_wrap.tmp\nmv -f mforms_wrap.tmp mforms_wrap.cxx\n";
 			showEnvVarsInLog = 0;
 		};
 		2BB58A730F45AEF100089423 /* Copy Module Data Files */ = {
@@ -14518,7 +14502,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "pyresdirce=\"3rd-party-ce/Python\"\npyresdirse=\"3rd-party-se/Python\"\n\npythondir=$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/libraries/\n\nmkdir -p \"$pythondir\"\n\n# If we're building for the commercial edition, we need the SQLCipher enabled sqlite and the corresponding pysqlite\nif [ -d ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/plugins/wba_audit ]; then\n    cp -R ${pyresdirse}/pysqlite2 \"$pythondir\"\n    cp ${pyresdirse}/pyodbc/pyodbc*.so \"$pythondir\"\n\nelse\n    cp -R ${pyresdirce}/pysqlite2 \"$pythondir\"\n    cp ${pyresdirce}/pyodbc/pyodbc*.so \"$pythondir\"\n\nfi\n\necho \"Copying Python modules\"\ncp -R $SRCROOT/library/python/studio \"$pythondir\"\n";
+			shellScript = "pyresdirce=\"3rd-party-ce/Python\"\npyresdirse=\"3rd-party-se/Python\"\n\npythondir=$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/libraries/\n\nmkdir -p \"$pythondir\"\n\n# If we're building for the commercial edition, we need the SQLCipher enabled sqlite and the corresponding pysqlite\nif [ -d ${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/plugins/wba_audit ]; then\n    cp -R ${pyresdirse}/pysqlite2 \"$pythondir\"\n    cp ${pyresdirse}/pyodbc/pyodbc*.so \"$pythondir\"\n\nelse\n    cp ${pyresdirce}/pyodbc/pyodbc*.so \"$pythondir\"\n\nfi\n\necho \"Copying Python modules\"\ncp -R $SRCROOT/library/python/studio \"$pythondir\"\n";
 			showEnvVarsInLog = 0;
 		};
 		2BEA13BE16E68F1500FC44F0 /* Copy plugins (dylibs) if exist */ = {
@@ -16666,7 +16650,6 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					BOOST_NO_CXX11_RVALUE_REFERENCES,
 					GL_SILENCE_DEPRECATION,
 					ENABLE_TESTING,
 					RAPIDJSON_HAS_STDSTRING,
@@ -16784,7 +16767,6 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					BOOST_NO_CXX11_RVALUE_REFERENCES,
 					GL_SILENCE_DEPRECATION,
 					ENABLE_TESTING,
 					RAPIDJSON_HAS_STDSTRING,
@@ -18564,7 +18546,6 @@
 				GCC_MODEL_TUNING = G5;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					BOOST_NO_CXX11_RVALUE_REFERENCES,
 					ENABLE_DEBUG,
 					HAVE_STRTOUL,
 					USE_MB_IDENT,
@@ -18601,7 +18582,6 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_MODEL_TUNING = G5;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					BOOST_NO_CXX11_RVALUE_REFERENCES,
 					HAVE_STRTOUL,
 					USE_MB_IDENT,
 					USE_MB,
@@ -19100,7 +19080,6 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "prefix/$(PRODUCT_NAME)_prefix.h";
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					BOOST_NO_CXX11_RVALUE_REFERENCES,
 					GL_SILENCE_DEPRECATION,
 					ENABLE_DEBUG,
 					_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION,
@@ -19172,7 +19151,6 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_PREFIX_HEADER = "prefix/$(PRODUCT_NAME)_prefix.h";
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					BOOST_NO_CXX11_RVALUE_REFERENCES,
 					GL_SILENCE_DEPRECATION,
 					_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION,
 				);

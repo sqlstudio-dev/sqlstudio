@@ -62,6 +62,12 @@ SqlStudio is tested and supported with:
 - **MySQL** 5.7, 8.0, 8.1, 8.2, 8.3, 8.4 (LTS), 9.x
 - **MariaDB** 10.4, 10.5, 10.6 (LTS), 10.11 (LTS), 11.x (support will be soon published)
 
+MySQL **26.7 and 26.10** have initial compatibility for connections, common queries, and
+table editing, with incremental grammar support for `INTERSECT`/`EXCEPT`,
+`JSON_VALUE`, and modern replication syntax. See the
+[compatibility scope and tests](testing/mysql-compatibility.md) for limitations
+and verification instructions.
+
 ---
 
 ## Supported Platforms
@@ -70,8 +76,8 @@ SqlStudio is tested and supported with:
 |---|---|
 | Windows 10 / 11 (x64) | ✅ Supported |
 | Windows Server 2019 / 2022 | ✅ Supported |
-| Ubuntu 20.04 / 22.04 / 24.04 | ✅ Supported |
-| Debian 11 / 12 | ✅ Supported |
+| Ubuntu 22.04 / 24.04 / 26.04 / 26.10 | ✅ Supported |
+| Debian 12 / 13 | ✅ Supported |
 | macOS 12 Monterey and later (ARM & Intel) | ✅ Supported |
 | Fedora / RHEL 8+ | 🔄 Community builds |
 
@@ -114,6 +120,7 @@ build/linux/build_3rdparty.sh --bundle "$HOME/sqlstudio-bundle"
 export WB_BUNDLE_DIR="$HOME/sqlstudio-bundle"
 build/compile.sh --build-type Release --prefix /usr --antlr-jar /path/to/antlr-4.13.2-complete.jar
 DESTDIR="$PWD/stage" cmake --install build/output
+build/linux/build_pyodbc.sh --bundle "$HOME/sqlstudio-bundle" --sdist pyodbc-5.3.0.tar.gz --out stage/usr/lib/sql-studio
 build/linux/make_deb.sh --stage stage --out dist
 ```
 
@@ -151,8 +158,8 @@ SqlStudio is built on the foundation of MySQL Workbench, originally developed by
 ## Links
 
 - 📘 Documentation: *(coming soon - published with first stable release)*
-- 🐛 Issue Tracker: [GitHub Issues](https://github.com/marcinm1980/sqlstudio/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/marcinm1980/mysqlstudio/discussions)
+- 🐛 Issue Tracker: [GitHub Issues](https://github.com/sqlstudio-dev/sqlstudio/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/sqlstudio-dev/sqlstudio/discussions)
 - 🎧 Discord Channel: [Join the Discord server](https://discord.gg/gQNPbpgeg)
-- 🔖 Releases: [GitHub Releases](../../releases)
-- 🌐 Source repository: [https://github.com/dante-d4f/mysqlstudio](https://github.com_dante/marcinm1980/mysqlstudio)
+- 🔖 Releases: [GitHub Releases](https://github.com/sqlstudio-dev/releases)
+- 🌐 Source repository: [Source repo](https://github.com/sqlstudio-dev/sqlstudio)

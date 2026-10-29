@@ -536,6 +536,60 @@ run_build_override() {
     "$fn" "$@"
 }
 
+# ── openssl ───────────────────────────────────────────────────────────────
+# MySQL 8.0 builds only against OpenSSL 1.1 / 3. On distros that ship
+# OpenSSL 4 (Ubuntu 26.10 and later) OpenSSL 3 is built into its own prefix,
+# so its headers and libssl.so never shadow the system OpenSSL the
+# application and the other libraries link against. Only the runtime
+# libraries are copied into lib/ to be shipped with the package.
+OPENSSL3_PREFIX="${BUNDLE_DIR}/openssl3"
+
+system_openssl_major() {
+    sed -n 's/^#[[:space:]]*define[[:space:]]\{1,\}OPENSSL_VERSION_MAJOR[[:space:]]\{1,\}\([0-9]\{1,\}\).*/\1/p' \
+        /usr/include/openssl/opensslv.h 2>/dev/null | head -n 1
+}
+
+# WITH_SSL value for mysql-server and mysql-connector-cpp.
+mysql_with_ssl() {
+    if [[ -d "${OPENSSL3_PREFIX}/lib" ]]; then
+        echo "${OPENSSL3_PREFIX}"
+    else
+        echo "system"
+    fi
+}
+
+build_override_openssl() {
+    local source_dir="$1" build_dir="$2"
+    local major; major="$(system_openssl_major)"
+
+    if [[ -z "$major" || "$major" -lt 4 ]]; then
+        info "System OpenSSL ${major:-?} is supported by MySQL — skipping bundled OpenSSL"
+        return 0
+    fi
+
+    info "Build system: ${C_GREEN}Configure${C_RESET} ${C_YELLOW}(OpenSSL 3 — system has OpenSSL ${major})${C_RESET}"
+    mkdir -p "$build_dir"
+    pushd "$build_dir" > /dev/null
+
+    run_cmd "configure (openssl)" \
+        "${source_dir}/Configure" \
+        --prefix="${OPENSSL3_PREFIX}" \
+        --openssldir="${OPENSSL3_PREFIX}/ssl" \
+        --libdir=lib \
+        shared no-tests no-docs
+
+    run_cmd "make (openssl)" \
+        make -j"${JOBS}"
+
+    run_cmd "make install (openssl)" \
+        make install_sw
+
+    popd > /dev/null
+
+    cp -a "${OPENSSL3_PREFIX}/lib/libssl.so.3" "${OPENSSL3_PREFIX}/lib/libcrypto.so.3" "${BUNDLE_LIB}/"
+    ok "OpenSSL 3 runtime copied to ${C_DIM}${BUNDLE_LIB}/${C_RESET}"
+}
+
 # ── mysql-server ──────────────────────────────────────────────────────────
 # Build only the client library, CLI tools, and authentication plugins.
 # Skips the full server, router, unit tests, man pages, etc.
@@ -569,7 +623,7 @@ build_override_mysql_server() {
         -DWITH_INNODB_MEMCACHED=OFF \
         -DDOWNLOAD_BOOST=ON \
         -DWITH_BOOST="${mysql_boost_dir}" \
-        -DWITH_SSL=system \
+        -DWITH_SSL="$(mysql_with_ssl)" \
         -DWITH_ZLIB=bundled \
         -DWITH_LZ4=bundled \
         -DWITH_ZSTD=bundled \
@@ -595,9 +649,23 @@ build_override_mysql_server() {
 # Needs to find the libmysqlclient that was just built above.
 build_override_mysql_connector_cpp() {
     local source_dir="$1" build_dir="$2"
+    local dependency_cmake="${source_dir}/cdk/cmake/dependency.cmake"
+    local protobuf_cmake="${source_dir}/cdk/extra/protobuf/CMakeLists.txt"
 
     info "Build system: ${C_GREEN}CMake${C_RESET} ${C_YELLOW}(mysql-connector-cpp)${C_RESET}"
     mkdir -p "$build_dir"
+
+    if [[ -f "${protobuf_cmake}" ]]; then
+        info "Normalizing bundled protobuf CMake policy compatibility"
+        sed -i.bak 's/^cmake_minimum_required(VERSION 3\.1)$/cmake_minimum_required(VERSION 3.5)/' "${protobuf_cmake}"
+        rm -f "${protobuf_cmake}.bak"
+    fi
+
+    if [[ -f "${dependency_cmake}" ]]; then
+        info "Forwarding CMake policy minimum into bundled dependency builds"
+        perl -0pi.bak -e 's/(set\(EXT_FWD\s*\n\s*CMAKE_BUILD_TYPE\s*\n)/$1  CMAKE_POLICY_VERSION_MINIMUM\n/' "${dependency_cmake}"
+        rm -f "${dependency_cmake}.bak"
+    fi
 
     run_cmd "cmake configure (connector-cpp)" \
         cmake \
@@ -610,9 +678,10 @@ build_override_mysql_connector_cpp() {
         -DCMAKE_INSTALL_LIBDIR="${BUNDLE_LIB}" \
         -DCMAKE_INSTALL_INCLUDEDIR="${BUNDLE_INCLUDE}" \
         -DCMAKE_PREFIX_PATH="${BUNDLE_DIR}" \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DMYSQL_DIR="${BUNDLE_DIR}" \
         -DWITH_JDBC=ON \
-        -DWITH_SSL=system
+        -DWITH_SSL="$(mysql_with_ssl)"
 
     run_cmd "cmake build (connector-cpp)" \
         cmake --build "$build_dir" -- -j"${JOBS}"
@@ -859,10 +928,12 @@ build_override_antlr4_runtime() {
         -G "Unix Makefiles" \
         -DCMAKE_INSTALL_PREFIX="${BUNDLE_DIR}" \
         -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DBUILD_SHARED_LIBS=ON \
         -DCMAKE_INSTALL_LIBDIR="${BUNDLE_LIB}" \
         -DCMAKE_INSTALL_INCLUDEDIR="${BUNDLE_INCLUDE}" \
         -DANTLR4_INSTALL=ON \
+        -DANTLR_BUILD_CPP_TESTS=OFF \
         -DWITH_DEMO=OFF
 
     run_cmd "cmake build (antlr4-runtime)" \
@@ -898,6 +969,15 @@ process_dep() {
     fi
 
     $DOWNLOAD_ONLY && return 0
+
+    # JAR tools are installed directly; they do not need extraction or compilation.
+    local artifact="${BUNDLE_SOURCE}/$(archive_name "$idx")"
+    if [[ "$artifact" == *.jar ]]; then
+        mkdir -p "${BUNDLE_BIN}"
+        cp -f "$artifact" "${BUNDLE_BIN}/$(basename "$artifact")"
+        ok "Installed JAR → ${C_DIM}${BUNDLE_BIN}/$(basename "$artifact")${C_RESET}"
+        return 0
+    fi
 
     # ── extract ───────────────────────────────────────────────────────
     extract_archive "$idx"

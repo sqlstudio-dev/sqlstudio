@@ -8,15 +8,17 @@
     <Edition Condition="'$(Edition)' == ''">community</Edition>
     <ProductVersion Condition="'$(ProductVersion)' == ''">0.0.0</ProductVersion>
     <VersionMain>$([System.Version]::Parse('$(ProductVersion)').ToString(2))</VersionMain>
+    <!-- Absolute, so the Files harvesting in sql_studio_fragment.xml does not resolve it against a bind path. -->
+    <PayloadFullPath Condition="'$(PayloadDirectory)' != ''">$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(PayloadDirectory)').TrimEnd('\'))</PayloadFullPath>
     <IncludeSearchPaths>$(MSBuildThisFileDirectory)source</IncludeSearchPaths>
-    <DefineConstants>$(DefineConstants);SETUP_TYPE=$(Edition);LICENSE_TYPE=$(Edition);VERSION_MAIN=$(VersionMain);VERSION_DETAIL=$(ProductVersion);InstallerSourceDir=$(MSBuildThisFileDirectory)</DefineConstants>
+    <DefineConstants>$(DefineConstants);SETUP_TYPE=$(Edition);LICENSE_TYPE=$(Edition);VERSION_MAIN=$(VersionMain);VERSION_DETAIL=$(ProductVersion);InstallerSourceDir=$(MSBuildThisFileDirectory);PayloadDirectory=$(PayloadFullPath)</DefineConstants>
     <OutputPath>$(MSBuildThisFileDirectory)bin\$(InstallerPlatform)\$(Edition)\</OutputPath>
     <IntermediateOutputPath>obj\$(InstallerPlatform)\$(Edition)\</IntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="source\sql_studio.xml" />
     <Compile Include="source\sql_studio_fragment.xml" />
-    <BindPath Include="$(PayloadDirectory)" Condition="'$(PayloadDirectory)' != ''" />
+    <BindPath Include="$(PayloadFullPath)" Condition="'$(PayloadFullPath)' != ''" />
     <PackageReference Include="WixToolset.Netfx.wixext" Version="7.0.0" />
     <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0" />
     <ProjectReference Include="MySQLCA\MySQLCA.csproj" />

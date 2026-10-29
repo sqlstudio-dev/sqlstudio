@@ -18,12 +18,16 @@ permissions:
 env:
   ANTLR_VERSION: 4.13.2
   ANTLR_SHA256: eae2dfa119a64327444672aff63e9ec35a20180dc5b8090b7a6ab85125df4d76
+  # The migration plugins (MSSQL, Access, Sybase, ODBC) import pyodbc. It is
+  # built against the bundled iODBC and shipped with the application.
+  PYODBC_VERSION: 5.3.0
+  PYODBC_SHA256: 2fe0e063d8fb66efd0ac6dc39236c4de1a45f17c33eaded0d553d21c199f4d05
 
 jobs:
-  # Every distro ships different library versions (libpython 3.10 / 3.12 /
-  # 3.11 / 3.13, ...), so each .deb is built inside a container of the distro it
-  # targets. Clean containers also keep libraries preinstalled on the hosted
-  # runner image from leaking into the build.
+  # Every distro ships different library versions (libpython 3.10 / 3.11 /
+  # 3.12 / 3.13 / 3.14, ...), so each .deb is built inside a container of the
+  # distro it targets. Clean containers also keep libraries preinstalled on the
+  # hosted runner image from leaking into the build.
   linux:
     name: Linux (${{ matrix.name }})
     runs-on: ubuntu-24.04
@@ -34,6 +38,8 @@ jobs:
         include:
           - { name: Ubuntu 22.04, image: "ubuntu:22.04", tag: ubuntu22.04 }
           - { name: Ubuntu 24.04, image: "ubuntu:24.04", tag: ubuntu24.04 }
+          - { name: Ubuntu 26.04, image: "ubuntu:26.04", tag: ubuntu26.04 }
+          - { name: Ubuntu 26.10, image: "ubuntu:26.10", tag: ubuntu26.10 }
           - { name: Debian 12,    image: "debian:12",    tag: debian12 }
           - { name: Debian 13,    image: "debian:13",    tag: debian13 }
     container:
@@ -122,6 +128,11 @@ jobs:
       - name: Build .deb package
         run: |
           DESTDIR="$STAGE_DIR" cmake --install build/output
+          curl -fsSL -o "$RUNNER_TEMP/pyodbc.tar.gz" \
+            "https://files.pythonhosted.org/packages/source/p/pyodbc/pyodbc-${PYODBC_VERSION}.tar.gz"
+          echo "${PYODBC_SHA256}  $RUNNER_TEMP/pyodbc.tar.gz" | sha256sum -c -
+          build/linux/build_pyodbc.sh --bundle "$WB_BUNDLE_DIR" \
+            --sdist "$RUNNER_TEMP/pyodbc.tar.gz" --out "$STAGE_DIR/usr/lib/sql-studio"
           build/linux/make_deb.sh --stage "$STAGE_DIR" --out dist --distro-tag ${{ matrix.tag }}
 
       - uses: actions/upload-artifact@v7
@@ -157,10 +168,19 @@ jobs:
         include:
           - { name: Ubuntu 22.04, image: "ubuntu:22.04", tag: ubuntu22.04 }
           - { name: Ubuntu 24.04, image: "ubuntu:24.04", tag: ubuntu24.04 }
+          - { name: Ubuntu 26.04, image: "ubuntu:26.04", tag: ubuntu26.04 }
+          - { name: Ubuntu 26.10, image: "ubuntu:26.10", tag: ubuntu26.10 }
           - { name: Debian 12,    image: "debian:12",    tag: debian12 }
           - { name: Debian 13,    image: "debian:13",    tag: debian13 }
     container:
       image: ${{ matrix.image }}
+    # A MySQL server for the TLS connection check. It creates its own
+    # certificates on first start.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: smoke-test
     defaults:
       run:
         shell: bash
@@ -197,6 +217,34 @@ jobs:
           fi
           echo "All libraries resolved."
 
+      # The migration plugins import pyodbc only when used, so the smoke test
+      # would not notice a broken module. Same search paths as the launcher.
+      - name: Check pyodbc
+        run: |
+          apt-get install -y -qq --no-install-recommends python3
+          LD_LIBRARY_PATH=/usr/lib/sql-studio PYTHONPATH=/usr/lib/sql-studio \
+            python3 -c "import pyodbc; print('pyodbc', pyodbc.version, pyodbc.__file__)"
+
+      # The bundled MySQL client library may use its own OpenSSL 3 (on distros
+      # with OpenSSL 4, see build/linux/build_3rdparty.sh), which only a real
+      # TLS handshake exercises. The bundled mysql client links the same
+      # library as the application.
+      - name: Check TLS connection to MySQL
+        env:
+          MYSQL_PWD: smoke-test
+        run: |
+          export LD_LIBRARY_PATH=/usr/lib/sql-studio
+          client=/usr/lib/sql-studio/mysql
+          ldd "$client" | grep -E 'libssl|libcrypto'
+          for _ in $(seq 60); do
+            "$client" -h mysql -u root -e 'SELECT 1' >/dev/null 2>&1 && break
+            sleep 2
+          done
+          status="$("$client" -h mysql -u root --ssl-mode=REQUIRED -N \
+            -e "SHOW SESSION STATUS WHERE Variable_name IN ('Ssl_version', 'Ssl_cipher')")"
+          echo "$status"
+          grep -qP '^Ssl_version\tTLSv1\.[23]$' <<<"$status"
+
       # Debian policy checks with the distro's own lintian. Errors fail the
       # job; warnings are listed only. Intentional exceptions are overridden in
       # the package itself (see build/linux/make_deb.sh).
@@ -232,6 +280,459 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: smoke-test-${{ matrix.tag }}-${{ env.SHORT_SHA }}
+          path: smoke-test
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Apple Silicon build of SqlStudio.app for macOS 26 and later. The bundle
+  # (build/mac/build_3rdparty.sh) provides MySQL client, Connector/C++, GDAL
+  # and the rest; glib, cairo and friends come from Homebrew, and
+  # build/mac/bundle_app.py copies everything the app loads into it.
+  macos:
+    name: macOS (Apple Silicon)
+    runs-on: macos-26
+    timeout-minutes: 240
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
+      # The last python.org installer of Python 3.12, which the Xcode project
+      # embeds (build/fixup_python_paths.sh).
+      PYTHON_VERSION: 3.12.10
+      PYTHON_PKG_SHA256: 8373e58da4ea146b3eb1c1f9834f19a319440b6b679b06050b1f9ee3237aa8e4
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set paths
+        run: |
+          echo "WB_BUNDLE_DIR=${RUNNER_TEMP}/bundle" >> "$GITHUB_ENV"
+          echo "DOWNLOADS=${RUNNER_TEMP}/downloads" >> "$GITHUB_ENV"
+          echo "APP=${RUNNER_TEMP}/xcode/Build/Products/Release/SqlStudio.app" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+          echo "/opt/homebrew/opt/openjdk/bin" >> "$GITHUB_PATH"
+
+      - name: Install Homebrew packages
+        run: |
+          brew install swig autoconf automake libtool pkgconf openjdk \
+            glib cairo pixman libpng libzip openssl@3 proj
+
+      # The bundle links some Homebrew libraries (OpenSSL, PROJ, ...), so a
+      # new version of those must rebuild it too.
+      - name: Hash Homebrew libraries used by the bundle
+        id: brew
+        run: |
+          versions="$(brew list --versions openssl@3 proj zstd lz4 libtiff json-c jpeg-turbo)"
+          echo "$versions"
+          echo "hash=$(shasum -a 256 <<<"$versions" | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore 3rd-party bundle
+        id: bundle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ env.WB_BUNDLE_DIR }}
+            !${{ env.WB_BUNDLE_DIR }}/source
+            !${{ env.WB_BUNDLE_DIR }}/build
+          key: bundle-macos-arm64-${{ hashFiles('build/mac/list.txt', 'build/mac/build_3rdparty.sh') }}-${{ steps.brew.outputs.hash }}
+
+      - name: Build 3rd-party bundle
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        run: build/mac/build_3rdparty.sh --bundle "$WB_BUNDLE_DIR" -j "$(sysctl -n hw.ncpu)"
+
+      # Saved right away so a failing application build does not throw the bundle away.
+      - name: Save 3rd-party bundle
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ env.WB_BUNDLE_DIR }}
+            !${{ env.WB_BUNDLE_DIR }}/source
+            !${{ env.WB_BUNDLE_DIR }}/build
+          key: ${{ steps.bundle-cache.outputs.cache-primary-key }}
+
+      - name: Remove bundle build trees
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        run: rm -rf "$WB_BUNDLE_DIR/source" "$WB_BUNDLE_DIR/build" && df -h /
+
+      - name: Download Python, pyodbc and ANTLR
+        run: |
+          mkdir -p "$DOWNLOADS"
+          curl -fsSL -o "$DOWNLOADS/pyodbc-${PYODBC_VERSION}.tar.gz" \
+            "https://files.pythonhosted.org/packages/source/p/pyodbc/pyodbc-${PYODBC_VERSION}.tar.gz"
+          echo "${PYODBC_SHA256}  $DOWNLOADS/pyodbc-${PYODBC_VERSION}.tar.gz" | shasum -a 256 -c -
+          curl -fsSL -o "$DOWNLOADS/python.pkg" \
+            "https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
+          echo "${PYTHON_PKG_SHA256}  $DOWNLOADS/python.pkg" | shasum -a 256 -c -
+          curl -fsSL -o "$DOWNLOADS/antlr-${ANTLR_VERSION}-complete.jar" \
+            "https://repo1.maven.org/maven2/org/antlr/antlr4/${ANTLR_VERSION}/antlr4-${ANTLR_VERSION}-complete.jar"
+          echo "${ANTLR_SHA256}  $DOWNLOADS/antlr-${ANTLR_VERSION}-complete.jar" | shasum -a 256 -c -
+
+      - name: Prepare 3rd-party-ce
+        run: |
+          build/mac/prepare_3rdparty_ce.sh \
+            --bundle "$WB_BUNDLE_DIR" \
+            --python-pkg "$DOWNLOADS/python.pkg" \
+            --antlr-jar "$DOWNLOADS/antlr-${ANTLR_VERSION}-complete.jar" \
+            --pyodbc-sdist "$DOWNLOADS/pyodbc-${PYODBC_VERSION}.tar.gz"
+
+      - name: Build SqlStudio
+        run: |
+          xcodebuild -version
+          xcodebuild -quiet \
+            -project SqlStudio.xcodeproj -scheme SqlStudio -configuration Release \
+            -arch arm64 ONLY_ACTIVE_ARCH=YES \
+            MACOSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" CODE_SIGNING_ALLOWED=NO \
+            -derivedDataPath "$RUNNER_TEMP/xcode" \
+            build
+
+      - name: Bundle libraries into the app
+        run: |
+          build/mac/bundle_app.py "$APP" \
+            --search "$WB_BUNDLE_DIR/lib" --search 3rd-party-ce/lib
+          du -sh "$APP"
+
+      # Drag-to-Applications window with the background from build/mac.
+      - name: Build .dmg
+        run: |
+          version="$(tools/get_wb_version.sh full_version)"
+          build/mac/make_dmg.sh "$APP" "dist/SqlStudio-${version}-macos-arm64.dmg"
+          ls -l dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-studio-macos-arm64-${{ env.SHORT_SHA }}
+          path: dist/*.dmg
+          retention-days: 14
+
+  # Installs the .dmg on a fresh runner, as a user would, with Homebrew and
+  # the system-wide Python hidden, so the app can only use what it ships.
+  macos-package-test:
+    name: Test package (macOS Apple Silicon)
+    needs: macos
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      APP: /Applications/SqlStudio.app
+
+    steps:
+      - name: Set paths
+        run: echo "SHORT_SHA=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+
+      # Only the test scripts are needed from the repository.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: build/mac
+          path: src
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: sql-studio-macos-arm64-${{ env.SHORT_SHA }}
+          path: dist
+
+      - name: Hide Homebrew and the system-wide Python
+        run: |
+          sudo mv /opt/homebrew /opt/homebrew.hidden
+          if [[ -d /Library/Frameworks/Python.framework ]]; then
+            sudo mv /Library/Frameworks/Python.framework /Library/Frameworks/Python.framework.hidden
+          fi
+
+      - name: Install from the .dmg
+        run: |
+          mount="$(mktemp -d)"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount" dist/*.dmg
+          cp -R "$mount/SqlStudio.app" /Applications/
+          hdiutil detach "$mount"
+          defaults read "$APP/Contents/Info" CFBundleShortVersionString
+          defaults read "$APP/Contents/Info" LSMinimumSystemVersion
+
+      # What a user sees when opening the .dmg: Finder applies the window
+      # layout stored in it. The screenshot goes to the smoke test results.
+      - name: Screenshot of the .dmg window
+        run: |
+          mkdir -p smoke-test
+          open dist/*.dmg
+          sleep 10
+          screencapture -x smoke-test/dmg-window.png
+          for volume in /Volumes/SqlStudio*; do hdiutil detach "$volume"; done
+
+      # Every library the app loads must be inside it or part of macOS, and
+      # the ad-hoc signature must be intact.
+      - name: Check libraries and signature
+        run: |
+          /usr/bin/python3 src/build/mac/bundle_app.py "$APP" --check
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+      # The migration plugins import pyodbc only when used, so the smoke test
+      # would not notice a broken module.
+      - name: Check pyodbc
+        run: |
+          "$APP/Contents/Frameworks/Python.framework/Versions/3.12/bin/python3.12" -I -c \
+            "import sys; sys.path.insert(0, '$APP/Contents/Resources/libraries'); import pyodbc; print('pyodbc', pyodbc.version)"
+
+      # Starts the app and checks that a window appears and it keeps running
+      # without Python errors.
+      - name: Smoke test
+        run: src/build/mac/smoke_test.sh "$APP" smoke-test
+
+      - name: Upload smoke test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-test-macos-arm64-${{ env.SHORT_SHA }}
+          path: smoke-test
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # x64 build of SqlStudio for Windows on the windows-2025 image (Visual
+  # Studio 2026, building with its v143 toolset).
+  # build/windows/build_3rdparty.ps1 builds every library the app links
+  # from source.
+  windows:
+    name: Windows (x64)
+    runs-on: windows-2025
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      # v145 (MSVC 14.51) emits ldftn with a null token in the C++/CLI
+      # boost::function constructors, so the app fails at startup with
+      # "Bad method token". The libraries and the app are built with v143.
+      PLATFORM_TOOLSET: v143
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set paths
+        run: |
+          "MSS_3DPARTY_PATH=$env:RUNNER_TEMP\bundle" >> $env:GITHUB_ENV
+          "SHORT_SHA=$($env:GITHUB_SHA.Substring(0, 8))" >> $env:GITHUB_ENV
+
+      # The runner image has the v143 compiler but not its ATL, which
+      # wbprivate.be needs (atlbase.h). Installed before anything is built:
+      # the VS installer refuses to run (exit code 8006) while MSBuild nodes
+      # left over from a build are still running.
+      - name: Install ATL for v143
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $version = (Get-Content "$vs\VC\Auxiliary\Build\Microsoft.VCToolsVersion.v143.default.txt" -TotalCount 1).Trim()
+          if (Test-Path "$vs\VC\Tools\MSVC\$version\atlmfc\include\atlbase.h") { Write-Host "ATL for $version is installed."; exit 0 }
+          $installer = Start-Process -Wait -PassThru "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" `
+            -ArgumentList @('modify', '--installPath', "`"$vs`"", '--add', 'Microsoft.VisualStudio.Component.VC.14.44.17.14.ATL', '--quiet', '--norestart', '--nocache')
+          if (-not (Test-Path "$vs\VC\Tools\MSVC\$version\atlmfc\include\atlbase.h")) { throw "ATL for $version was not installed (installer exit code $($installer.ExitCode))" }
+
+      # Only what a Release build of the app needs: no Debug libraries
+      # (debug), build-time tools (_tools) or build trees (_work). The path
+      # ends in /* because exclusions only filter matched entries: a bare
+      # directory is archived whole, exclusions included.
+      - name: Restore 3rd-party bundle
+        id: bundle-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ runner.temp }}/bundle/*
+            !${{ runner.temp }}/bundle/_work
+            !${{ runner.temp }}/bundle/_tools
+            !${{ runner.temp }}/bundle/debug
+          key: bundle-windows-x64-${{ env.PLATFORM_TOOLSET }}-${{ hashFiles('build/windows/libs.txt', 'build/windows/build_3rdparty.ps1') }}
+
+      # The cairo/glib build uses an MSYS2 MinGW pkg-config with libffi-8.dll
+      # next to it, from C:\msys64 (preinstalled on the runner). Its bin
+      # directory goes last on PATH so it does not shadow MSVC or Python.
+      - name: Install bundle build tools
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install --disable-pip-version-check meson==1.12.1 ninja==1.13.2
+          C:\msys64\usr\bin\pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi
+          if ($LASTEXITCODE) { throw "pacman failed with exit code $LASTEXITCODE" }
+          "C:\msys64\mingw64\bin" >> $env:GITHUB_PATH
+
+      - name: Build 3rd-party bundle
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        run: |
+          build/windows/build_3rdparty.ps1 -BundleDir $env:MSS_3DPARTY_PATH -VerboseOutput -PlatformToolset $env:PLATFORM_TOOLSET
+          if ($LASTEXITCODE) { throw "build_3rdparty.ps1 failed with exit code $LASTEXITCODE" }
+
+      # Saved right away so a failing application build does not throw the bundle away.
+      - name: Save 3rd-party bundle
+        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ runner.temp }}/bundle/*
+            !${{ runner.temp }}/bundle/_work
+            !${{ runner.temp }}/bundle/_tools
+            !${{ runner.temp }}/bundle/debug
+          key: ${{ steps.bundle-cache.outputs.cache-primary-key }}
+
+      # Built after the cache is saved, so it stays out of the bundle cache.
+      # PrepareOutputDir.ps1 copies it to python\site-packages.
+      - name: Build pyodbc
+        run: |
+          $sdist = "$env:RUNNER_TEMP\pyodbc-$env:PYODBC_VERSION.tar.gz"
+          Invoke-WebRequest -UseBasicParsing -OutFile $sdist `
+            "https://files.pythonhosted.org/packages/source/p/pyodbc/pyodbc-$env:PYODBC_VERSION.tar.gz"
+          if ((Get-FileHash -Algorithm SHA256 $sdist).Hash -ne $env:PYODBC_SHA256) { throw "pyodbc checksum mismatch" }
+          build/windows/build_pyodbc.ps1 -BundleDir $env:MSS_3DPARTY_PATH -Sdist $sdist -PlatformToolset $env:PLATFORM_TOOLSET
+
+      - name: Build SqlStudio
+        run: |
+          build/windows/compile.ps1 -Action build -Configuration Release -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
+          if ($LASTEXITCODE) { throw "compile.ps1 failed with exit code $LASTEXITCODE" }
+          Get-ChildItem bin\x64\Release | Format-Table Name, Length
+
+      - name: Check DLL dependencies
+        run: |
+          build/windows/check_dll_deps.ps1 -OutputDir bin\x64\Release
+          if ($LASTEXITCODE) { throw "check_dll_deps.ps1 failed with exit code $LASTEXITCODE" }
+
+      # Modules the app imports only when a feature is used: pyodbc for the
+      # migration plugins, ssl and hashlib for SSH tunnels and connections.
+      - name: Check Python modules
+        run: |
+          $env:PYTHONHOME = "$PWD\bin\x64\Release\python"
+          bin\x64\Release\python.exe -c "import sys; sys.path.insert(0, r'$env:PYTHONHOME\site-packages'); import ssl, hashlib, sqlite3, ctypes, pyodbc; print(ssl.OPENSSL_VERSION); print('sqlite', sqlite3.sqlite_version); print('pyodbc', pyodbc.version, pyodbc.drivers())"
+          if ($LASTEXITCODE) { throw "Python module import failed" }
+
+      - name: Build .zip
+        run: |
+          build/zip/make_zip.ps1 -BinDir bin\x64\Release -OutDir dist
+          Get-ChildItem dist | Format-Table Name, Length
+
+      # Built from the unpacked .zip, so both packages ship the same files.
+      # AcceptEula accepts the WiX 7 EULA (Open Source Maintenance Fee terms,
+      # https://docs.firegiant.com/wix/osmf/); WiX refuses to build without it.
+      - name: Build .msi
+        run: |
+          $zip = Get-Item dist\*.zip
+          $version = $zip.BaseName -replace '^sql-studio-(.+)-winx64$', '$1'
+          Expand-Archive -LiteralPath $zip -DestinationPath "$env:RUNNER_TEMP\msi-payload"
+          $payload = @(Get-ChildItem "$env:RUNNER_TEMP\msi-payload" -Directory)[0].FullName
+          dotnet build build/msi/SqlStudio.wixproj -c Release -p:Edition=community -p:ProductVersion=$version `
+            -p:InstallerPlatform=x64 -p:Platform=x64 "-p:PayloadDirectory=$payload" -p:AcceptEula=wix7
+          if ($LASTEXITCODE) { throw "dotnet build failed with exit code $LASTEXITCODE" }
+          $name = "sql-studio-$version-winx64.msi"
+          Copy-Item build\msi\bin\x64\community\sql_studio.msi "dist\$name"
+          $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
+          Set-Content -LiteralPath "dist\$name.sha256" -Value "$hash  $name" -Encoding ascii -NoNewline
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sql-studio-windows-x64-${{ env.SHORT_SHA }}
+          path: dist/*
+          compression-level: 0
+          retention-days: 14
+
+  # Unpacks the .zip on a fresh runner, as a user would, with the runner's
+  # own Python taken off PATH, so the app can only use what it ships.
+  windows-package-test:
+    name: Test package (Windows x64)
+    needs: windows
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Set paths
+        run: |
+          "SHORT_SHA=$($env:GITHUB_SHA.Substring(0, 8))" >> $env:GITHUB_ENV
+          $path = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'Python' }) -join ';'
+          "PATH=$path" >> $env:GITHUB_ENV
+
+      # Only the test scripts are needed from the repository.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: build/windows
+          path: src
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: sql-studio-windows-x64-${{ env.SHORT_SHA }}
+          path: dist
+
+      - name: Unpack the .zip
+        run: |
+          $zip = Get-Item dist\*.zip
+          $expected = (Get-Content "$($zip.FullName).sha256").Split(' ')[0]
+          if ((Get-FileHash -Algorithm SHA256 $zip).Hash -ne $expected) { throw "SHA256 mismatch for $($zip.Name)" }
+          Expand-Archive -LiteralPath $zip -DestinationPath C:\apps
+          $app = @(Get-ChildItem C:\apps -Directory)[0].FullName
+          "APP=$app" >> $env:GITHUB_ENV
+          Write-Host "Unpacked to $app"
+
+      # Every DLL must be in the package or part of Windows, the Visual C++
+      # runtime included.
+      - name: Check DLL dependencies
+        run: |
+          src/build/windows/check_dll_deps.ps1 -OutputDir $env:APP -RequireAppLocalRuntime
+          if ($LASTEXITCODE) { throw "check_dll_deps.ps1 failed with exit code $LASTEXITCODE" }
+
+      - name: Check Python modules
+        run: |
+          $env:PYTHONHOME = "$env:APP\python"
+          & "$env:APP\python.exe" -c "import sys; sys.path.insert(0, r'$env:PYTHONHOME\site-packages'); import ssl, hashlib, sqlite3, ctypes, pyodbc; print(sys.executable, sys.prefix); print(ssl.OPENSSL_VERSION); print('pyodbc', pyodbc.version)"
+          if ($LASTEXITCODE) { throw "Python module import failed" }
+
+      # Starts the app and checks that its main window appears and it keeps
+      # running without Python errors.
+      - name: Smoke test
+        run: |
+          src/build/windows/smoke_test.ps1 -AppDir $env:APP -OutDir smoke-test
+          if ($LASTEXITCODE) { throw "smoke_test.ps1 failed with exit code $LASTEXITCODE" }
+
+      # The same checks on an installed copy, then an uninstall that must
+      # leave nothing behind.
+      - name: Install the .msi
+        run: |
+          $msi = Get-Item dist\*.msi
+          $expected = (Get-Content "$($msi.FullName).sha256").Split(' ')[0]
+          if ((Get-FileHash -Algorithm SHA256 $msi).Hash -ne $expected) { throw "SHA256 mismatch for $($msi.Name)" }
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/i', "`"$($msi.FullName)`"", '/qn', '/l*v', "`"$PWD\smoke-test\msi-install.log`"")
+          if ($p.ExitCode) { throw "msiexec /i failed with exit code $($p.ExitCode)" }
+          $exe = @(Get-ChildItem "$env:ProgramFiles\MySQL" -Recurse -Filter SqlStudio.exe -ErrorAction SilentlyContinue)
+          if (-not $exe) { throw "SqlStudio.exe was not installed under $env:ProgramFiles\MySQL" }
+          $dir = $exe[0].DirectoryName
+          "INSTALLED_APP=$dir" >> $env:GITHUB_ENV
+          Write-Host "Installed to $dir ($(@(Get-ChildItem $dir -Recurse -File).Count) files)"
+          $shortcut = @(Get-ChildItem "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\MySQL" -Filter *.lnk -ErrorAction SilentlyContinue)
+          if (-not $shortcut) { throw "No Start menu shortcut was created" }
+          Write-Host "Shortcut: $($shortcut[0].FullName)"
+
+      - name: Check DLL dependencies (installed)
+        run: |
+          src/build/windows/check_dll_deps.ps1 -OutputDir $env:INSTALLED_APP -RequireAppLocalRuntime
+          if ($LASTEXITCODE) { throw "check_dll_deps.ps1 failed with exit code $LASTEXITCODE" }
+
+      - name: Smoke test (installed)
+        run: |
+          src/build/windows/smoke_test.ps1 -AppDir $env:INSTALLED_APP -OutDir smoke-test\installed
+          if ($LASTEXITCODE) { throw "smoke_test.ps1 failed with exit code $LASTEXITCODE" }
+
+      - name: Uninstall the .msi
+        run: |
+          $msi = Get-Item dist\*.msi
+          $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @('/x', "`"$($msi.FullName)`"", '/qn', '/l*v', "`"$PWD\smoke-test\msi-uninstall.log`"")
+          if ($p.ExitCode) { throw "msiexec /x failed with exit code $($p.ExitCode)" }
+          # Custom actions run with Return="ignore", so msiexec succeeds even when they
+          # cannot start. DeleteFolders and DeleteFilesWildcard are not checked: they
+          # report folders the uninstall has already removed.
+          $caErrors = @(Select-String -Path smoke-test\msi-*.log -Pattern 'SFXCA: Failed|Exception in CustomAction (PrecompilePythonFiles|DeletePycacheFolders)')
+          if ($caErrors) { $caErrors | ForEach-Object { Write-Host $_.Line }; throw "Custom actions failed (see the msiexec logs)" }
+          if (Test-Path -LiteralPath $env:INSTALLED_APP) {
+            Get-ChildItem -LiteralPath $env:INSTALLED_APP -Recurse | Select-Object -First 20 | Format-Table FullName
+            throw "$env:INSTALLED_APP is left after the uninstall"
+          }
+
+      - name: Upload smoke test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-test-windows-x64-${{ env.SHORT_SHA }}
           path: smoke-test
           if-no-files-found: ignore
           retention-days: 14

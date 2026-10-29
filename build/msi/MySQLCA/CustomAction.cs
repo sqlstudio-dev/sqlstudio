@@ -151,6 +151,43 @@ namespace MySQLCA
     }
 
 
+    // Python 3 writes byte code to __pycache__ folders next to the sources. The
+    // installer does not know about them, so they would keep the installation
+    // directory from being removed.
+    [CustomAction]
+    public static ActionResult DeletePycacheFolders(Session session)
+    {
+        ActionResult thisResult = ActionResult.Failure;
+
+        session.Log("Entering CustomAction: DeletePycacheFolders");
+
+        try
+        {
+            string targetDirectory = session.CustomActionData.ToString().TrimEnd('\\');
+
+            if (Directory.Exists(targetDirectory))
+            {
+                foreach (string d in Directory.GetDirectories(targetDirectory, "__pycache__", SearchOption.AllDirectories))
+                {
+                    session.Log(String.Format("Deleting: {0}", d));
+                    Directory.Delete(d, true);
+                }
+            }
+
+            thisResult = ActionResult.Success;
+        }
+        catch (Exception ex)
+        {
+            session.Log("Exception in CustomAction DeletePycacheFolders: " + ex.Message);
+            thisResult = ActionResult.Failure;
+        }
+
+        session.Log("Exiting CustomAction: DeletePycacheFolders");
+
+        return thisResult;
+    }
+
+
     private static bool IsDirectoryEmpty(string targetDirectory)
     {
         bool directoryEmpty = false;

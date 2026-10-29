@@ -11,7 +11,12 @@
 # Adjust versions and URLs to match the exact releases your build requires.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# ── MySQL Server (built first — provides libmysqlclient, mysql, mysqldump) ───
+# ── OpenSSL 3 (only where the system has OpenSSL 4, which MySQL 8.0 does not
+#    support, e.g. Ubuntu 26.10; skipped elsewhere — must precede mysql-server) ─
+
+openssl|3.5.9|https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz
+
+# ── MySQL Server (provides libmysqlclient, mysql, mysqldump) ─────────────────
 
 mysql-server|8.0.42|https://dev.mysql.com/get/Downloads/MySQL-8.0/mysql-8.0.42.tar.gz
 
@@ -35,6 +40,9 @@ gdal|3.10.2|https://github.com/OSGeo/gdal/releases/download/v3.10.2/gdal-3.10.2.
 
 # ANTLR4 C++ runtime (parser generator runtime)
 antlr4-runtime|4.13.2|https://www.antlr.org/download/antlr4-cpp-runtime-4.13.2-source.zip
+
+# ANTLR4 parser generator (installed directly into bin/)
+antlr4-jar|4.13.2|https://www.antlr.org/download/antlr-4.13.2-complete.jar
 
 # libssh (SSH client library)
 libssh|0.11.1|https://www.libssh.org/files/0.11/libssh-0.11.1.tar.xz

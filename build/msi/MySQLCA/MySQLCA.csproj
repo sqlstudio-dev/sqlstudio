@@ -11,6 +11,6 @@
   <ItemGroup>
     <PackageReference Include="WixToolset.Dtf.CustomAction" Version="7.0.0" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
-    <Content Include="CustomAction.config" />
+    <Content Include="CustomAction.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

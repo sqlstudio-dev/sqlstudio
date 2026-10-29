@@ -70,39 +70,84 @@ Note about gdal:
 Building on Windows
 -------------------
 
-To build on Windows, you need Visual Studio 2017 with C++ and C# support.
-You also need to prepare pre-compiled binaries for all the 3rd party libraries that SqlStudio
-depends on. You can use a C++ package manager for Windows, Linux and MacOS 
-https://docs.microsoft.com/en-us/cpp/vcpkg?view=vs-2017
+SqlStudio for Windows is built for x64, the same way as in CI (the windows
+job in .github/workflows/build.yml). The libraries and the app are built with
+the v143 toolset: v145 (MSVC 14.5x) miscompiles the C++/CLI wrappers, and the
+app fails at startup with "Bad method token".
 
-To Build:
-- Create folder bundle or similar and put there all 3dpart libs. Folder should look like:
-     * bin
-     * include
-     * lib
-     * debug
-      ** bin
-      ** include
-      ** lib
-     * python
-- Create in system environoment variable which point to folder where 3rd party libs are located WB_3DPARTY_LIB=<libs and headers files directory>
-- Go to the sql-studio directory
-- Open SqlStudio.sln solution file
-- Select Release_OSS or the Debug Configuration
-- Build Project
+- Install Visual Studio 2022 or 2026 with the "Desktop development with C++"
+  and ".NET desktop development" workloads, the MSVC v143 build tools, C++ ATL
+  and C++/CLI support for v143, and the .NET Framework 4.8 targeting pack.
+  Also install PowerShell 7, Python 3 and MSYS2 (in C:\msys64), then the tools
+  the cairo/glib build uses:
+
+  PS> python -m pip install meson==1.12.1 ninja==1.13.2
+  PS> C:\msys64\usr\bin\pacman.exe -Sy --needed mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi
+  PS> $env:PATH += ";C:\msys64\mingw64\bin"
+
+- Build the 3rd-party bundle (MySQL client, Connector/C++, OpenSSL, Python,
+  GDAL, cairo, glib, ...) and pyodbc, from the pyodbc source archive
+  (pyodbc-5.3.0.tar.gz):
+
+  PS> build/windows/build_3rdparty.ps1 -BundleDir C:\sqlstudio-bundle -PlatformToolset v143
+  PS> build/windows/build_pyodbc.ps1 -BundleDir C:\sqlstudio-bundle -Sdist pyodbc-5.3.0.tar.gz -PlatformToolset v143
+
+- Build the app into bin\x64\Release and check that every DLL it imports
+  can be found:
+
+  PS> build/windows/compile.ps1 -Action build -Configuration Release -BundleDir C:\sqlstudio-bundle -PlatformToolset v143
+  PS> build/windows/check_dll_deps.ps1 -OutputDir bin\x64\Release
+
+- Package it as a portable .zip (with the Visual C++ runtime) and an .msi
+  built from it. WiX 7 requires accepting its EULA (Open Source Maintenance
+  Fee terms, https://docs.firegiant.com/wix/osmf/); see build/msi/README.md:
+
+  PS> build/zip/make_zip.ps1 -BinDir bin\x64\Release -OutDir dist
+  PS> Expand-Archive dist\sql-studio-1.0.1-winx64.zip msi-payload
+  PS> dotnet build build/msi/SqlStudio.wixproj -c Release -p:Edition=community -p:ProductVersion=1.0.1 `
+          -p:InstallerPlatform=x64 -p:Platform=x64 "-p:PayloadDirectory=$PWD\msi-payload\SqlStudio 1.0.1 (winx64)" `
+          -p:AcceptEula=wix7
+
+  The .msi is written to build\msi\bin\x64\community\sql_studio.msi.
 
 
 
-Buiding on macOS
--------------------
+Building on macOS
+-----------------
 
-- Go to http://rudix.org/ and download and install the following packages
-  gettext, glib, libpng, libsigc++, lua, pkg-config, pcre, libzip, cairo, pixman
-- Install a recent MySQL server (64bit). The installer will link /usr/local/mysql
-  to the correct installation.
-- Install the latest MySQL Connector/C++ and vsqlite++.
-- Install the latest Xcode and open the SqlStudio.xcodeproj file.
-- In the target dropdown pick SqlStudio and build it.
+SqlStudio for macOS is built for Apple Silicon (arm64) and macOS 26 or later,
+the same way as in CI (the macos job in .github/workflows/build.yml).
+
+- Install Xcode and Homebrew, then the build tools and libraries:
+
+  $> brew install swig autoconf automake libtool pkgconf openjdk cmake \
+                  glib cairo pixman libpng libzip openssl@3 proj
+  $> export PATH="$(brew --prefix openjdk)/bin:$PATH"
+
+- Build the 3rd-party bundle (MySQL client, Connector/C++, GDAL, ANTLR runtime,
+  libssh, ...):
+
+  $> build/mac/build_3rdparty.sh --bundle "$HOME/sqlstudio-bundle-mac"
+
+- Download the python.org installer for Python 3.12 (python-3.12.10-macos11.pkg),
+  antlr-4.13.2-complete.jar and the pyodbc source archive (pyodbc-5.3.0.tar.gz),
+  then lay out 3rd-party-ce/, which the Xcode project reads:
+
+  $> build/mac/prepare_3rdparty_ce.sh --bundle "$HOME/sqlstudio-bundle-mac" \
+         --python-pkg python-3.12.10-macos11.pkg \
+         --antlr-jar antlr-4.13.2-complete.jar --pyodbc-sdist pyodbc-5.3.0.tar.gz
+
+- Build the app:
+
+  $> xcodebuild -project SqlStudio.xcodeproj -scheme SqlStudio -configuration Release \
+         -arch arm64 ONLY_ACTIVE_ARCH=YES MACOSX_DEPLOYMENT_TARGET=26.0 \
+         CODE_SIGNING_ALLOWED=NO -derivedDataPath build/xcode build
+
+- Copy the libraries the app loads into it and package it as a .dmg:
+
+  $> build/mac/bundle_app.py build/xcode/Build/Products/Release/SqlStudio.app \
+         --search "$HOME/sqlstudio-bundle-mac/lib" --search 3rd-party-ce/lib
+  $> build/mac/make_dmg.sh build/xcode/Build/Products/Release/SqlStudio.app SqlStudio.dmg
 
 ==============================================================================
 

@@ -144,13 +144,13 @@
   if (PyUnicode_Check($input))
   {
     PyObject *tmp = PyUnicode_AsUTF8String($input);
-    s = PyString_AsString(tmp);
+    s = PyBytes_AsString(tmp);
     $1 = (char*)s.c_str();
     Py_DECREF(tmp); 
   } 
-  else if (PyString_Check($input)) 
+  else if (PyBytes_Check($input)) 
   {
-    s = PyString_AsString($input); 
+    s = PyBytes_AsString($input); 
     $1 = (char*)s.c_str();
   }
   else 
