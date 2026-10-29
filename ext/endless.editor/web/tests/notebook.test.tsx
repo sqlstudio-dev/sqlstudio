@@ -63,6 +63,38 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Connections home', () => {
+  it.each(['success', 'failure'])('shows connection placeholders until loading finishes with %s', async (outcome) => {
+    let finish!: (value: ConnectionProfile[]) => void;
+    let fail!: (error: Error) => void;
+    vi.mocked(sqlApi.listConnections).mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject; }));
+    mount();
+    expect(screen.getByRole('progressbar', { name: 'Loading connections' })).toBeTruthy();
+    expect(document.querySelectorAll('.connection-tile-skeleton')).toHaveLength(3);
+    expect(document.querySelector('.connections-scroll')?.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByText('No connections yet')).toBeNull();
+    await act(async () => { if (outcome === 'success') finish(connections); else fail(new Error('Backend offline')); });
+    expect(screen.queryByRole('progressbar', { name: 'Loading connections' })).toBeNull();
+    expect(document.querySelectorAll('.connection-tile-skeleton')).toHaveLength(0);
+    expect(document.querySelector('.connections-scroll')?.getAttribute('aria-busy')).toBe('false');
+    if (outcome === 'success') expect(screen.getByRole('button', { name: 'Open test' })).toBeTruthy();
+    else expect(screen.getByRole('alert').textContent).toContain('Backend offline');
+  });
+
+  it('uses the infinity mark for the Endless Editor brand and notebook entry', async () => {
+    mount();
+    await screen.findByRole('button', { name: 'Open test' });
+    const rail = screen.getByRole('complementary', { name: 'Workspace' });
+    const brand = within(rail).getByRole('img', { name: 'Endless Editor' });
+    expect(brand.querySelector('svg.lucide-infinity')).toBeTruthy();
+    const notebook = within(rail).getByLabelText('SQL notebook');
+    expect(notebook.getAttribute('title')).toBe('Endless Editor - SQL notebook');
+    expect(notebook.querySelector('svg.lucide-infinity')).toBeTruthy();
+    expect(notebook.classList.contains('active')).toBe(false);
+    await openTile();
+    await screen.findByText('CONNECTED');
+    expect(within(rail).getByLabelText('SQL notebook').classList.contains('active')).toBe(true);
+  });
+
   it('groups tiles by engine with watermarks, adds a connection, imports XML, and removes tiles', async () => {
     mount();
     const mysql = within(await screen.findByRole('region', { name: 'MySQL connections' }));
@@ -135,6 +167,22 @@ describe('Connections home', () => {
 });
 
 describe('SQL notebook', () => {
+  it.each(['success', 'failure'])('shows a session skeleton until connecting finishes with %s', async (outcome) => {
+    let finish!: (value: typeof session) => void;
+    let fail!: (error: Error) => void;
+    vi.mocked(sqlApi.createSession).mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject; }));
+    mount();
+    await openTile();
+    expect(screen.getByRole('progressbar', { name: 'Opening database session' })).toBeTruthy();
+    expect(document.querySelector('.session-loading .skeleton-table')).toBeTruthy();
+    expect(document.querySelector('.session-loading')?.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByText('Session ready. Write a query below to begin.')).toBeNull();
+    await act(async () => { if (outcome === 'success') finish(session); else fail(new Error('Connection refused')); });
+    expect(screen.queryByRole('progressbar', { name: 'Opening database session' })).toBeNull();
+    if (outcome === 'success') expect(screen.getByText('CONNECTED')).toBeTruthy();
+    else expect(screen.getByText('Connection refused')).toBeTruthy();
+  });
+
   it('prompts for a password, opens one session in StrictMode, and closes it on unmount', async () => {
     const view = mount();
     await openTile();
@@ -166,6 +214,8 @@ describe('SQL notebook', () => {
     fireEvent.change(input, { target: { value: 'SELECT 1' } });
     fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
     expect(screen.getByRole('status', { name: 'Query result loading' })).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'Query result loading' }).hasAttribute('aria-valuenow')).toBe(false);
+    expect(document.querySelector('.execution-output')?.getAttribute('aria-busy')).toBe('true');
     expect(input.value).toBe('');
     expect(input.disabled).toBe(false);
     fireEvent.change(input, { target: { value: 'SELECT 2' } });
@@ -174,12 +224,14 @@ describe('SQL notebook', () => {
     expect(sqlApi.execute).toHaveBeenCalledTimes(1);
     expect(historyHas('SELECT 1')).toBe(true);
     await act(async () => finish(result));
+    expect(screen.queryByRole('progressbar')).toBeNull();
     expect(screen.getByText('NULL')).toBeTruthy();
     expect(screen.getByText('42')).toBeTruthy();
     expect(input.value).toBe('SELECT 2');
     vi.mocked(sqlApi.execute).mockResolvedValueOnce({ type: 'error', error: { message: 'Table does not exist', code: 1146, executionTimeMs: 1 } });
     fireEvent.keyDown(input, { key: 'Enter', metaKey: true });
     await screen.findByText('Table does not exist');
+    expect(screen.queryByRole('progressbar')).toBeNull();
     expect(historyHas('SELECT 1')).toBe(true);
     expect(historyHas('SELECT 2')).toBe(true);
     expect(screen.getAllByRole('textbox')).toHaveLength(1);

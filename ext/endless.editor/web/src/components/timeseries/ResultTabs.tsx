@@ -37,6 +37,7 @@ import { LiveToolbar } from './LiveToolbar';
 import { SeriesConfiguration } from './SeriesConfiguration';
 import { StatisticsPanel } from './StatisticsPanel';
 import { TimeSeriesChart, type TimeSeriesChartHandle } from './TimeSeriesChart';
+import { ResultTableSkeleton } from '../results/ResultTableSkeleton';
 
 type Tab = 'grid' | 'chart' | 'stats' | 'visualize';
 const CHART_TYPES: { value: ChartType; label: string; icon: typeof ChartLine }[] = [
@@ -98,6 +99,7 @@ export function ResultTabs({ executionId, sql, result, children }: ResultTabsPro
   const toggleSeries = useCallback((seriesKey: string, visible: boolean) => updateConfig({ hiddenSeries: visible ? config.hiddenSeries.filter((item) => item !== seriesKey) : [...config.hiddenSeries, seriesKey] }), [config.hiddenSeries, updateConfig]);
 
   const visualTabs = Boolean(mapping);
+  const loadingEmpty = live.state.busy && live.state.dataset.sourceRows === 0;
   const chartHeight = fullscreen ? Math.max(320, window.innerHeight - 200) : 320;
   const chart = (type: ChartType) => <TimeSeriesChart ref={chartRef} series={type === 'histogram' ? histogramSeries : rendered.series} chartType={type} rightAxis={config.rightAxis} hiddenSeries={config.hiddenSeries}
     timezone={config.displayTimezone} timeAxis={type !== 'histogram'} xLabel={type === 'histogram' ? 'bin' : mapping?.timeColumn} yMin={config.yMin} yMax={config.yMax} height={chartHeight} onToggleSeries={toggleSeries} syncKey={executionId} />;
@@ -112,12 +114,13 @@ export function ResultTabs({ executionId, sql, result, children }: ResultTabsPro
         </button>)}
     </div>
     {tab === 'grid' && children}
-    {tab !== 'grid' && <section className="ts-panel" aria-label={tab === 'chart' ? 'Time series' : tab === 'stats' ? 'Statistics' : 'Visualization'}>
+    {tab !== 'grid' && <section className="ts-panel" aria-busy={live.state.busy} aria-label={tab === 'chart' ? 'Time series' : tab === 'stats' ? 'Statistics' : 'Visualization'}>
       <LiveToolbar live={live} config={config} onChange={updateConfig} renderedPoints={totalPoints(tab === 'visualize' && config.chartType === 'histogram' ? { ...rendered, series: histogramSeries } : rendered)} totalPoints={totalPoints(aggregated)}
         configOpen={configOpen || !mapping} onToggleConfig={() => setConfigOpen((open) => !open)} fullscreen={fullscreen} onToggleFullscreen={toggleFullscreen}
         onExport={exportPng} onResetZoom={() => chartRef.current?.resetZoom()} showChartTools={tab !== 'stats'} />
       {live.state.lastError && <div className="ts-error" role="alert"><CircleAlert size={14} /> {live.state.lastError}{live.state.status === 'error' && ' — live updates paused; press play to retry.'}</div>}
-      {!mapping ? needsMapping : tab === 'chart' ? chart(config.chartType === 'histogram' ? 'line' : config.chartType)
+      {loadingEmpty ? <ResultTableSkeleton label="Loading query data" chart={tab !== 'stats'} />
+        : !mapping ? needsMapping : tab === 'chart' ? chart(config.chartType === 'histogram' ? 'line' : config.chartType)
         : tab === 'stats' ? <StatisticsPanel dataset={aggregated} timezone={config.displayTimezone} status={live.state.status} lastUpdated={live.state.lastUpdated} hiddenSeries={config.hiddenSeries} />
         : <>
           <div className="chart-type-strip" role="radiogroup" aria-label="Chart type">
@@ -125,7 +128,7 @@ export function ResultTabs({ executionId, sql, result, children }: ResultTabsPro
           </div>
           {chart(config.chartType)}
         </>}
-      {mapping && rendered.series.length === 0 && tab !== 'stats' && <div className="empty-result">No samples in the selected range.</div>}
+      {!loadingEmpty && mapping && rendered.series.length === 0 && tab !== 'stats' && <div className="empty-result">No samples in the selected range.</div>}
       {live.state.generatedSql && <details className="ts-generated"><summary>Plugin-generated SQL ({live.state.fetchMode})</summary><pre>{live.state.generatedSql}</pre></details>}
       {(configOpen || !mapping) && configure}
     </section>}

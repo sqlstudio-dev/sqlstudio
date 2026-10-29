@@ -29,6 +29,7 @@ import type { ConnectionProfile, ConnectorPlugin } from '../../models/sql';
 import { AddConnectionDialog } from './AddConnectionDialog';
 import { ConnectDialog } from './ConnectDialog';
 import { ConnectionTile } from './ConnectionTile';
+import { LoadingProgress } from '../ui/LoadingProgress';
 
 interface EngineGroup { key: string; label: string; plugin?: ConnectorPlugin; connections: ConnectionProfile[] }
 
@@ -77,8 +78,15 @@ export function ConnectionsHome() {
       </div>
     </header>
     {notice && <div className={`home-notice ${notice.kind}`} role="status">{notice.text}</div>}
-    <div className="connections-scroll">
-      {state.connectionsStatus === 'loading' && <p className="home-empty">Loading connections…</p>}
+    <div className="connections-scroll" aria-busy={state.connectionsStatus === 'loading'}>
+      {state.connectionsStatus === 'loading' && <div className="connections-loading">
+        <LoadingProgress label="Loading connections" />
+        {groups.length === 0 && <div className="tile-grid" aria-hidden="true">
+          {[0, 1, 2].map((tile) => <div className="connection-tile-skeleton" key={tile}>
+            <div className="skeleton" /><div className="skeleton" /><div className="skeleton" />
+          </div>)}
+        </div>}
+      </div>}
       {state.connectionsStatus === 'error' && <div className="connection-error" role="alert">{state.connectionsError}
         <button type="button" className="secondary-button" onClick={reloadConnections}><RotateCw size={13} /> Retry</button></div>}
       {state.connectionsStatus === 'ready' && groups.length === 0 && <div className="home-empty">

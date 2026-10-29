@@ -48,7 +48,7 @@ function Result({ execution, result }: { execution: SqlExecution; result: SqlSin
 }
 
 export function SqlExecutionResult({ execution }: { execution: SqlExecution }) {
-  if (execution.status === 'pending') return <div className="execution-output"><ResultTableSkeleton /><div className="output-status muted">Running query…</div></div>;
+  if (execution.status === 'pending') return <div className="execution-output" aria-busy="true"><ResultTableSkeleton /><div className="output-status muted">Running query…</div></div>;
   if (execution.status === 'error') {
     const error = execution.error!;
     return <>

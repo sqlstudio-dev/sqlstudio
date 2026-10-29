@@ -28,7 +28,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { SqlConsoleProvider } from '../src/context/SqlConsoleContext';
 import { sqlApi } from '../src/api/sqlApi';
-import type { ConnectionProfile, ConnectorPlugin, SqlExecutionResponse } from '../src/models/sql';
+import type { ConnectionProfile, ConnectorPlugin, SqlExecutionResponse, SqlResultSet } from '../src/models/sql';
 
 vi.mock('../src/api/sqlApi', () => ({ sqlApi: {
   listPlugins: vi.fn(), listConnections: vi.fn(), createConnection: vi.fn(), deleteConnection: vi.fn(), importConnections: vi.fn(),
@@ -71,6 +71,50 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('result tabs', () => {
+  it.each(['success', 'failure'])('keeps the existing chart visible while a refresh finishes with %s', async (outcome) => {
+    let finish!: (value: { sql: string; result: SqlExecutionResponse }) => void;
+    let fail!: (error: Error) => void;
+    vi.mocked(sqlApi.execute).mockResolvedValueOnce(timeSeriesResult);
+    vi.mocked(sqlApi.timeSeries).mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject; }));
+    mount(); await openNotebook(); await run('SELECT ts, device, value FROM m');
+    fireEvent.click(screen.getByRole('tab', { name: 'Time Series' }));
+    const chart = screen.getByTestId('time-series-chart');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh now' }));
+    expect(screen.getByRole('progressbar', { name: 'Refreshing query data' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Time series' }).getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByTestId('time-series-chart')).toBe(chart);
+    expect(document.querySelector('.result-skeleton')).toBeNull();
+    await act(async () => {
+      if (outcome === 'success') finish({ sql: 'wrapped', result: timeSeriesResult });
+      else fail(new Error('Refresh unavailable'));
+    });
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Time series' }).getAttribute('aria-busy')).toBe('false');
+    expect(screen.getByTestId('time-series-chart')).toBe(chart);
+    if (outcome === 'failure') expect(screen.getByRole('alert').textContent).toContain('Refresh unavailable');
+  });
+
+  it.each(['Time Series', 'Statistics', 'Visualize'])('shows a skeleton instead of an empty %s view during refresh', async (tab) => {
+    let finish!: (value: SqlExecutionResponse) => void;
+    const emptyResult: SqlResultSet = {
+      type: 'resultset', columns: [{ name: 'ts', kind: 'timestamp' }, { name: 'value', kind: 'number' }],
+      rows: [], returnedRows: 0, truncated: false, warningCount: 0, executionTimeMs: 1,
+    };
+    vi.mocked(sqlApi.execute).mockResolvedValueOnce(emptyResult)
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    mount(); await openNotebook(); await run('SELECT ts, value FROM m');
+    fireEvent.click(screen.getByRole('tab', { name: tab }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh now' }));
+    expect(screen.getByRole('progressbar', { name: 'Loading query data' })).toBeTruthy();
+    expect(screen.queryByText('No time-series columns detected')).toBeNull();
+    expect(screen.queryByText('No samples in the selected range.')).toBeNull();
+    expect(screen.queryByTestId('time-series-chart')).toBeNull();
+    if (tab !== 'Statistics') expect(document.querySelector('.chart-skeleton')).toBeTruthy();
+    await act(async () => finish(emptyResult));
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByText('No time-series columns detected')).toBeTruthy();
+  });
+
   it('keeps the data grid for plain results and offers manual column mapping', async () => {
     vi.mocked(sqlApi.execute).mockResolvedValueOnce(plainResult);
     mount(); await openNotebook(); await run('SELECT name, city FROM people');

@@ -22,7 +22,7 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-import { Braces, Database, LayoutGrid, TerminalSquare } from 'lucide-react';
+import { Braces, Database, Infinity as InfinityIcon, LayoutGrid } from 'lucide-react';
 import { ConnectionsHome } from './components/connections/ConnectionsHome';
 import { SqlConsole } from './components/sql-console/SqlConsole';
 import { useSqlConsole } from './hooks/useSqlConsole';
@@ -32,10 +32,10 @@ export default function App() {
   const active = state.activeConnection;
   return <div className="app-shell">
     <aside className="activity-rail" aria-label="Workspace">
-      <div className="app-brand" title="Endless Control"><span>e</span></div>
+      <div className="app-brand" role="img" aria-label="Endless Editor" title="Endless Editor"><InfinityIcon size={24} strokeWidth={2.25} aria-hidden="true" /></div>
       <div className="rail-divider" />
       <button type="button" className={`rail-action${active ? '' : ' active'}`} aria-label="Connections" title="Connections" onClick={closeConnection}><LayoutGrid size={19} /></button>
-      <div className={`rail-action${active ? ' active' : ''}`} aria-label="SQL notebook" title="SQL notebook"><TerminalSquare size={19} /></div>
+      <div className={`rail-action${active ? ' active' : ''}`} aria-label="SQL notebook" title="Endless Editor - SQL notebook"><InfinityIcon size={21} aria-hidden="true" /></div>
       <div className="rail-spacer" /><div className="user-mark">EC</div>
     </aside>
     <section className="workspace-shell">

@@ -26,6 +26,7 @@ import { Ban, Download, Maximize2, Minimize2, Pause, Play, RefreshCw, Settings2,
 import type { LiveQueryController } from '../../timeseries/useLiveQuery';
 import { REFRESH_SECONDS, type TimeRange, type VisualizationConfig } from '../../timeseries/model';
 import { formatTimestamp } from '../../timeseries/timestamps';
+import { LoadingProgress } from '../ui/LoadingProgress';
 
 interface LiveToolbarProps {
   live: LiveQueryController; config: VisualizationConfig; onChange: (patch: Partial<VisualizationConfig>) => void;
@@ -71,5 +72,6 @@ export function LiveToolbar({ live, config, onChange, renderedPoints, totalPoint
       <button type="button" className="icon-button" aria-label={fullscreen ? 'Exit full screen' : 'Full screen'} title="Full screen" onClick={onToggleFullscreen}>{fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
       <button type="button" className={`icon-button${configOpen ? ' active' : ''}`} aria-label="Series configuration" aria-pressed={configOpen} title="Configure series" onClick={onToggleConfig}><Settings2 size={14} /></button>
     </span>
+    {state.busy && state.dataset.sourceRows > 0 && <LoadingProgress label="Refreshing query data" />}
   </div>;
 }

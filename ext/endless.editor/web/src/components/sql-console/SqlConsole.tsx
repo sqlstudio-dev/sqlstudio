@@ -28,6 +28,7 @@ import { useSqlConsole } from '../../hooks/useSqlConsole';
 import { useSqlKeyboardShortcuts } from '../../hooks/useSqlKeyboardShortcuts';
 import { SqlExecutionHistory } from './SqlExecutionHistory';
 import { SqlPrompt, type SqlPromptHandle } from './SqlPrompt';
+import { ResultTableSkeleton } from '../results/ResultTableSkeleton';
 
 export function SqlConsole() {
   const { state, dispatch, execute, retryConnection, closeConnection } = useSqlConsole();
@@ -58,6 +59,7 @@ export function SqlConsole() {
     </div></header>
     <div className="console-scroll">{state.sessionStatus === 'error' && <div className="connection-error">{state.sessionError}</div>}
       <div className="notebook-content">
+        {state.sessionStatus === 'connecting' && <div className="session-loading" aria-busy="true"><ResultTableSkeleton label="Opening database session" /></div>}
         {state.executions.length === 0 && state.sessionStatus === 'ready' && <div className="notebook-welcome"><span className="welcome-index">01</span>
           <div><strong>SQL notebook</strong><span>Session ready. Write a query below to begin.</span></div></div>}
         <SqlExecutionHistory executions={state.executions} />

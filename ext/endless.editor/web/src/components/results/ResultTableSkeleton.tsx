@@ -22,13 +22,17 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-export function ResultTableSkeleton() {
-  return <div className="animate-pulse motion-reduce:animate-none overflow-hidden rounded border border-line" aria-label="Query result loading" role="status">
-    <div className="grid grid-cols-4 gap-5 border-b border-line bg-[#202725] px-4 py-3">
-      {[0, 1, 2, 3].map((item) => <div key={item} className="skeleton h-3 w-24 max-w-full" />)}
-    </div>
-    {[0, 1, 2].map((row) => <div className="grid grid-cols-4 gap-5 border-b border-line/70 px-4 py-3 last:border-0" key={row}>
-      {[0, 1, 2, 3].map((item) => <div key={item} className={`skeleton h-3 ${item === 0 ? 'w-32' : 'w-20'} max-w-full`} />)}
-    </div>)}
+import { LoadingProgress } from '../ui/LoadingProgress';
+
+export function ResultTableSkeleton({ label = 'Query result loading', chart = false }: { label?: string; chart?: boolean }) {
+  return <div className="result-skeleton">
+    <LoadingProgress label={label} />
+    {chart ? <div className="chart-skeleton" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((line) => <div className="skeleton" key={line} />)}
+    </div> : <div className="skeleton-table" aria-hidden="true">
+      {[0, 1, 2, 3, 4].map((row) => <div className="skeleton-table-row" key={row}>
+        {[0, 1, 2, 3].map((column) => <div key={column} className="skeleton" />)}
+      </div>)}
+    </div>}
   </div>;
 }
