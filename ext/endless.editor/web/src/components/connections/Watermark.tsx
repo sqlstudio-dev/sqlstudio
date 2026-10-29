@@ -22,10 +22,14 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+import clickhouseLogo from '../../assets/watermarks/clickhouse.png';
 import databaseLogo from '../../assets/watermarks/database.png';
+import influxdbLogo from '../../assets/watermarks/influxdb.png';
 import mssqlLogo from '../../assets/watermarks/mssql.png';
 import mysqlLogo from '../../assets/watermarks/mysql.png';
 import postgresqlLogo from '../../assets/watermarks/postgresql.png';
+import questdbLogo from '../../assets/watermarks/questdb.png';
+import timescaledbLogo from '../../assets/watermarks/timescaledb.png';
 
 // Engine logos drawn faintly on connection tiles. A plugin picks one by name;
 // anything unknown falls back to the generic database icon.
@@ -33,6 +37,10 @@ const logos: Record<string, string> = {
   mysql: mysqlLogo, mariadb: mysqlLogo, dolphin: mysqlLogo,
   postgresql: postgresqlLogo, postgres: postgresqlLogo, elephant: postgresqlLogo,
   mssql: mssqlLogo, sqlserver: mssqlLogo,
+  questdb: questdbLogo, quest: questdbLogo,
+  influxdb: influxdbLogo, influx: influxdbLogo,
+  timescaledb: timescaledbLogo, timescale: timescaledbLogo,
+  clickhouse: clickhouseLogo,
   database: databaseLogo,
 };
 
