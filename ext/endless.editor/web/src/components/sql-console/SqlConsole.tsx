@@ -23,14 +23,14 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { ArrowDownToLine, Eraser, Play, RotateCw } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, Eraser, Play, RotateCw } from 'lucide-react';
 import { useSqlConsole } from '../../hooks/useSqlConsole';
 import { useSqlKeyboardShortcuts } from '../../hooks/useSqlKeyboardShortcuts';
 import { SqlExecutionHistory } from './SqlExecutionHistory';
 import { SqlPrompt, type SqlPromptHandle } from './SqlPrompt';
 
 export function SqlConsole() {
-  const { state, dispatch, execute, retryConnection } = useSqlConsole();
+  const { state, dispatch, execute, retryConnection, closeConnection } = useSqlConsole();
   const promptRef = useRef<SqlPromptHandle>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pending = state.executions.some((execution) => execution.status === 'pending');
@@ -41,11 +41,15 @@ export function SqlConsole() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     if (state.sessionStatus === 'ready') promptRef.current?.focus();
   }, [state.executions, state.sessionStatus]);
+  const connection = state.activeConnection;
+  const engine = state.plugins.find((plugin) => connection && (plugin.id === connection.type || plugin.aliases.includes(connection.type)))?.name ?? connection?.type ?? 'Database';
 
   return <main className="console-main">
-    <header className="console-toolbar"><div className="toolbar-left"><span className={`connection-led ${state.sessionStatus}`} />
-      <div className="connection-label"><strong>{state.session ? 'SQL session' : 'MySQL / MariaDB'}</strong>
-        <span>{state.session ? `${state.session.host}:${state.session.port} · ${state.session.type}` : 'Database session'}</span></div>
+    <header className="console-toolbar"><div className="toolbar-left">
+      <button type="button" className="icon-button" aria-label="Back to connections" title="Back to connections" onClick={closeConnection}><ArrowLeft size={15} /></button>
+      <span className={`connection-led ${state.sessionStatus}`} />
+      <div className="connection-label"><strong>{connection?.name ?? 'SQL session'}</strong>
+        <span>{connection ? `${connection.username ? connection.username + '@' : ''}${connection.host}:${connection.port} · ${engine}` : 'Database session'}</span></div>
       <span className={`session-chip ${state.sessionStatus}`}>{state.sessionStatus === 'ready' ? 'CONNECTED' : state.sessionStatus === 'connecting' ? 'CONNECTING' : 'OFFLINE'}</span>
     </div><div className="toolbar-actions">
       <button className="icon-button" aria-label="Clear console" title="Clear history (keeps database session)" disabled={pending} onClick={() => dispatch({ type: 'CLEAR_CONSOLE' })}><Eraser size={15} /></button>

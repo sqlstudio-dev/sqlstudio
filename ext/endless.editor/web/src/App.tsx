@@ -22,24 +22,36 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-import { Braces, Database, TerminalSquare } from 'lucide-react';
+import { Braces, Database, LayoutGrid, TerminalSquare } from 'lucide-react';
+import { ConnectionsHome } from './components/connections/ConnectionsHome';
 import { SqlConsole } from './components/sql-console/SqlConsole';
+import { useSqlConsole } from './hooks/useSqlConsole';
 
 export default function App() {
+  const { state, closeConnection } = useSqlConsole();
+  const active = state.activeConnection;
   return <div className="app-shell">
     <aside className="activity-rail" aria-label="Workspace">
       <div className="app-brand" title="Endless Control"><span>e</span></div>
       <div className="rail-divider" />
-      <div className="rail-action active" aria-label="SQL notebook" title="SQL notebook"><TerminalSquare size={19} /></div>
+      <button type="button" className={`rail-action${active ? '' : ' active'}`} aria-label="Connections" title="Connections" onClick={closeConnection}><LayoutGrid size={19} /></button>
+      <div className={`rail-action${active ? ' active' : ''}`} aria-label="SQL notebook" title="SQL notebook"><TerminalSquare size={19} /></div>
       <div className="rail-spacer" /><div className="user-mark">EC</div>
     </aside>
     <section className="workspace-shell">
       <header className="window-bar">
-        <div className="breadcrumbs"><span>WORKSPACE</span><b>/</b><strong>SQL Notebook</strong></div>
-        <div className="window-meta"><Braces size={14} /><span>SQL</span><i />Local development</div>
+        <div className="breadcrumbs"><span>WORKSPACE</span><b>/</b>{active
+          ? <><button type="button" className="breadcrumb-link" onClick={closeConnection}>Connections</button><b>/</b><strong>{active.name}</strong></>
+          : <strong>Connections</strong>}</div>
+        <div className="window-meta"><Braces size={14} /><span>SQL</span><i />{active ? `${active.host}:${active.port}` : 'Local development'}</div>
       </header>
-      <div className="editor-tabs"><div className="editor-tab"><Database size={14} /><span>SQL Notebook</span><i /></div><div className="tab-context">Endless console</div></div>
-      <SqlConsole />
+      <div className="editor-tabs">
+        {active
+          ? <div className="editor-tab"><Database size={14} /><span>{active.name}</span><i /></div>
+          : <div className="editor-tab"><LayoutGrid size={14} /><span>Connections</span><i /></div>}
+        <div className="tab-context">{active ? 'SQL notebook' : 'Endless console'}</div>
+      </div>
+      {active ? <SqlConsole /> : <ConnectionsHome />}
     </section>
   </div>;
 }

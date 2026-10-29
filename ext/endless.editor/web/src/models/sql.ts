@@ -39,8 +39,19 @@ export interface SqlExecution {
   result?: SqlResult; error?: SqlError; partialResults?: SqlSingleResult[];
 }
 export interface SqlSession {
-  sessionId: string; database?: string | null; host: string; port: number; type: 'mysql' | 'mariadb';
+  sessionId: string; connectionId: string; name: string; database?: string | null; host: string; port: number;
+  username: string; type: string;
 }
+export interface ConnectionProfile {
+  id: string; name: string; type: string; host: string; port: number; username: string; database: string;
+  default: boolean; lastConnected: number | null; options: Record<string, string | number | boolean>;
+}
+export interface ConnectionInput { name: string; type: string; host: string; port: number; username: string; database: string }
+export interface ConnectorPlugin {
+  id: string; name: string; defaultPort: number; watermark: string; driver: string; aliases: string[]; available: boolean;
+  unavailableReason: string | null;
+}
+export interface ConnectionImportResult { imported: number; duplicates: number; skipped: number; connections: ConnectionProfile[] }
 export type SqlSingleResult = SqlResultSet | SqlCommandResult;
 export type SqlResult = SqlSingleResult | { type: 'batch'; results: SqlSingleResult[]; executionTimeMs: number };
 export type SqlExecutionResponse = SqlResult | { type: 'error'; error: SqlError; partialResults?: SqlSingleResult[] };

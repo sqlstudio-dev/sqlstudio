@@ -23,9 +23,13 @@
 import os
 from dataclasses import dataclass, field
 
+from app.database.connection_store import ConnectionProfile
+
 
 @dataclass(frozen=True)
 class DatabaseConnectionConfig:
+    """Environment defaults: result limit plus the seed connection used when no connection.json exists."""
+
     type: str = "mysql"
     host: str = "127.0.0.1"
     port: int = 3306
@@ -35,8 +39,6 @@ class DatabaseConnectionConfig:
     result_limit: int = 1000
 
     def __post_init__(self) -> None:
-        if self.type not in {"mysql", "mariadb"}:
-            raise ValueError("DB_TYPE must be mysql or mariadb")
         if not 1 <= self.port <= 65535 or self.result_limit < 1:
             raise ValueError("Invalid database port or result limit")
 
@@ -52,9 +54,6 @@ class DatabaseConnectionConfig:
             result_limit=int(os.getenv("DB_RESULT_LIMIT", "1000")),
         )
 
-    def connector_options(self) -> dict[str, object]:
-        return {
-            "host": self.host, "port": self.port, "user": self.username,
-            "password": self.password, "database": self.database or None,
-            "connect_timeout": 8, "charset": "utf8mb4", "autocommit": True,
-        }
+    def seed_profile(self) -> ConnectionProfile:
+        return ConnectionProfile(id="local-default", name="Local development", type=self.type, host=self.host,
+                                 port=self.port, username=self.username, database=self.database, default=True)

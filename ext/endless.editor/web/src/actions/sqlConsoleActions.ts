@@ -23,20 +23,48 @@
  */
 
 import { sqlApi } from '../api/sqlApi';
-import type { SqlExecutionResponse, SqlSession } from '../models/sql';
+import type { ConnectionInput, ConnectionProfile, SqlExecutionResponse, SqlSession } from '../models/sql';
 import type { SqlConsoleAction, SqlConsoleState } from '../reducers/sqlConsoleReducer';
 
 type Dispatch = (action: SqlConsoleAction) => void;
+const messageOf = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
-export async function createSqlSession(dispatch: Dispatch): Promise<SqlSession | null> {
+export async function loadConnections(dispatch: Dispatch): Promise<void> {
+  dispatch({ type: 'CONNECTIONS_LOAD_REQUEST' });
+  try {
+    const [connections, plugins] = await Promise.all([sqlApi.listConnections(), sqlApi.listPlugins()]);
+    dispatch({ type: 'CONNECTIONS_LOAD_SUCCESS', connections, plugins });
+  } catch (error) {
+    dispatch({ type: 'CONNECTIONS_LOAD_FAILURE', message: messageOf(error, 'Could not load connections.') });
+  }
+}
+
+export async function addConnection(input: ConnectionInput, dispatch: Dispatch): Promise<ConnectionProfile> {
+  const connection = await sqlApi.createConnection(input);
+  dispatch({ type: 'CONNECTION_ADDED', connection });
+  return connection;
+}
+
+export async function removeConnection(id: string, dispatch: Dispatch): Promise<void> {
+  await sqlApi.deleteConnection(id);
+  dispatch({ type: 'CONNECTION_REMOVED', id });
+}
+
+export async function importConnections(xml: string, dispatch: Dispatch) {
+  const result = await sqlApi.importConnections(xml);
+  dispatch({ type: 'CONNECTIONS_IMPORTED', connections: result.connections });
+  return result;
+}
+
+export async function createSqlSession(connection: ConnectionProfile, password: string, dispatch: Dispatch): Promise<SqlSession | null> {
   dispatch({ type: 'SESSION_CREATE_REQUEST' });
   try {
-    const session = await sqlApi.createSession();
+    const session = await sqlApi.createSession(connection.id, password);
     dispatch({ type: 'SESSION_CREATE_SUCCESS', session });
     return session;
   }
   catch (error) {
-    dispatch({ type: 'SESSION_CREATE_FAILURE', message: error instanceof Error ? error.message : 'Could not connect.' });
+    dispatch({ type: 'SESSION_CREATE_FAILURE', message: messageOf(error, 'Could not connect.') });
     return null;
   }
 }

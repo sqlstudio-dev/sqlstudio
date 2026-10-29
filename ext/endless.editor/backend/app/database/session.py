@@ -24,28 +24,32 @@ from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any
 
-import pymysql
-from pymysql.cursors import SSCursor
+from app.database.connection_store import ConnectionProfile
+from app.plugins.base import ConnectorPlugin
 
-from app.database.config import DatabaseConnectionConfig
+
+class SessionClosedError(RuntimeError):
+    pass
 
 
 @dataclass
 class SqlSession:
     session_id: str
     connection: Any
-    config: DatabaseConnectionConfig
+    profile: ConnectionProfile
+    plugin: ConnectorPlugin
+    result_limit: int = 1000
     lock: RLock = field(default_factory=RLock)
     closed: bool = False
 
     @classmethod
-    def connect(cls, session_id: str, config: DatabaseConnectionConfig) -> "SqlSession":
-        connection = pymysql.connect(**config.connector_options(), cursorclass=SSCursor)
-        return cls(session_id=session_id, connection=connection, config=config)
+    def connect(cls, session_id: str, profile: ConnectionProfile, plugin: ConnectorPlugin, password: str,
+                result_limit: int) -> "SqlSession":
+        connection = plugin.connect(profile.host, profile.port, profile.username, password, profile.database)
+        return cls(session_id=session_id, connection=connection, profile=profile, plugin=plugin, result_limit=result_limit)
 
     def close(self) -> None:
         with self.lock:
             if not self.closed:
                 self.closed = True
-                if self.connection.open:
-                    self.connection.close()
+                self.plugin.close(self.connection)

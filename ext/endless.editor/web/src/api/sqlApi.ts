@@ -22,7 +22,7 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-import type { SqlExecutionResponse, SqlSession } from '../models/sql';
+import type { ConnectionImportResult, ConnectionInput, ConnectionProfile, ConnectorPlugin, SqlExecutionResponse, SqlSession } from '../models/sql';
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
 
@@ -40,7 +40,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const sqlApi = {
-  createSession: () => request<SqlSession>('/api/sessions', { method: 'POST' }),
+  listPlugins: () => request<ConnectorPlugin[]>('/api/plugins'),
+  listConnections: () => request<ConnectionProfile[]>('/api/connections'),
+  createConnection: (input: ConnectionInput) => request<ConnectionProfile>('/api/connections', { method: 'POST', body: JSON.stringify(input) }),
+  deleteConnection: (id: string) => request<void>('/api/connections/' + encodeURIComponent(id), { method: 'DELETE' }),
+  importConnections: (xml: string) => request<ConnectionImportResult>('/api/connections/import', { method: 'POST', body: JSON.stringify({ xml }) }),
+  createSession: (connectionId: string, password: string) => request<SqlSession>('/api/sessions', { method: 'POST', body: JSON.stringify({ connectionId, password }) }),
   closeSession: (id: string) => request<void>('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE', keepalive: true }),
   execute: (sessionId: string, sql: string) => request<SqlExecutionResponse>(
     '/api/sessions/' + encodeURIComponent(sessionId) + '/execute', { method: 'POST', body: JSON.stringify({ sql }) },

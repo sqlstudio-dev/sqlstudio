@@ -20,17 +20,46 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.connections import create_connections_router
 from app.api.sql import create_sql_router
 from app.database.config import DatabaseConnectionConfig
+from app.database.connection_import import discover_connections_xml, parse_connections_xml
+from app.database.connection_store import ConnectionStore, default_connections_file
 from app.database.session_manager import SessionManager
+from app.plugins.loader import load_plugins
 
+log = logging.getLogger("endless.startup")
 config = DatabaseConnectionConfig.from_environment()
-session_manager = SessionManager(config)
+plugins = load_plugins()
+store = ConnectionStore(default_connections_file())
+
+
+def initialize_connections(store: ConnectionStore, config: DatabaseConnectionConfig) -> None:
+    """Create connection.json on first start from SqlStudio's connections.xml or the environment defaults."""
+    if store.exists():
+        store.load()
+        return
+    xml_path = discover_connections_xml()
+    if xml_path is not None:
+        try:
+            profiles, skipped = parse_connections_xml(xml_path.read_text(encoding="utf-8"))
+            store.add_many(profiles)
+            log.info("Imported %d connections from %s (%d skipped)", len(profiles), xml_path, skipped)
+        except Exception as error:
+            log.warning("Could not import %s: %s", xml_path, error)
+    if not store.list():
+        store.add(config.seed_profile())
+    store.save()
+
+
+initialize_connections(store, config)
+session_manager = SessionManager(store, plugins, config.result_limit)
 
 
 @asynccontextmanager
@@ -42,6 +71,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Endless Control SQL API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "https://appassets.example"],
                    allow_methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["Content-Type"])
+app.include_router(create_connections_router(store, plugins))
 app.include_router(create_sql_router(session_manager))
 
 

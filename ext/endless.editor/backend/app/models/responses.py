@@ -23,7 +23,7 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from math import isfinite
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -32,12 +32,33 @@ class SqlExecuteRequest(BaseModel):
     sql: str = Field(min_length=1, max_length=1_000_000)
 
 
+class SessionCreateRequest(BaseModel):
+    connectionId: str = Field(min_length=1, max_length=200)
+    password: str = Field(default="", max_length=1024)
+
+
 class SqlSessionResponse(BaseModel):
     sessionId: str
+    connectionId: str
+    name: str
     database: str | None
     host: str
     port: int
-    type: Literal["mysql", "mariadb"]
+    username: str
+    type: str
+
+
+class ConnectionCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    type: str = Field(min_length=1, max_length=40)
+    host: str = Field(min_length=1, max_length=255)
+    port: int = Field(ge=1, le=65535)
+    username: str = Field(default="", max_length=128)
+    database: str = Field(default="", max_length=128)
+
+
+class ConnectionImportRequest(BaseModel):
+    xml: str = Field(min_length=1, max_length=5_000_000)
 
 
 def cell_to_json(value: Any) -> Any:

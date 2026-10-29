@@ -28,6 +28,8 @@ hosts/windows/obj/
 hosts/macos/.build/
 
 backend/.venv/
+backend/connection.json
+backend/connection.json.tmp
 __pycache__/
 *.pyc
 .env

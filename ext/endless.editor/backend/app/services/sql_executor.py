@@ -23,37 +23,32 @@
 from time import perf_counter
 from typing import Any
 
-import pymysql
-from pymysql.constants import FIELD_TYPE
-
-from app.database.session import SqlSession
+from app.database.session import SessionClosedError, SqlSession
 from app.models.responses import cell_to_json
-
-FIELD_NAMES = {value: name for name, value in vars(FIELD_TYPE).items() if isinstance(value, int)}
 
 
 def execute_sql(session: SqlSession, sql: str) -> dict[str, Any]:
     started = perf_counter()
     results: list[dict[str, Any]] = []
     error: dict[str, Any] | None = None
+    plugin = session.plugin
     with session.lock:
         cursor = None
         try:
             if session.closed:
-                raise pymysql.OperationalError(2006, "Database session is closed. Reload to start a new session.")
+                raise SessionClosedError("Database session is closed. Reload to start a new session.")
             cursor = session.connection.cursor()
             cursor.execute(sql)
             while True:
                 result_started = perf_counter()
                 if cursor.description:
-                    columns = [{"name": d[0], "type": FIELD_NAMES.get(d[1], str(d[1]))}
-                               for d in cursor.description]
+                    columns = plugin.describe_columns(cursor.description)
                     rows = []
                     truncated = False
                     # Drain every row without retaining it: an unread result would
                     # poison the next command on this same physical connection.
                     while batch := cursor.fetchmany(256):
-                        available = max(0, session.config.result_limit - len(rows))
+                        available = max(0, session.result_limit - len(rows))
                         rows.extend([[cell_to_json(v) for v in row] for row in batch[:available]])
                         truncated = truncated or len(batch) > available
                     result = {"type": "resultset", "columns": columns, "rows": rows,
@@ -61,17 +56,17 @@ def execute_sql(session: SqlSession, sql: str) -> dict[str, Any]:
                 else:
                     result = {"type": "command", "affectedRows": max(0, cursor.rowcount),
                               "message": "Query OK"}
-                result.update(warningCount=cursor.warning_count,
+                result.update(warningCount=plugin.warning_count(cursor),
                               executionTimeMs=round((perf_counter() - result_started) * 1000, 2))
                 results.append(result)
                 # CALL may produce multiple result sets; consume and display all.
                 if not cursor.nextset():
                     break
-        except pymysql.Error as exc:
-            error = {"message": str(exc.args[1]) if len(exc.args) > 1 else "Database execution failed.",
-                     "code": exc.args[0] if exc.args else None, "sqlState": None}
-        except Exception:
-            error = {"message": "Database execution failed unexpectedly.", "code": None, "sqlState": None}
+        except SessionClosedError as exc:
+            error = {"message": str(exc), "code": None, "sqlState": None}
+        except Exception as exc:
+            error = plugin.error_details(exc) or {"message": "Database execution failed unexpectedly.",
+                                                  "code": None, "sqlState": None}
         finally:
             if cursor is not None:
                 try:

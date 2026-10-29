@@ -23,8 +23,8 @@
 from fastapi import APIRouter, HTTPException, Response
 from starlette.concurrency import run_in_threadpool
 
-from app.database.session_manager import SessionManager
-from app.models.responses import SqlExecuteRequest, SqlSessionResponse
+from app.database.session_manager import SessionManager, UnknownConnectionError, UnsupportedEngineError
+from app.models.responses import SessionCreateRequest, SqlExecuteRequest, SqlSessionResponse
 from app.services.sql_executor import execute_sql
 
 
@@ -32,13 +32,20 @@ def create_sql_router(session_manager: SessionManager) -> APIRouter:
     router = APIRouter(prefix="/api/sessions", tags=["sql"])
 
     @router.post("", response_model=SqlSessionResponse)
-    async def create_session() -> dict[str, object]:
+    async def create_session(request: SessionCreateRequest) -> dict[str, object]:
         try:
-            session = await run_in_threadpool(session_manager.create)
+            session = await run_in_threadpool(session_manager.create, request.connectionId, request.password)
+        except UnknownConnectionError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except UnsupportedEngineError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
         except Exception as error:
-            raise HTTPException(status_code=503, detail="Could not open the configured database session. Check the server and backend configuration.") from error
-        return {"sessionId": session.session_id, "database": session.config.database,
-                "host": session.config.host, "port": session.config.port, "type": session.config.type}
+            details = session_manager.describe_error(request.connectionId, error)
+            raise HTTPException(status_code=503, detail=f"Could not open the database session: {details}") from error
+        profile = session.profile
+        return {"sessionId": session.session_id, "connectionId": profile.id, "name": profile.name,
+                "database": profile.database or None, "host": profile.host, "port": profile.port,
+                "username": profile.username, "type": profile.type}
 
     @router.delete("/{session_id}", status_code=204)
     async def close_session(session_id: str) -> Response:

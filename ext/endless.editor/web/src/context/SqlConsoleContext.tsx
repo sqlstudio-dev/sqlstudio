@@ -23,8 +23,8 @@
  */
 
 import { createContext, useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from 'react';
-import { closeSqlSession, createSqlSession, executeSql } from '../actions/sqlConsoleActions';
-import type { SqlSession } from '../models/sql';
+import { addConnection, closeSqlSession, createSqlSession, executeSql, importConnections, loadConnections, removeConnection } from '../actions/sqlConsoleActions';
+import type { ConnectionInput, ConnectionProfile, SqlSession } from '../models/sql';
 import { initialSqlConsoleState, sqlConsoleReducer, type SqlConsoleAction, type SqlConsoleState } from '../reducers/sqlConsoleReducer';
 
 interface SqlConsoleContextValue {
@@ -32,30 +32,64 @@ interface SqlConsoleContextValue {
   dispatch: Dispatch<SqlConsoleAction>;
   execute: () => Promise<void>;
   retryConnection: () => void;
+  reloadConnections: () => void;
+  openConnection: (connection: ConnectionProfile, password: string) => void;
+  closeConnection: () => void;
+  addConnection: (input: ConnectionInput) => Promise<ConnectionProfile>;
+  removeConnection: (id: string) => Promise<void>;
+  importConnections: (xml: string) => ReturnType<typeof importConnections>;
 }
 export const SqlConsoleContext = createContext<SqlConsoleContextValue | null>(null);
 
 export function SqlConsoleProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(sqlConsoleReducer, initialSqlConsoleState);
   const connecting = useRef<Promise<SqlSession | null> | null>(null);
+  // The password only lives in memory for reconnects; it is never persisted.
+  const credentials = useRef<{ connection: ConnectionProfile; password: string } | null>(null);
+  const loading = useRef(false);
   const mounted = useRef(false);
   const executing = useRef(false);
   const disposal = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const safeDispatch = useCallback((action: SqlConsoleAction) => { if (mounted.current) dispatch(action); }, []);
+
+  const reloadConnections = useCallback(() => {
+    if (loading.current) return;
+    loading.current = true;
+    void loadConnections(safeDispatch).finally(() => { loading.current = false; });
+  }, [safeDispatch]);
+
+  const releaseSession = useCallback(() => {
+    const pending = connecting.current;
+    connecting.current = null;
+    void pending?.then((session) => session && closeSqlSession(session));
+  }, []);
 
   const retryConnection = useCallback(() => {
-    if (connecting.current) return;
-    connecting.current = createSqlSession((action) => {
-      if (mounted.current) dispatch(action);
-    });
+    if (connecting.current || !credentials.current) return;
+    const { connection, password } = credentials.current;
+    connecting.current = createSqlSession(connection, password, safeDispatch);
     void connecting.current.then((session) => {
       if (!session) connecting.current = null;
     });
-  }, []);
+  }, [safeDispatch]);
+
+  const openConnection = useCallback((connection: ConnectionProfile, password: string) => {
+    releaseSession();
+    credentials.current = { connection, password };
+    dispatch({ type: 'CONNECTION_OPENED', connection });
+    retryConnection();
+  }, [releaseSession, retryConnection]);
+
+  const closeConnection = useCallback(() => {
+    releaseSession();
+    credentials.current = null;
+    dispatch({ type: 'CONNECTION_CLOSED' });
+  }, [releaseSession]);
 
   useEffect(() => {
     mounted.current = true;
     clearTimeout(disposal.current);
-    retryConnection();
+    reloadConnections();
     const close = () => { void connecting.current?.then((session) => session && closeSqlSession(session)); };
     window.addEventListener('pagehide', close);
     return () => {
@@ -65,7 +99,7 @@ export function SqlConsoleProvider({ children }: { children: ReactNode }) {
       // Dispose real unmounts, even if session creation is still pending.
       disposal.current = setTimeout(close, 0);
     };
-  }, [retryConnection]);
+  }, [reloadConnections]);
 
   const execute = useCallback(async () => {
     // Guard calls occurring before React has rendered the pending state.
@@ -75,6 +109,11 @@ export function SqlConsoleProvider({ children }: { children: ReactNode }) {
     finally { executing.current = false; }
   }, [state]);
 
-  const value = useMemo(() => ({ state, dispatch, execute, retryConnection }), [state, execute, retryConnection]);
+  const value = useMemo<SqlConsoleContextValue>(() => ({
+    state, dispatch, execute, retryConnection, reloadConnections, openConnection, closeConnection,
+    addConnection: (input) => addConnection(input, safeDispatch),
+    removeConnection: (id) => removeConnection(id, safeDispatch),
+    importConnections: (xml) => importConnections(xml, safeDispatch),
+  }), [state, execute, retryConnection, reloadConnections, openConnection, closeConnection, safeDispatch]);
   return <SqlConsoleContext.Provider value={value}>{children}</SqlConsoleContext.Provider>;
 }

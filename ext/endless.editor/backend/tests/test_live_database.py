@@ -22,18 +22,29 @@
 
 """Opt-in checks using only connection-local variables and temporary tables."""
 import os
+import tempfile
 import unittest
+from pathlib import Path
 
 from app.database.config import DatabaseConnectionConfig
+from app.database.connection_store import ConnectionStore
 from app.database.session_manager import SessionManager
+from app.plugins.loader import load_plugins
 from app.services.sql_executor import execute_sql
 
 
 @unittest.skipUnless(os.getenv("SQL_LIVE_TEST") == "1", "Set SQL_LIVE_TEST=1 to test the configured database")
 class LiveDatabaseTests(unittest.TestCase):
     def test_session_results_and_transactions(self):
-        manager = SessionManager(DatabaseConnectionConfig.from_environment())
-        session = manager.create()
+        config = DatabaseConnectionConfig.from_environment()
+        with tempfile.TemporaryDirectory() as directory:
+            store = ConnectionStore(Path(directory) / "connection.json")
+            profile = store.add(config.seed_profile())
+            manager = SessionManager(store, load_plugins(), config.result_limit)
+            session = manager.create(profile.id, config.password)
+            self._exercise(session, profile.database)
+
+    def _exercise(self, session, database):
         def execute(sql):
             result = execute_sql(session, sql)
             self.assertNotEqual(result["type"], "error", result)
@@ -41,10 +52,10 @@ class LiveDatabaseTests(unittest.TestCase):
         try:
             execute("SET @endless_control_test = 10")
             self.assertEqual(execute("SELECT @endless_control_test")["rows"], [[10]])
-            if session.config.database:
-                schema = session.config.database.replace("`", "``")
+            if database:
+                schema = database.replace("`", "``")
                 execute("USE `" + schema + "`")
-                self.assertEqual(execute("SELECT DATABASE()")["rows"], [[session.config.database]])
+                self.assertEqual(execute("SELECT DATABASE()")["rows"], [[database]])
             execute("CREATE TEMPORARY TABLE endless_control_test (id INT PRIMARY KEY, label VARCHAR(30)) ENGINE=InnoDB")
             execute("INSERT INTO endless_control_test VALUES (1, 'before')")
             execute("START TRANSACTION")
@@ -56,11 +67,11 @@ class LiveDatabaseTests(unittest.TestCase):
             self.assertEqual(execute("SELECT 1")["rows"], [[1]])
             digits = "(SELECT 0 n UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9)"
             limited = execute(f"SELECT a.n FROM {digits} a CROSS JOIN {digits} b CROSS JOIN {digits} c CROSS JOIN {digits} d")
-            self.assertEqual(limited["returnedRows"], min(session.config.result_limit, 10000))
-            self.assertEqual(limited["truncated"], session.config.result_limit < 10000)
+            self.assertEqual(limited["returnedRows"], min(session.result_limit, 10000))
+            self.assertEqual(limited["truncated"], session.result_limit < 10000)
             self.assertEqual(execute("SELECT @endless_control_test")["rows"], [[10]])
         finally:
-            manager.close_all()
+            session.close()
 
 
 if __name__ == "__main__":

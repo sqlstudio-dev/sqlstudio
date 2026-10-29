@@ -22,13 +22,24 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-import type { SqlExecution, SqlSession } from '../models/sql';
+import type { ConnectionProfile, ConnectorPlugin, SqlExecution, SqlSession } from '../models/sql';
 
 export interface SqlConsoleState {
-  session: SqlSession | null; sessionStatus: 'connecting' | 'ready' | 'error'; sessionError: string | null;
+  connections: ConnectionProfile[]; plugins: ConnectorPlugin[];
+  connectionsStatus: 'loading' | 'ready' | 'error'; connectionsError: string | null;
+  activeConnection: ConnectionProfile | null;
+  session: SqlSession | null; sessionStatus: 'idle' | 'connecting' | 'ready' | 'error'; sessionError: string | null;
   executions: SqlExecution[]; currentSql: string;
 }
 export type SqlConsoleAction =
+  | { type: 'CONNECTIONS_LOAD_REQUEST' }
+  | { type: 'CONNECTIONS_LOAD_SUCCESS'; connections: ConnectionProfile[]; plugins: ConnectorPlugin[] }
+  | { type: 'CONNECTIONS_LOAD_FAILURE'; message: string }
+  | { type: 'CONNECTION_ADDED'; connection: ConnectionProfile }
+  | { type: 'CONNECTIONS_IMPORTED'; connections: ConnectionProfile[] }
+  | { type: 'CONNECTION_REMOVED'; id: string }
+  | { type: 'CONNECTION_OPENED'; connection: ConnectionProfile }
+  | { type: 'CONNECTION_CLOSED' }
   | { type: 'SESSION_CREATE_REQUEST' }
   | { type: 'SESSION_CREATE_SUCCESS'; session: SqlSession }
   | { type: 'SESSION_CREATE_FAILURE'; message: string }
@@ -38,13 +49,27 @@ export type SqlConsoleAction =
   | { type: 'CLEAR_CONSOLE' };
 
 export const initialSqlConsoleState: SqlConsoleState = {
-  session: null, sessionStatus: 'connecting', sessionError: null, executions: [], currentSql: '',
+  connections: [], plugins: [], connectionsStatus: 'loading', connectionsError: null, activeConnection: null,
+  session: null, sessionStatus: 'idle', sessionError: null, executions: [], currentSql: '',
 };
 
 export function sqlConsoleReducer(state: SqlConsoleState, action: SqlConsoleAction): SqlConsoleState {
   switch (action.type) {
+    case 'CONNECTIONS_LOAD_REQUEST': return { ...state, connectionsStatus: 'loading', connectionsError: null };
+    case 'CONNECTIONS_LOAD_SUCCESS':
+      return { ...state, connections: action.connections, plugins: action.plugins, connectionsStatus: 'ready', connectionsError: null };
+    case 'CONNECTIONS_LOAD_FAILURE': return { ...state, connectionsStatus: 'error', connectionsError: action.message };
+    case 'CONNECTION_ADDED': return { ...state, connections: [...state.connections, action.connection] };
+    case 'CONNECTIONS_IMPORTED': return { ...state, connections: [...state.connections, ...action.connections] };
+    case 'CONNECTION_REMOVED': return { ...state, connections: state.connections.filter((item) => item.id !== action.id) };
+    case 'CONNECTION_OPENED':
+      return { ...state, activeConnection: action.connection, session: null, sessionStatus: 'connecting', sessionError: null, executions: [], currentSql: '' };
+    case 'CONNECTION_CLOSED':
+      return { ...state, activeConnection: null, session: null, sessionStatus: 'idle', sessionError: null, executions: [], currentSql: '' };
     case 'SESSION_CREATE_REQUEST': return { ...state, sessionStatus: 'connecting', sessionError: null };
-    case 'SESSION_CREATE_SUCCESS': return { ...state, session: action.session, sessionStatus: 'ready', sessionError: null };
+    case 'SESSION_CREATE_SUCCESS':
+      return { ...state, session: action.session, sessionStatus: 'ready', sessionError: null,
+        connections: state.connections.map((item) => item.id === action.session.connectionId ? { ...item, lastConnected: Math.floor(Date.now() / 1000) } : item) };
     case 'SESSION_CREATE_FAILURE': return { ...state, sessionStatus: 'error', sessionError: action.message };
     case 'SQL_INPUT_CHANGED': return { ...state, currentSql: action.sql };
     case 'EXECUTE_SQL_REQUEST': return { ...state, currentSql: '', executions: [...state.executions, action.execution] };
