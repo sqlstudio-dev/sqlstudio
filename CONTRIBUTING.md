@@ -29,6 +29,21 @@ python -m pip install -r tools/format-requirements.txt
 python tools/check_format.py
 ```
 
+On Windows (or anywhere `pwsh` is available), `run-clang-format.ps1` in the
+repository root installs the pinned formatter into a cached virtual environment
+on first use and then runs the same check:
+
+```powershell
+.\run-clang-format.ps1                          # changed and untracked files
+.\run-clang-format.ps1 -Base origin/develop     # this branch, like CI
+.\run-clang-format.ps1 -All                     # every non-ignored file
+.\run-clang-format.ps1 -Base origin/develop -Fix  # reformat in place
+.\run-clang-format.ps1 --fix-format             # same as -Fix
+```
+
+Both the script and `tools/check_format.py` also accept the GNU-style options
+`--base REF`, `--all` and `--fix-format` (alias `--fix`).
+
 The check covers whole C/C++ files changed since `HEAD` (staged and unstaged),
 plus untracked files. To include committed changes on your branch, use:
 
@@ -44,7 +59,9 @@ if the executable is not on PATH.
 
 `.clang-format-ignore` excludes vendored dependencies and generated/build
 output. The `build/` directory also contains maintained sources, so it is not
-excluded wholesale. This check targets C/C++ files; Objective-C and Objective-C++
+excluded wholesale. For now, it also temporarily excludes every maintained source
+folder (`backend/`, `frontend/`, `library/`, `modules/`, `plugins/`, `res/`,
+`testing/`, `tools/`). To enforce formatting in a folder, remove its line. This check targets C/C++ files; Objective-C and Objective-C++
 files are not included. Keep include ordering and per-file pointer alignment as
 configured, and avoid unrelated repository-wide formatting changes.
 

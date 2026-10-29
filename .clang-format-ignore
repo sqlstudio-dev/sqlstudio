@@ -10,3 +10,14 @@ prefix/**
 **/CMakeFiles/**
 **/Debug/**
 **/Release/**
+
+# Temporary: formatting is not enforced on maintained sources yet.
+# Remove a folder's line to start checking it.
+backend/**
+frontend/**
+library/**
+modules/**
+plugins/**
+res/**
+testing/**
+tools/**

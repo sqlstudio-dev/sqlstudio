@@ -22,6 +22,15 @@ namespace Aga.Controls.Tree
         public Color HeaderBackColor { get; set; }
         [DefaultValue(typeof(Color), "Empty")]
         public Color HeaderForeColor { get; set; }
+        // Logical owner-drawn icon/glyph zoom, including device DPI.
+        [DefaultValue(1f)]
+        public float GlyphScale { get; set; } = 1f;
+        [DefaultValue(typeof(Color), "")]
+        public Color SelectionBackColor { get; set; }
+        [DefaultValue(typeof(Color), "")]
+        public Color SelectionForeColor { get; set; }
+        [DefaultValue(typeof(Color), "")]
+        public Color InactiveSelectionBackColor { get; set; }
 
 		private Cursor _innerCursor = null;
 
@@ -66,7 +75,7 @@ namespace Aga.Controls.Tree
 			get
 			{
 				if (UseColumns && ShowHeader)
-					return _columnHeaderHeight;
+					return Math.Max(_columnHeaderHeight, Font.Height + (int)Math.Ceiling(8 * DeviceDpi / 96f));
 				else
 					return 0;
 			}

@@ -41,6 +41,30 @@ TEST_F(WindowsTheme, DarkApplicationTextHasReadableContrast) {
   }
 }
 
+TEST_F(WindowsTheme, ControlStatesHaveReadableContrast) {
+  base::Color::set_active_scheme(base::ColorSchemeDark);
+  for (auto role : {base::AppColorControl, base::AppColorSelection, base::AppColorHover, base::AppColorPressed}) {
+    auto foreground = base::Color::getApplicationColor(role, true);
+    auto background = base::Color::getApplicationColor(role, false);
+    EXPECT_GE((luminance(foreground) + 0.05) / (luminance(background) + 0.05), 4.5);
+  }
+}
+
+TEST_F(WindowsTheme, CustomControlColorsRoundTrip) {
+  const std::map<std::string, std::string> custom = {
+    {"CustomColor:control:back", "#303030"}, {"CustomColor:control:fore", "#eeeeee"}
+  };
+  base::Color::load_custom_colors(custom);
+  base::Color::set_active_scheme(base::ColorSchemeCustom);
+  EXPECT_EQ(base::Color::getApplicationColorAsString(base::AppColorControl, false), "#303030");
+  EXPECT_EQ(base::Color::getApplicationColorAsString(base::AppColorControl, true), "#eeeeee");
+  EXPECT_TRUE(base::Color::getApplicationColor(base::AppColorBorder, false).is_valid());
+  std::map<std::string, std::string> saved;
+  base::Color::save_custom_colors(saved);
+  EXPECT_EQ(saved["CustomColor:control:back"], "#303030");
+  EXPECT_EQ(saved["CustomColor:control:fore"], "#eeeeee");
+}
+
 TEST_F(WindowsTheme, EditorBackgroundAndTextFollowDarkPalette) {
   base::Color::set_active_scheme(base::ColorSchemeDark);
   EXPECT_LT(luminance(base::Color::getSystemColor(base::TextBackgroundColor)), 0.05);

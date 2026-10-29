@@ -7,6 +7,7 @@
     <ProjectGuid>{E22FBE4A-62CE-45E7-8C3C-03A34B2A91B1}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
+    <ApplicationManifest>Properties\app.manifest</ApplicationManifest>
     <RootNamespace>MySQL.GUI.SqlStudio</RootNamespace>
     <AssemblyName>SqlStudio</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>

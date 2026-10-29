@@ -112,6 +112,12 @@ namespace MySQL.Controls
     private Color bottomTabSelectedColor = Color.White;
     private Color bottomTabSelectedTextColor = Color.Black;
 
+    public float GlyphScale { get; set; } = 1f;
+    private Size ScaledIconSize
+    {
+      get { return ImageList == null ? Size.Empty : new Size((int)Math.Ceiling(ImageList.ImageSize.Width * GlyphScale), (int)Math.Ceiling(ImageList.ImageSize.Height * GlyphScale)); }
+    }
+
     private int glowSize = 12; // The size of the glow behind text on glass tabs.
 
     private bool showCloseButton = true; // Central flag for close buttons. Can be overridden by each page.
@@ -179,6 +185,7 @@ namespace MySQL.Controls
 
       CanReorderTabs = false;
       AllowDrop = false;
+      ControlTheme.Attach(this);
     }
 
     protected override void OnCreateControl()
@@ -569,13 +576,13 @@ namespace MySQL.Controls
         (ImageList.Images[page.ImageIndex] != null))
       {
         drawImage = true;
-        int iconSpacing = 4;
+        int iconSpacing = (int)Math.Ceiling(4 * GlyphScale);
 
         imagePosition = new Point((int) bounds.X + itemPadding.Left, (int) bounds.Y);
 				
-        int adjustment = ImageList.ImageSize.Width + iconSpacing;
+        int adjustment = ScaledIconSize.Width + iconSpacing;
 
-        imagePosition.Y += ((int)bounds.Height - ImageList.ImageSize.Height) / 2;
+        imagePosition.Y += ((int)bounds.Height - ScaledIconSize.Height) / 2;
         bounds.X += adjustment;
         bounds.Width -= adjustment;
       }
@@ -680,7 +687,7 @@ namespace MySQL.Controls
       }
 
       if (drawImage)
-        g.DrawImageUnscaled(ImageList.Images[page.ImageIndex], imagePosition);
+        g.DrawImage(ImageList.Images[page.ImageIndex], new Rectangle(imagePosition, ScaledIconSize));
 
       // Finally the close button if this tab is active (or we use the TopTransparent style or
       // the tab is marked as busy).
@@ -709,14 +716,14 @@ namespace MySQL.Controls
               break;
           }
           ImageAnimator.UpdateFrames(indicator);
-          g.DrawImageUnscaled(indicator, buttonRect);
+          g.DrawImage(indicator, buttonRect);
         }
         else
         {
           switch (tabStyle)
           {
             case TabStyleType.TopTransparent:
-              g.DrawImageUnscaled(Conversions.InDarkMode() ? lightCloseButton : darkCloseButton, buttonRect);
+              g.DrawImage(Conversions.InDarkMode() ? lightCloseButton : darkCloseButton, buttonRect);
               break;
             case TabStyleType.TopNormal:
               {
@@ -727,13 +734,13 @@ namespace MySQL.Controls
                   if (Conversions.InHighContrastMode())
                     drawDark = !drawDark;
                 if (drawDark)
-                  g.DrawImageUnscaled(darkCloseButton, buttonRect);
+                  g.DrawImage(darkCloseButton, buttonRect);
                 else
-                  g.DrawImageUnscaled(lightCloseButton, buttonRect);
+                  g.DrawImage(lightCloseButton, buttonRect);
                 break;
               }
             case TabStyleType.BottomNormal:
-              g.DrawImageUnscaled(Conversions.InDarkMode() ? lightCloseButton : darkCloseButton, buttonRect);
+              g.DrawImage(Conversions.InDarkMode() ? lightCloseButton : darkCloseButton, buttonRect);
               break;
           }
         }
@@ -863,17 +870,17 @@ namespace MySQL.Controls
       // account for right and bottom borders which should not be used in drawing.
       r0.Right--;
       r0.Bottom--;
-      Rectangle scrollerRect = new Rectangle(r0.Location, r0.Size);
-			using (Brush br = new SolidBrush(SystemColors.Control))
-        g.FillRectangle(br, scrollerRect);
-			
-      // Make a small outer border.
-			using (Pen border = new Pen(SystemColors.ControlDark))
-      {
-        Rectangle rborder = scrollerRect;
-        rborder.Inflate(-1, -1);
-        g.DrawRectangle(border, rborder);
-      }
+	  Rectangle scrollerRect = new Rectangle(r0.Location, r0.Size);
+			using (Brush br = new SolidBrush(Conversions.InDarkMode() ? Conversions.GetApplicationColor(ApplicationColor.AppColorControl, false) : SystemColors.Control))
+		g.FillRectangle(br, scrollerRect);
+
+	  // Make a small outer border.
+			using (Pen border = new Pen(Conversions.InDarkMode() ? Conversions.GetApplicationColor(ApplicationColor.AppColorBorder, false) : SystemColors.ControlDark))
+	  {
+		Rectangle rborder = scrollerRect;
+		rborder.Inflate(-1, -1);
+		g.DrawRectangle(border, rborder);
+	  }
 
 			int nMiddle = (r0.Width / 2);
 			int nTop = (r0.Height - leftRightImages.ImageSize.Height) / 2 + 1;
@@ -1454,21 +1461,21 @@ namespace MySQL.Controls
             // Not a strong limitation actually, since all tabs are of same height too.
             System.Resources.ResourceManager resources = new System.Resources.ResourceManager(typeof(FlatTabControl));
             Bitmap image = ((System.Drawing.Bitmap)(resources.GetObject("busy-indicator-blue")));
-            buttonSize = image.Size;
+            buttonSize = new Size((int)Math.Ceiling(image.Width * GlyphScale), (int)Math.Ceiling(image.Height * GlyphScale));
           }
           else
-            buttonSize = new Size(darkCloseButton.Width, darkCloseButton.Height);
+            buttonSize = new Size((int)Math.Ceiling(darkCloseButton.Width * GlyphScale), (int)Math.Ceiling(darkCloseButton.Height * GlyphScale));
           if (buttonSpaceNeeded)
             buttonPart = buttonSpacing + buttonSize.Width;
           int tabWidth = itemPadding.Horizontal + textWidth + buttonPart;
           if ((info.page.ImageIndex >= 0) && (ImageList != null) && (ImageList.Images.Count > info.page.ImageIndex) &&
             (ImageList.Images[info.page.ImageIndex] != null))
           {
-            tabWidth += ImageList.ImageSize.Width;
+            tabWidth += ScaledIconSize.Width;
             
-            // Add 4 px spacing if there is something after the icon.
+            // Keep drawing and measured icon spacing in the same scale.
             if (buttonSpaceNeeded || textWidth > 0)
-              tabWidth += 4;
+              tabWidth += (int)Math.Ceiling(4 * GlyphScale);
           }
 
           if (ItemSize.Width > tabWidth)

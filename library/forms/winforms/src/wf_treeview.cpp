@@ -217,7 +217,8 @@ public:
   //------------------------------------------------------------------------------------------------
 
   virtual Size MeasureSize(TreeNodeAdv ^ node, DrawContext context) override {
-    return _expanded_icon->Size;
+    float scale = Parent == nullptr ? 1.0f : Parent->GlyphScale;
+    return Size((int)Math::Ceiling(_expanded_icon->Width * scale), (int)Math::Ceiling(_expanded_icon->Height * scale));
   }
 
   //------------------------------------------------------------------------------------------------
@@ -230,8 +231,9 @@ public:
         img = _expanded_icon;
       else
         img = _collapsed_icon;
-      int dy = (int)Math::Round((float)(r.Height - img->Height) / 2);
-      context.Graphics->DrawImageUnscaled(img, System::Drawing::Point(r.X, r.Y + dy));
+      Size size = MeasureSize(node, context);
+      int dy = (int)Math::Round((float)(r.Height - size.Height) / 2);
+      context.Graphics->DrawImage(img, System::Drawing::Rectangle(r.X, r.Y + dy, size.Width, size.Height));
     }
   }
 

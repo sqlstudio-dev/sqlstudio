@@ -70,7 +70,7 @@ private:
 
 public:
   ScrollFillPanel() {
-    // MySQL::Controls::ControlTheme::AttachSurface(this); @@@FIXME: This is not needed, because the panel is not a surface, but a container. The surface is the child control.
+    MySQL::Controls::ControlTheme::AttachSurface(this);
     autoHideScrollbars = true;
     hideHorizontalScrollbar = false;
     hideVerticalScrollbar = false;

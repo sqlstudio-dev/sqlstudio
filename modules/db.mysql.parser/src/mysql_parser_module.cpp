@@ -345,7 +345,7 @@ void LexerErrorListener::syntaxError(Recognizer *recognizer, Token *, size_t lin
 
 //----------------------------------------------------------------------------------------------------------------------
 
-std::string intervalToString(misc::IntervalSet set, size_t maxCount, dfa::Vocabulary vocabulary) {
+std::string intervalToString(misc::IntervalSet const& set, size_t maxCount, dfa::Vocabulary const& vocabulary) {
   std::vector<ssize_t> symbols = set.toList();
 
   if (symbols.empty()) {

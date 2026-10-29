@@ -34,6 +34,8 @@
 #include "base/log.h"
 #include "base/any.h"
 
+#include <stdexcept>
+
 DEFAULT_LOG_DOMAIN("home");
 
 using namespace base;
@@ -562,7 +564,36 @@ ConnectionsWelcomeScreen::~ConnectionsWelcomeScreen() {
 //----------------------------------------------------------------------------------------------------------------------
 
 base::Size ConnectionsWelcomeScreen::getLayoutSize(base::Size proposedSize) {
-  return base::Size(proposedSize.width, _totalHeight); // Height doesn't change. Constant content.
+  // Layout precedes the first paint, so measure without depending on a visible surface.
+  cairo_surface_t *surface = cairo_recording_surface_create(CAIRO_CONTENT_COLOR_ALPHA, nullptr);
+  cairo_t *cr = cairo_create(surface);
+  const auto layout = layoutText(cr);
+  const auto status = cairo_status(cr);
+  cairo_destroy(cr);
+  cairo_surface_destroy(surface);
+  if (status != CAIRO_STATUS_SUCCESS)
+    throw std::runtime_error(std::string("Cannot measure home screen welcome text: ") + cairo_status_to_string(status));
+  return base::Size(proposedSize.width, layout.linksBaseline + 20);
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+
+ConnectionsWelcomeScreen::TextLayout ConnectionsWelcomeScreen::layoutText(cairo_t *cr) const {
+  TextLayout layout;
+  int yoffset = layout.headingBaseline + mforms::HomeScreenSettings::HOME_TITLE_FONT_SIZE * 3;
+  cairo_save(cr);
+  cairo_select_font_face(cr, mforms::HomeScreenSettings::HOME_TITLE_FONT, CAIRO_FONT_SLANT_NORMAL,
+                         CAIRO_FONT_WEIGHT_NORMAL);
+  cairo_set_font_size(cr, mforms::HomeScreenSettings::HOME_TITLE_FONT_SIZE * 0.8);
+  for (const auto &line : _content) {
+    layout.lineBaselines.push_back(yoffset);
+    cairo_text_extents_t extents;
+    cairo_text_extents(cr, line.c_str(), &extents);
+    yoffset += (int)extents.height + 10;
+  }
+  layout.linksBaseline = yoffset + 40;
+  cairo_restore(cr);
+  return layout;
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -650,7 +681,7 @@ void ConnectionsWelcomeScreen::repaint(cairo_t *cr, int areax, int areay, int ar
   cairo_save(cr);
   mforms::Utilities::paint_icon(cr, _closeIcon, _closeHomeScreenButton.bounds.left(), _closeHomeScreenButton.bounds.top());
 
-  int yoffset = 100;
+  const auto layout = layoutText(cr);
 
   cairo_select_font_face(cr, mforms::HomeScreenSettings::HOME_TITLE_FONT, CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_NORMAL);
@@ -662,20 +693,17 @@ void ConnectionsWelcomeScreen::repaint(cairo_t *cr, int areax, int areay, int ar
 
   double x;
   x = get_width() / 2 - (extents.width / 2 + extents.x_bearing);
-  cairo_move_to(cr, x, yoffset);
+  cairo_move_to(cr, x, layout.headingBaseline);
   cairo_show_text(cr, _heading.c_str());
-  yoffset += mforms::HomeScreenSettings::HOME_TITLE_FONT_SIZE * 3;
 
-  for (auto &line : _content) {
+  for (size_t i = 0; i < _content.size(); ++i) {
+    const auto &line = _content[i];
     cairo_set_font_size(cr, mforms::HomeScreenSettings::HOME_TITLE_FONT_SIZE * 0.8);
     cairo_text_extents(cr, line.c_str(), &extents);
     x = get_width() / 2 - (extents.width / 2 + extents.x_bearing);
-    cairo_move_to(cr, x, yoffset);
+    cairo_move_to(cr, x, layout.lineBaselines[i]);
     cairo_show_text(cr, line.c_str());
-    yoffset += (int)extents.height + 10;
   }
-
-  yoffset += 40;
 
   // Draw heading links
   cairo_select_font_face(cr, mforms::HomeScreenSettings::HOME_TITLE_FONT, CAIRO_FONT_SLANT_NORMAL,
@@ -687,13 +715,12 @@ void ConnectionsWelcomeScreen::repaint(cairo_t *cr, int areax, int areay, int ar
   for (auto btn : { &_browseDocButton, &_readBlogButton, &_discussButton }) {
     cairo_text_extents(cr, btn->title.c_str(), &extents);
     x = get_width() * pos - (extents.width / 2 + extents.x_bearing);
-    cairo_move_to(cr, floor(x), floor(yoffset));
+    cairo_move_to(cr, floor(x), layout.linksBaseline);
     cairo_show_text(cr, btn->title.c_str());
-    btn->bounds = base::Rect(ceil(x), floor(yoffset + extents.y_bearing), ceil(extents.width), ceil(extents.height));
+    btn->bounds = base::Rect(ceil(x), floor(layout.linksBaseline + extents.y_bearing), ceil(extents.width),
+                            ceil(extents.height));
     pos += 0.25;
   }
-
-  _totalHeight = yoffset + 20;
 
   cairo_restore(cr);
 }

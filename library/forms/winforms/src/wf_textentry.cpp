@@ -55,6 +55,18 @@ public:
 
   //------------------------------------------------------------------------------------------------
 
+  virtual void OnForeColorChanged(EventArgs ^ args) override {
+    __super::OnForeColorChanged(args);
+    // Keep the normal color synchronized with live theme changes. Placeholder
+    // transitions must not overwrite it with their temporary gray foreground.
+    if (!changingText) textColor = ForeColor;
+  }
+
+  virtual void OnFontChanged(EventArgs ^ args) override {
+    __super::OnFontChanged(args);
+    if (!Multiline) MaximumSize = Drawing::Size(MaximumSize.Width, PreferredHeight);
+  }
+
   virtual void OnTextChanged(EventArgs ^ args) override {
     __super ::OnTextChanged(args);
 
@@ -111,8 +123,8 @@ public:
     __super ::OnGotFocus(args);
 
     if (!hasRealText) {
-      ForeColor = textColor;
       changingText = true;
+      ForeColor = textColor;
       Text = "";
       changingText = false;
     }
@@ -124,8 +136,8 @@ public:
     __super ::OnLostFocus(args);
 
     if (!hasRealText && placeholderString != nullptr) {
-      ForeColor = placeholderColor;
       changingText = true;
+      ForeColor = placeholderColor;
       Text = placeholderString;
       changingText = false;
     }
@@ -187,7 +199,7 @@ bool TextEntryWrapper::create(mforms::TextEntry *backend, mforms::TextEntryType 
 
   MformsTextBox ^ textbox = TextEntryWrapper::Create<MformsTextBox>(backend, wrapper);
   textbox->Multiline = false;
-  textbox->AutoSize = false;
+  textbox->AutoSize = true;
 
   switch (type) {
     case mforms::NormalEntry:

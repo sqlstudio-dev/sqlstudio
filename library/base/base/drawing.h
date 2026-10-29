@@ -85,6 +85,14 @@ namespace base {
     AppColorTopTabSelectedFocused,
     AppColorTopTabSelectedUnfocused,
     AppColorStatusbar,
+    AppColorControl,
+    AppColorBorder,
+    AppColorSelection,
+    AppColorHover,
+    AppColorPressed,
+    AppColorDisabled,
+    AppColorSplitter,
+    AppColorAccent,
   };
 
   // The platform specific type of color to return (label, window, control etc.). Types not supported directly by a
@@ -187,6 +195,13 @@ namespace base {
     HSVColor() : h(0), s(0), v(0), a(1){};
     HSVColor(int ah, double as, double av, double aa = 1.0) : h(ah), s(as), v(av), a(aa){};
     HSVColor(const Color &rgb);
+  };
+
+  // Shared application zoom for native drawing; monitor DPI is supplied by the view.
+  class BASELIBRARY_PUBLIC_FUNC UiMetrics {
+  public:
+    static void set_zoom(float zoom);
+    static float control_scale();
   };
 
   class BASELIBRARY_PUBLIC_FUNC OSConstants {

@@ -75,7 +75,6 @@ namespace MySQL.GUI.SqlStudio
 
     private bool shuttingDown = false;
     private ImageList tabImageList = null;
-    private float uiScaleFactor = 1f;
 
     public MainPageDockDelegate dockDelegate = null;
 
@@ -100,6 +99,8 @@ namespace MySQL.GUI.SqlStudio
     {
       wbContext = WbContext;
       grtManager = wbContext.get_grt_manager();
+      UiScale.AttachApplication(this);
+      ControlTheme.Attach(this);
 
       dockDelegate = new MainPageDockDelegate(this, null);
 
@@ -944,6 +945,11 @@ namespace MySQL.GUI.SqlStudio
     /// </summary>
     public void PostInit()
     {
+      // Program calls this only after wbContext.init has created the application
+      // options. Reading them in the constructor dereferences an uninitialized
+      // native app_Application and causes an access violation.
+      int scalePercent;
+      UiScale.Configure(int.TryParse(wbContext.read_option_value("", "WindowsUIScale", "100"), out scalePercent) ? scalePercent : 100);
       UpdateColors();
 
       List<String> commands = new List<string>();
@@ -1699,8 +1705,8 @@ namespace MySQL.GUI.SqlStudio
     {
       int x = wbContext.read_state("left", "mainform", 100);
       int y = wbContext.read_state("top", "mainform", 100);
-      int w = (int)Math.Round(wbContext.read_state("width", "mainform", 1200) * uiScaleFactor);
-      int h = (int)Math.Round(wbContext.read_state("height", "mainform", 900) * uiScaleFactor);
+      int w = wbContext.read_state("width", "mainform", 1200);
+      int h = wbContext.read_state("height", "mainform", 900);
 
       // Sanity checks to avoid restoring the application into a state where it cannot be reached.
       if (x + w < 100)
@@ -1731,15 +1737,15 @@ namespace MySQL.GUI.SqlStudio
       {
         wbContext.save_state("left", "mainform", Left);
         wbContext.save_state("top", "mainform", Top);
-        wbContext.save_state("width", "mainform", (int)Math.Round(Width / uiScaleFactor));
-        wbContext.save_state("height", "mainform", (int)Math.Round(Height / uiScaleFactor));
+        wbContext.save_state("width", "mainform", Width);
+        wbContext.save_state("height", "mainform", Height);
       }
       else
       {
         wbContext.save_state("left", "mainform", RestoreBounds.Left);
         wbContext.save_state("top", "mainform", RestoreBounds.Top);
-        wbContext.save_state("width", "mainform", (int)Math.Round(RestoreBounds.Width / uiScaleFactor));
-        wbContext.save_state("height", "mainform", (int)Math.Round(RestoreBounds.Height / uiScaleFactor));
+        wbContext.save_state("width", "mainform", RestoreBounds.Width);
+        wbContext.save_state("height", "mainform", RestoreBounds.Height);
       }
 
       bool outputVisible = false;
@@ -1759,56 +1765,11 @@ namespace MySQL.GUI.SqlStudio
       Conversions.RefreshSystemColorScheme();
 
       LoadFormState();
-      ApplyUiScale();
+      UiScale.Apply(this);
 
       BringToFront();
       Activate();
     }
-
-    private void ApplyUiScale()
-    {
-      int scalePercent;
-      if (!int.TryParse(wbContext.read_option_value("", "WindowsUIScale", "100"), out scalePercent) ||
-        (scalePercent != 100 && scalePercent != 150))
-        return;
-
-      uiScaleFactor = scalePercent / 100f / (DeviceDpi / 96f);
-      if (Math.Abs(uiScaleFactor - 1f) < 0.01f)
-      {
-        uiScaleFactor = 1f;
-        return;
-      }
-
-      MinimumSize = new Size((int)Math.Round(MinimumSize.Width * uiScaleFactor),
-        (int)Math.Round(MinimumSize.Height * uiScaleFactor));
-
-      foreach (Control control in Controls)
-        AttachScaleHandlers(control);
-      foreach (Control control in Controls)
-        control.Scale(new SizeF(uiScaleFactor, uiScaleFactor));
-    }
-
-    private void AttachScaleHandlers(Control control)
-    {
-      control.ControlAdded -= ScaledControlAdded;
-      control.ControlAdded += ScaledControlAdded;
-
-      foreach (Control child in control.Controls)
-        AttachScaleHandlers(child);
-    }
-
-    private void ScaledControlAdded(object sender, ControlEventArgs e)
-    {
-      int scalePercent;
-      if (int.TryParse(wbContext.read_option_value("", "WindowsUIScale", "100"), out scalePercent) &&
-        (scalePercent == 100 || scalePercent == 150))
-      {
-        AttachScaleHandlers(e.Control);
-        if (Math.Abs(uiScaleFactor - 1f) >= 0.01f)
-          e.Control.Scale(new SizeF(uiScaleFactor, uiScaleFactor));
-      }
-    }
-
 
     void MainForm_Activated(object sender, System.EventArgs e)
     {

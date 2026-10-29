@@ -80,6 +80,7 @@
     </Compile>
     <Compile Include="AgaTreeStateKeeper.cs" />
     <Compile Include="ControlTheme.cs" />
+    <Compile Include="UiScale.cs" />
     <Compile Include="Bevel.cs">
       <SubType>Component</SubType>
     </Compile>

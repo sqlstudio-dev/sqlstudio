@@ -28,6 +28,7 @@
 #include "base/threading.h"
 #include "base/log.h"
 
+#include "mforms/app.h"
 #include "mforms/popup.h"
 #include "mforms/menu.h"
 #include "mforms/menubar.h"
@@ -125,30 +126,63 @@ void SidebarSection::drawTriangle(cairo_t *cr, int x1, int y1, int x2, int y2, f
 
 //----------------------------------------------------------------------------------------------------------------------
 
+int SidebarSection::sidebarMetric(int value) {
+#ifdef _MSC_VER
+  // The control width already includes Windows DPI and application zoom.
+  // Derive drawing and hit testing from it instead of scaling those twice.
+  return std::max(1, (int)std::round(value * get_width() / 48.0));
+#else
+  return value;
+#endif
+}
+
 void SidebarSection::repaint(cairo_t *cr, int areax, int areay, int areaw, int areah) {
   int height = get_height();
 
   // Section buttons.
-  int yoffset = SIDEBAR_TOP_PADDING;
+  const int rowHeight = sidebarMetric(SIDEBAR_ROW_HEIGHT);
+  const int leftPadding = sidebarMetric(SIDEBAR_LEFT_PADDING);
+  const int rightPadding = sidebarMetric(SIDEBAR_RIGHT_PADDING);
+  int yoffset = sidebarMetric(SIDEBAR_TOP_PADDING);
   if (_entries.size() > 0 && yoffset < height) {
     for (auto &iterator : _entries) {
       float alpha = (iterator.first == _activeEntry  || iterator.first == _hotEntry) ? 1 : 0.5f;
-      if ((yoffset + SIDEBAR_ROW_HEIGHT) > height)
+      if ((yoffset + rowHeight) > height)
         alpha = 0.25f;
 
-      Size size = mforms::Utilities::getImageSize(iterator.first->icon);
-      iterator.first->acc_bounds.pos.x = SIDEBAR_LEFT_PADDING;
+      iterator.first->acc_bounds.pos.x = leftPadding;
       iterator.first->acc_bounds.pos.y = yoffset;
-      iterator.first->acc_bounds.size.width = size.width;
-      iterator.first->acc_bounds.size.height = SIDEBAR_ROW_HEIGHT;
+#ifdef _MSC_VER
+      iterator.first->acc_bounds.size.width = get_width() - leftPadding - rightPadding;
+#else
+      iterator.first->acc_bounds.size.width = mforms::Utilities::getImageSize(iterator.first->icon).width;
+#endif
+      iterator.first->acc_bounds.size.height = rowHeight;
 
-      mforms::Utilities::paint_icon(cr, iterator.first->icon, SIDEBAR_LEFT_PADDING, yoffset, alpha);
+#ifdef _MSC_VER
+      // Fit both normal and @2x assets into a centered 28 DIP icon box.
+      // Use actual surface pixels so asset DPI metadata cannot enlarge it again.
+      int imageWidth = cairo_image_surface_get_width(iterator.first->icon);
+      int imageHeight = cairo_image_surface_get_height(iterator.first->icon);
+      double iconSize = std::min(sidebarMetric(28), get_width() - leftPadding - rightPadding);
+      double scale = iconSize / std::max(imageWidth, imageHeight);
+      double iconWidth = imageWidth * scale, iconHeight = imageHeight * scale;
+      cairo_save(cr);
+      cairo_translate(cr, (get_width() - iconWidth) / 2.0, yoffset + (rowHeight - iconHeight) / 2.0);
+      cairo_scale(cr, scale, scale);
+      cairo_set_source_surface(cr, iterator.first->icon, 0, 0);
+      cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_BEST);
+      cairo_paint_with_alpha(cr, alpha);
+      cairo_restore(cr);
+#else
+      mforms::Utilities::paint_icon(cr, iterator.first->icon, leftPadding, yoffset, alpha);
+#endif
 
       if (iterator.first == _activeEntry)
-        drawTriangle(cr, get_width() - SIDEBAR_RIGHT_PADDING, yoffset, get_width(), yoffset + SIDEBAR_ROW_HEIGHT,
+        drawTriangle(cr, get_width() - rightPadding, yoffset, get_width(), yoffset + rowHeight,
                      alpha);
 
-      yoffset += SIDEBAR_ROW_HEIGHT + SIDEBAR_SPACING;
+      yoffset += rowHeight + sidebarMetric(SIDEBAR_SPACING);
       if (yoffset >= height)
         break;
     }
@@ -157,17 +191,20 @@ void SidebarSection::repaint(cairo_t *cr, int areax, int areay, int areaw, int a
 //----------------------------------------------------------------------------------------------------------------------
 
 int SidebarSection::shortcutFromPoint(int x, int y) {
-  if (x < SIDEBAR_LEFT_PADDING || y < SIDEBAR_TOP_PADDING || x > get_width() - SIDEBAR_RIGHT_PADDING)
+  const int topPadding = sidebarMetric(SIDEBAR_TOP_PADDING);
+  const int rowHeight = sidebarMetric(SIDEBAR_ROW_HEIGHT);
+  const int spacing = sidebarMetric(SIDEBAR_SPACING);
+  if (x < sidebarMetric(SIDEBAR_LEFT_PADDING) || y < topPadding || x > get_width() - sidebarMetric(SIDEBAR_RIGHT_PADDING))
     return -1;
 
-  y -= SIDEBAR_TOP_PADDING;
-  int point_in_row = y % (SIDEBAR_ROW_HEIGHT + SIDEBAR_SPACING);
-  if (point_in_row >= SIDEBAR_ROW_HEIGHT)
+  y -= topPadding;
+  int point_in_row = y % (rowHeight + spacing);
+  if (point_in_row >= rowHeight)
     return -1;  // In the spacing between entries.
 
-  size_t row = y / (SIDEBAR_ROW_HEIGHT + SIDEBAR_SPACING);
-  size_t height = get_height() - SIDEBAR_TOP_PADDING;
-  size_t row_bottom = row * (SIDEBAR_ROW_HEIGHT + SIDEBAR_SPACING) + SIDEBAR_ROW_HEIGHT;
+  size_t row = y / (rowHeight + spacing);
+  int height = get_height() - topPadding;
+  int row_bottom = (int)row * (rowHeight + spacing) + rowHeight;
   if (row_bottom > height)
     return -1;  // The last shortcut is dimmed if it goes over the bottom border.
                 // Take it out from the hit test too.
@@ -332,7 +369,11 @@ HomeScreen::HomeScreen() : AppView(true, "Home", "home", true) {
 
   _sidebarSection = new SidebarSection(this);
   _sidebarSection->set_name("homeScreenSideBar");
+#ifdef _MSC_VER
+  _sidebarSection->set_size((int)std::round(48 * App::get()->backing_scale_factor()), -1);
+#else
   _sidebarSection->set_size(85, -1);
+#endif
   add(_sidebarSection, false, true);
 
   Box::scoped_connect(signal_resized(), std::bind(&HomeScreen::on_resize, this));

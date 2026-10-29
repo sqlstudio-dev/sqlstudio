@@ -171,6 +171,10 @@ void AppWrapper::init() {
   f->_app_impl.enter_event_loop = &enter_event_loop;
   f->_app_impl.exit_event_loop = &exit_event_loop;
   f->_app_impl.isDarkModeActive = &isDarkModeActive;
+  f->_app_impl.backing_scale_factor = [](mforms::App *) -> float {
+    auto form = UtilitiesWrapper::get_mainform();
+    return form == nullptr ? 1.0f : form->DeviceDpi / 96.0f;
+  };
 
 }
 

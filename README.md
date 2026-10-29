@@ -102,13 +102,13 @@ Prerequisites and build instructions are provided in the [BUILDING.md](BUILDING.
 
 A Windows build requires Visual Studio 2022 or later with the Desktop C++ workload. On Linux and macOS, GCC 11+ or Clang 14+ is required.
 
-On Windows, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\build\compile-studio.ps1`
-to build the `SqlStudio` application in Debug/x64. The script discovers the newest
+On Windows, run `powershell -NoProfile -ExecutionPolicy Bypass -File .\build\windows\compile.ps1`
+to build SqlStudio in Debug/x64. The script discovers the newest
 Visual Studio or Build Tools installation with C++ tools, selects its installed
-toolset, and locates the third-party bundle through `MSS_3DPARTY_PATH`,
-`../wb_build/bundle`, `../bundle`, or `./bundle`. Use `-BundleDir <path>` or
+toolset, and locates the third-party bundle. Use `-BundleDir <path>` or
 `-VsInstallPath <path>` to override discovery, `-Configuration Release` for a
-release build, and `-DryRun` to inspect the selected tools without compiling.
+release build, `-Action build-unittest` or `-Action run-unittest` for the native
+test suite, and `-Help` for all options.
 The C++/CLI tools, Windows SDK, and .NET Framework 4.8 targeting pack are also required.
 
 On Debian and Ubuntu, a `.deb` package is built the same way as in CI, on the

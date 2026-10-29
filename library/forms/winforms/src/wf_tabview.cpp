@@ -38,8 +38,20 @@ using namespace MySQL::Utilities;
 
 //----------------- MformsStandardTabControl -------------------------------------------------------
 
-ref class MformsStandardTabControl : TabControl {
+ref class MformsStandardTabControl : FlatTabControl {
 public:
+  MformsStandardTabControl() {
+    // System tab headers ignore BackColor and keep bright borders in dark mode.
+    // Use the same renderer as the editor tabs, preserving native tab selection.
+    ShowCloseButton = false;
+    HideWhenEmpty = false;
+    ShowFocusState = true;
+    CanReorderTabs = false;
+    TabStyle = FlatTabControl::TabStyleType::TopNormal;
+    ItemSize = System::Drawing::Size(0, 21);
+    ItemPadding = System::Windows::Forms::Padding(8, 0, 8, 0);
+    ContentPadding = System::Windows::Forms::Padding(0, 4, 0, 0);
+  }
   virtual void OnSelected(TabControlEventArgs ^ args) override {
     __super ::OnSelected(args);
 

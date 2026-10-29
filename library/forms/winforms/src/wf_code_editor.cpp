@@ -341,6 +341,14 @@ bool CodeEditorWrapper::create(mforms::CodeEditor *backend, bool showInfo) {
 
 sptr_t CodeEditorWrapper::send_editor(mforms::CodeEditor *backend, unsigned int message, uptr_t wParam, sptr_t lParam) {
   ScintillaControl ^ editor = CodeEditorWrapper::GetManagedObject<ScintillaControl>(backend);
+  // Scintilla consumes point sizes and applies monitor DPI itself. Scale only
+  // incoming logical font settings, never its existing styles or zoom level.
+  if (message == SCI_STYLESETSIZE)
+    lParam = (sptr_t)System::Math::Round(MySQL::Controls::UiScale::FontSize(
+      MySQL::Controls::UiScale::FontRole::General, (float)lParam));
+  else if (message == SCI_STYLESETSIZEFRACTIONAL)
+    lParam = (sptr_t)System::Math::Round(100 * MySQL::Controls::UiScale::FontSize(
+      MySQL::Controls::UiScale::FontRole::General, (float)lParam / 100));
   return editor->direct_call(message, wParam, lParam);
 }
 
