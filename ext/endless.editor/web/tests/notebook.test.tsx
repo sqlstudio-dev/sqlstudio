@@ -107,6 +107,31 @@ describe('Connections home', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     await screen.findByText('No connections yet');
   });
+
+  it('offers the QuestDB plugin with its PGWire port and database field', async () => {
+    vi.mocked(sqlApi.listPlugins).mockResolvedValue([...plugins, {
+      id: 'questdb', name: 'QuestDB', defaultPort: 8812, watermark: 'questdb', driver: 'psycopg[binary]',
+      aliases: ['quest'], available: true, unavailableReason: null,
+    }]);
+    vi.mocked(sqlApi.createConnection).mockResolvedValue(profile({
+      id: 'quest-local', name: 'QuestDB local', type: 'questdb', port: 8812, username: 'reader', database: 'qdb',
+    }));
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: 'Add connection' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Add connection' }));
+    fireEvent.change(dialog.getByLabelText('Database engine'), { target: { value: 'questdb' } });
+    expect((dialog.getByLabelText('Port') as HTMLInputElement).value).toBe('8812');
+    expect(dialog.getByLabelText('Database').getAttribute('placeholder')).toBe('qdb');
+    fireEvent.change(dialog.getByLabelText('Name'), { target: { value: 'QuestDB local' } });
+    fireEvent.change(dialog.getByLabelText('Username'), { target: { value: 'reader' } });
+    fireEvent.change(dialog.getByLabelText('Database'), { target: { value: 'qdb' } });
+    fireEvent.click(dialog.getByRole('button', { name: 'Save connection' }));
+    await screen.findByRole('button', { name: 'Open QuestDB local' });
+    expect(sqlApi.createConnection).toHaveBeenCalledWith({
+      name: 'QuestDB local', type: 'questdb', host: '127.0.0.1', port: 8812, username: 'reader', database: 'qdb',
+    });
+    expect(document.querySelector('.watermark-questdb')).toBeTruthy();
+  });
 });
 
 describe('SQL notebook', () => {

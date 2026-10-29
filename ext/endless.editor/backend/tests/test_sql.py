@@ -192,7 +192,7 @@ class SqlTests(unittest.TestCase):
 
     def test_plugins_are_loaded_from_connector_files(self):
         ids = sorted(plugin.id for plugin in PLUGINS)
-        self.assertEqual(ids, ["mysql", "postgresql"])
+        self.assertEqual(ids, ["mysql", "postgresql", "questdb"])
         self.assertIs(PLUGINS.for_type("mariadb"), MYSQL)
         self.assertIsNone(PLUGINS.for_type("sqlite"))
         info = {plugin["id"]: plugin for plugin in PLUGINS.to_json()}
@@ -314,7 +314,7 @@ class SqlTests(unittest.TestCase):
         app.include_router(create_connections_router(self.store, PLUGINS))
         with TestClient(app) as client:
             plugins = client.get("/api/plugins").json()
-            self.assertEqual([p["id"] for p in plugins], ["mysql", "postgresql"])
+            self.assertEqual([p["id"] for p in plugins], ["mysql", "postgresql", "questdb"])
             self.assertEqual(client.get("/api/connections").json(), [])
             payload = {"name": " Local PG ", "type": "postgresql", "host": "db.local", "port": 5432, "username": "app", "database": "shop"}
             created = client.post("/api/connections", json=payload)

@@ -135,14 +135,14 @@ The active frontend is now a SQL-only React/TypeScript notebook. Executed statem
 
 ### Connections, plugins, and connection.json
 
-- **Connector plugins** live in `backend/plugins/`. Every `*_connector.py` file there is imported at backend startup; it must define a module-level `plugin` instance of `app.plugins.base.ConnectorPlugin` (id, display name, default port, watermark, driver package, `connect`, `describe_columns`, `error_details`). Shipped plugins: `mysql_connector.py` (PyMySQL; also serves `mariadb`) and `postgresql_connector.py` (psycopg 3). A plugin whose driver is not installed still appears in the Add dialog, disabled, with the install hint. Broken plugin files are logged and skipped. `ENDLESS_PLUGINS_DIR` overrides the folder.
+- **Connector plugins** live in `backend/plugins/`. Every `*_connector.py` file there is imported at backend startup; it must define a module-level `plugin` instance of `app.plugins.base.ConnectorPlugin` (id, display name, default port, watermark, driver package, `connect`, `describe_columns`, `error_details`). Shipped plugins: `mysql_connector.py` (PyMySQL; also serves `mariadb`), `postgresql_connector.py`, and `questdb_connector.py` (both use psycopg 3 through the shared PGWire adapter). A plugin whose driver is not installed still appears in the Add dialog, disabled, with the install hint. Broken plugin files are logged and skipped. `ENDLESS_PLUGINS_DIR` overrides the folder.
 - **connection.json** (default `backend/connection.json`, override with `ENDLESS_CONNECTIONS_FILE`; gitignored) stores `{ "version": 1, "connections": [...] }` with id, name, type, host, port, username, database, default flag, lastConnected, and non-secret options such as serverVersion/useSSL. **Passwords are never written**; they are requested when a tile is opened and held in memory only for that session's reconnects.
 - **First start**: when connection.json does not exist the backend imports SqlStudio's `connections.xml` from `%APPDATA%\MySQL\SqlStudio` (Windows), `~/Library/Application Support/MySQL/SqlStudio` (macOS) or `~/.config/MySQL/SqlStudio` (Linux), or the path in `SQLSTUDIO_CONNECTIONS_XML`. If nothing is found it seeds one "Local development" entry from the DB_* environment variables below. Imports keep the GRT connection id, so re-importing the same file never duplicates entries; `password` parameters are dropped and unknown drivers are skipped.
 - API: `GET /api/plugins`, `GET/POST /api/connections`, `DELETE /api/connections/{id}`, `POST /api/connections/import` (`{ "xml": "..." }`), and `POST /api/sessions` now takes `{ "connectionId", "password" }`. Connection failures return 503 with the driver's message (for example *Access denied*), unknown ids 404, unsupported engines 400.
 
 ### Start the backend (PowerShell, from the repository root)
 
-Requires Python 3.10+ and an existing MySQL, MariaDB, or PostgreSQL server.
+Requires Python 3.10+ and an existing MySQL, MariaDB, PostgreSQL, or QuestDB server.
 
 ~~~powershell
 python -m venv backend/.venv
@@ -155,9 +155,28 @@ $env:DB_DATABASE = 'sakila'
 backend/.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
 ~~~
 
-Python packages: FastAPI, Uvicorn (standard extras), PyMySQL (RSA authentication extras), and psycopg (binary). MySQL and MariaDB share the PyMySQL plugin. The backend is a separate process; the native hosts do not launch it automatically.
+Python packages: FastAPI, Uvicorn (standard extras), PyMySQL (RSA authentication extras), and psycopg (binary). MySQL and MariaDB share the PyMySQL plugin; PostgreSQL and QuestDB share the psycopg transport but generate engine-specific time-series SQL. The backend is a separate process; the native hosts do not launch it automatically.
 
 Environment overrides are DB_TYPE, DB_HOST, DB_PORT, DB_USERNAME, DB_DATABASE, DB_RESULT_LIMIT (default 1000 rows per result set), and DB_TIMESERIES_LIMIT (default 100000 rows per time-series fetch); they only shape the seed connection and the row limits — day-to-day connections come from connection.json. DB_PASSWORD is used by the opt-in live test only.
+
+### QuestDB connections and time-series data
+
+Restart the backend after adding a connector so it is discovered. In **Add connection**, choose **QuestDB**, enter the server host and its **PGWire port** (default **8812**, not the HTTP console port 9000), and supply the configured PGWire username. The Database field may be left blank to use `qdb`. Passwords are requested when connecting and are not saved. Saved profiles use type `questdb`; `quest` is also accepted.
+
+The connector uses the existing `psycopg[binary]` dependency with autocommit and automatic statement preparation disabled for QuestDB. Timestamp, numeric, and symbol/string columns feed the existing chart detection and manual mappings. QuestDB timestamps are UTC; the connector returns explicit UTC offsets for timestamp values so the browser does not mistake them for local wall-clock times. PGWire/Python timestamp precision is microseconds; chart coordinates are milliseconds.
+
+Query an existing table with a timestamp and one or more numeric measurements, then open **Time Series** or **Statistics**. Select a device/symbol column under **Series configuration** to split measurements into series. To try the chart without creating tables or writing data, run this read-only QuestDB query:
+
+~~~sql
+SELECT
+    timestamp_sequence('2026-01-01T00:00:00.000000Z', 1000000) AS ts,
+    concat('device-', cast(x % 2 as string)) AS device,
+    220.0 + sin(x / 10.0) * 5.0 AS voltage,
+    50.0 + cos(x / 15.0) * 0.1 AS frequency
+FROM long_sequence(600);
+~~~
+
+This generates demonstration rows for the query only, not stored measurements. QuestDB supports polling and incremental timestamp filters, server-side `avg`, `sum`, `min`, `max`, and `count` aggregation with `timestamp_floor('<seconds>s', ts)`, and cancellation over PGWire. Bucketing uses a derived table and explicit grouping, so it also works for user queries without a designated timestamp required by `SAMPLE BY`. Native streaming is not advertised.
 
 ### Start the frontend (second terminal, repository root)
 
@@ -209,13 +228,13 @@ Every result set is shown inside a tab strip: **Data Grid** (the unchanged table
   "incrementalQueries": true, "latestValueQueries": false, "queryCancellation": true }
 ~~~
 
-Plugins that do not override it get `supportedLiveModes: []` and `false` for every optional feature: results still render as charts, polling re-runs the plain statement, aggregation happens in the browser, and cancellation/server-side options are disabled in the UI. Shipped values: MySQL/MariaDB and PostgreSQL both support polling, bucketing, incremental queries, and cancellation; neither offers native streaming (MySQL has no push protocol for arbitrary queries and PostgreSQL LISTEN/NOTIFY is not a query stream).
+Plugins that do not override it get `supportedLiveModes: []` and `false` for every optional feature: results still render as charts, polling re-runs the plain statement, aggregation happens in the browser, and cancellation/server-side options are disabled in the UI. Shipped values: MySQL/MariaDB, PostgreSQL, and QuestDB support polling, bucketing, incremental queries, and cancellation; none offers native streaming (MySQL has no push protocol for arbitrary queries and PostgreSQL LISTEN/NOTIFY is not a query stream).
 
 #### Adding time-series support to a connector plugin
 
 1. Emit `kind` in `describe_columns` so detection can trust metadata (`timestamp`, `date`, `time`, `number`, `boolean`, `string`, `binary`, `other`).
 2. Override `visualization_capabilities()` to advertise what you implement.
-3. Implement `time_series_query(spec: TimeSeriesQuerySpec) -> str`. The spec carries the user's read-only SQL plus `time_column`, `value_columns`, `group_column`, `aggregation` (`avg|sum|min|max|count`), `interval_seconds` (`None` means windowed pass-through used for incremental fetches), `since`/`until` (raw cell text), `since_exclusive`, and `limit`. Use `strip_statement` and `is_read_only_statement` from `app.plugins.base`, quote identifiers and literals with your dialect's rules, and keep every SQL fragment inside your plugin — MySQL uses `FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(t)/n)*n)`, PostgreSQL uses `date_bin(make_interval(secs => n), t, '2000-01-01')` so `timestamp` and `timestamptz` keep their type; QuestDB would use `SAMPLE BY`, TimescaleDB `time_bucket`.
+3. Implement `time_series_query(spec: TimeSeriesQuerySpec) -> str`. The spec carries the user's read-only SQL plus `time_column`, `value_columns`, `group_column`, `aggregation` (`avg|sum|min|max|count`), `interval_seconds` (`None` means windowed pass-through used for incremental fetches), `since`/`until` (raw cell text), `since_exclusive`, and `limit`. Use `strip_statement` and `is_read_only_statement` from `app.plugins.base`, quote identifiers and literals with your dialect's rules, and keep every SQL fragment inside your plugin — MySQL uses `FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(t)/n)*n)`, PostgreSQL uses `date_bin(make_interval(secs => n), t, '2000-01-01')` so `timestamp` and `timestamptz` keep their type; QuestDB uses `timestamp_floor('<n>s', t)` and explicit grouping; a future TimescaleDB plugin could use `time_bucket`.
 4. Implement `cancel(connection, host, port, username, password)` if the driver can abort a running statement (psycopg: `cancel_safe()`; PyMySQL: `KILL QUERY` from a side connection, which is why the session keeps the password in memory only).
 5. Implement `subscribe(connection, sql, on_batch)` and list `"streaming"` in `supportedLiveModes` only when a genuine push transport exists; the frontend then needs a matching transport before it will use the mode.
 
@@ -225,7 +244,7 @@ The reference notebook was studied at D:/develop/_mysql_/shell-plugins/gui/front
 
 ### Database session semantics
 
-Each notebook creates one server-side session ID with one physical driver connection (PyMySQL or psycopg). Every command using that ID is serialized under that session's lock. USE, user variables, temporary tables, and explicit transactions therefore survive across commands. No automatic reconnect or retry silently replays SQL or loses transaction state.
+Each notebook creates one server-side session ID with one physical driver connection (PyMySQL or psycopg). Every command using that ID is serialized under that session's lock. USE, user variables, temporary tables, and explicit transactions therefore survive across commands where supported by the engine (QuestDB does not provide PostgreSQL's full transaction/session SQL semantics). No automatic reconnect or retry silently replays SQL or loses transaction state.
 
 Connections start with autocommit enabled, matching an interactive SQL client. Ordinary writes commit immediately. START TRANSACTION, COMMIT, ROLLBACK, and SET autocommit work as normal SQL; the executor does not commit after every command. Closing a connection rolls back an outstanding transaction according to database behavior.
 
@@ -243,10 +262,19 @@ Push-Location backend
 # Optional: run against the configured real server.
 $env:SQL_LIVE_TEST = '1'
 .venv/Scripts/python -m unittest discover -s tests -p test_live_database.py -v
+# Optional: read-only QuestDB integration checks (use your configured credentials).
+$env:QUESTDB_LIVE_TEST = '1'
+$env:QUESTDB_HOST = '127.0.0.1'
+$env:QUESTDB_PORT = '8812'
+$env:QUESTDB_USERNAME = '<PGWire username>'
+$env:QUESTDB_PASSWORD = '<PGWire password>'
+.venv/Scripts/python -m unittest discover -s tests -p test_questdb.py -v
 Pop-Location
 ~~~
 
 The live check uses temporary tables and connection-local variables against a connection seeded from the DB_* variables (DB_PASSWORD supplies the password). It checks USE, variable persistence, UPDATE, rollback, inline errors, truncation, and a subsequent query; it does not modify the sakila.actor table. Run it once with each MySQL/MariaDB configuration to verify both servers.
+
+QuestDB tests include plugin discovery, PGWire connection options and missing-driver handling, SQL quoting and validation, and frontend engine selection. Opt-in live tests use only `long_sequence` and read-only statements, with a temporary profile store: they verify UTC/text/binary timestamps, column kinds, all five grouped aggregations, incremental bounds, truncation, error recovery, cancellation, and session teardown. These live checks passed against QuestDB 10.1.0.
 
 Implementation verification: production build passed, sixteen backend unit/API tests (executor, plugin loader and capabilities, read-only guard, dialect-specific time-series query generation, cancel and time-series endpoints, connection store, XML import, connections API, session API) and thirty-four frontend tests (notebook, connections home, time-series detection/time zones/nulls/grouping/ordering/duplicates/downsampling/statistics/preferences, live controller scheduling/overlap/abort/cleanup/failure handling, result tabs) passed. Against a live MySQL 8.0 server the Time Series, Statistics, and Visualize tabs, incremental polling (plugin-wrapped `WHERE ts >= …`), server-side one-minute bucketing with dual Y axes, and loop teardown on leaving the notebook were checked in a browser. A PostgreSQL round trip has not yet been run against a live server.
 

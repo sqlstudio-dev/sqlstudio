@@ -65,7 +65,7 @@ export function AddConnectionDialog({ plugins, onSubmit, onClose }: AddConnectio
       </div>
       <div className="form-row">
         <label>Username<input value={form.username} maxLength={128} autoComplete="off" onChange={(event) => update({ username: event.target.value })} /></label>
-        <label>{form.type === 'postgresql' ? 'Database' : 'Default schema'}<input value={form.database} maxLength={128} onChange={(event) => update({ database: event.target.value })} /></label>
+        <label>{form.type === 'postgresql' || form.type === 'questdb' ? 'Database' : 'Default schema'}<input value={form.database} placeholder={form.type === 'questdb' ? 'qdb' : undefined} maxLength={128} onChange={(event) => update({ database: event.target.value })} /></label>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       <div className="dialog-actions">

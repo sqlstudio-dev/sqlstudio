@@ -82,7 +82,7 @@ export function ConnectionsHome() {
       {state.connectionsStatus === 'error' && <div className="connection-error" role="alert">{state.connectionsError}
         <button type="button" className="secondary-button" onClick={reloadConnections}><RotateCw size={13} /> Retry</button></div>}
       {state.connectionsStatus === 'ready' && groups.length === 0 && <div className="home-empty">
-        <strong>No connections yet</strong><span>Add a MySQL or PostgreSQL connection, or import a SqlStudio connections.xml file.</span></div>}
+        <strong>No connections yet</strong><span>Add a MySQL, PostgreSQL, or QuestDB connection, or import a SqlStudio connections.xml file.</span></div>}
       {groups.map((group) => <section key={group.key} className="engine-group" aria-label={`${group.label} connections`}>
         <h2>{group.label}<small>{group.connections.length}</small>{group.plugin && !group.plugin.available && <em className="warning-text">driver not installed</em>}</h2>
         <div className="tile-grid">
