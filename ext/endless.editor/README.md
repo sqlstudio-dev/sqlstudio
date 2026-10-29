@@ -157,7 +157,7 @@ backend/.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --host 12
 
 Python packages: FastAPI, Uvicorn (standard extras), PyMySQL (RSA authentication extras), and psycopg (binary). MySQL and MariaDB share the PyMySQL plugin. The backend is a separate process; the native hosts do not launch it automatically.
 
-Environment overrides are DB_TYPE, DB_HOST, DB_PORT, DB_USERNAME, DB_DATABASE, and DB_RESULT_LIMIT (default 1000 rows per result set); they only shape the seed connection and the row limit — day-to-day connections come from connection.json. DB_PASSWORD is used by the opt-in live test only.
+Environment overrides are DB_TYPE, DB_HOST, DB_PORT, DB_USERNAME, DB_DATABASE, DB_RESULT_LIMIT (default 1000 rows per result set), and DB_TIMESERIES_LIMIT (default 100000 rows per time-series fetch); they only shape the seed connection and the row limits — day-to-day connections come from connection.json. DB_PASSWORD is used by the opt-in live test only.
 
 ### Start the frontend (second terminal, repository root)
 
@@ -178,6 +178,48 @@ Open http://127.0.0.1:5173. The API defaults to http://127.0.0.1:8000; VITE_API_
 - backend/app/api/connections.py exposes the plugin list and connection CRUD/import; backend/app/api/sql.py exposes POST /api/sessions, POST /api/sessions/{id}/execute, and DELETE /api/sessions/{id}. GET /api/health reports API availability, not database connectivity.
 - backend/app/plugins/ defines the ConnectorPlugin contract and the loader; backend/plugins/ contains the engine plugins. backend/app/database/ holds the connection store, the connections.xml importer, one physical connection per session, its execution lock, and the session registry.
 - backend/app/services/sql_executor.py executes SQL in a worker thread, consumes every result, caps retained rows, and normalizes errors through the session's plugin. backend/app/models/responses.py handles request models and JSON-safe cell values.
+- web/src/timeseries/ is the framework-free time-series core: detection, timestamp parsing, dataset building/merging, downsampling, statistics, preference persistence, and the `useLiveQuery` controller. web/src/components/timeseries/ renders the result tabs, uPlot chart, live toolbar, series configuration, and statistics panel.
+
+### Time series, statistics, and live queries
+
+Every result set is shown inside a tab strip: **Data Grid** (the unchanged table), **Time Series**, **Statistics**, and **Visualize**. The grid is never replaced automatically; the other tabs light up when the result looks like time-series data and otherwise offer a manual column mapping.
+
+**Detection** (`web/src/timeseries/detect.ts`) looks at the driver's normalised column `kind` first (`timestamp`, `date`, `number`, `string`, …, emitted by each plugin's `describe_columns`), then samples values for untyped or string columns (ISO/SQL date-times, numeric strings, epoch integers). Group candidates are low-cardinality columns such as device IDs. Column names are only a tie-breaker for integer epoch columns and never decide alone. The suggested mapping can be overridden in **Series configuration** (X axis, Y axis columns with optional right-hand axis, group by); a stored mapping is validated against the current columns.
+
+**Timestamps**: offset-aware values (`…Z`, `…+02:00`, PostgreSQL `timestamptz`) are absolute. Naive values (MySQL `DATETIME`, PostgreSQL `timestamp`) are interpreted as *Local time* by default so they display exactly as the server stores them; switch *Naive timestamps are* to UTC when the database stores UTC. *Display time zone* controls axis and statistics formatting. Numeric epochs are classified by magnitude (s/ms/µs/ns).
+
+**Chart** (`TimeSeriesChart.tsx`, uPlot, MIT, canvas): multiple series, line/area/bar/scatter/histogram, time X axis, left and right Y scales, drag-to-zoom, Ctrl/Cmd+wheel zoom at the cursor, Shift+wheel pan (a plain wheel keeps scrolling the notebook unless the panel is full screen), double-click or the toolbar button to reset, crosshair with a live legend acting as the synchronized tooltip, legend clicks to hide series, manual Y range, full screen, and PNG export. Data refreshes call `setData` on the existing instance, so zoom, hidden series, and axis choices survive each poll.
+
+**Pipeline per refresh**: raw rows (retained up to *Retained samples*, acting as a ring buffer) → parse and group into series, sort out-of-order samples, collapse duplicate timestamps (last value wins), count nulls and unparseable timestamps → optional time range (relative to the newest sample) → optional aggregation (client-side bucketing, or server-side when enabled) → downsampling to *Max rendered points* shared across series using min/max buckets (default, keeps spikes and outliers) or LTTB → chart. The toolbar always distinguishes *points rendered* from the database row count and flags truncated results.
+
+**Live modes** (`useLiveQuery.ts`): *Manual* runs once. *Polling* re-executes at the chosen interval using a timeout chain, so a slow query never overlaps the next one (overlaps are counted as skipped); Start, Pause, Resume, Stop, and Cancel are exposed, the last successful update time is shown, errors are displayed without discarding the existing data, and after three consecutive failures (or a lost session) polling pauses itself. *Streaming* only appears when a plugin lists it in `supportedLiveModes`; no shipped plugin does, and selecting it without a transport reports an error instead of pretending. Only read-only statements (`SELECT`, `WITH`, `SHOW`, `EXPLAIN`, `DESCRIBE`, `TABLE`, `VALUES`) are eligible for live modes or server-side wrapping — the backend enforces the same rule — so DML/DDL is never re-run automatically. Closing the notebook, switching connections, or changing the statement aborts in-flight requests and stops the loop; sessions are bound to a connection, so a tab can never poll through another connection's session.
+
+**Polling strategies**: *Fetch new rows only* (incremental) asks the plugin to wrap the original statement as a derived table with `WHERE time >= <newest raw timestamp>` and merges the batch, dropping rows that duplicate the boundary; the raw cell text is echoed back verbatim so no time-zone conversion happens in transit. *Replace full window* re-runs the user statement as written. Server-side aggregation (when the plugin reports `serverSideAggregation`) sends the mapping to the plugin, which emits a dialect-specific bucket query; the generated SQL is always shown under *Plugin-generated SQL*. User SQL is never rewritten silently: wrapping only happens for these explicit options.
+
+**Statistics**: KPI cards with the latest value per series plus a table with min, max, average, standard deviation, sample and null counts, first/last values and timestamps, and sample rate, all over the selected range. **Visualize** offers line, area, bar, scatter, and a 30-bin histogram of the current range.
+
+**Preferences** are saved in `localStorage` under `endless.visualization:<connectionId>:<statement hash>` and restored whenever the same statement is executed again against the same connection.
+
+#### Plugin capability negotiation
+
+`ConnectorPlugin.visualization_capabilities()` returns (and `GET /api/plugins` exposes as `capabilities`):
+
+~~~json
+{ "timeSeries": true, "supportedLiveModes": ["polling"], "serverSideAggregation": true, "timeBucketing": true,
+  "incrementalQueries": true, "latestValueQueries": false, "queryCancellation": true }
+~~~
+
+Plugins that do not override it get `supportedLiveModes: []` and `false` for every optional feature: results still render as charts, polling re-runs the plain statement, aggregation happens in the browser, and cancellation/server-side options are disabled in the UI. Shipped values: MySQL/MariaDB and PostgreSQL both support polling, bucketing, incremental queries, and cancellation; neither offers native streaming (MySQL has no push protocol for arbitrary queries and PostgreSQL LISTEN/NOTIFY is not a query stream).
+
+#### Adding time-series support to a connector plugin
+
+1. Emit `kind` in `describe_columns` so detection can trust metadata (`timestamp`, `date`, `time`, `number`, `boolean`, `string`, `binary`, `other`).
+2. Override `visualization_capabilities()` to advertise what you implement.
+3. Implement `time_series_query(spec: TimeSeriesQuerySpec) -> str`. The spec carries the user's read-only SQL plus `time_column`, `value_columns`, `group_column`, `aggregation` (`avg|sum|min|max|count`), `interval_seconds` (`None` means windowed pass-through used for incremental fetches), `since`/`until` (raw cell text), `since_exclusive`, and `limit`. Use `strip_statement` and `is_read_only_statement` from `app.plugins.base`, quote identifiers and literals with your dialect's rules, and keep every SQL fragment inside your plugin — MySQL uses `FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(t)/n)*n)`, PostgreSQL uses `date_bin(make_interval(secs => n), t, '2000-01-01')` so `timestamp` and `timestamptz` keep their type; QuestDB would use `SAMPLE BY`, TimescaleDB `time_bucket`.
+4. Implement `cancel(connection, host, port, username, password)` if the driver can abort a running statement (psycopg: `cancel_safe()`; PyMySQL: `KILL QUERY` from a side connection, which is why the session keeps the password in memory only).
+5. Implement `subscribe(connection, sql, on_batch)` and list `"streaming"` in `supportedLiveModes` only when a genuine push transport exists; the frontend then needs a matching transport before it will use the mode.
+
+API: `POST /api/sessions/{id}/time-series` (`TimeSeriesQueryRequest`: `sql`, `timeColumn`, `valueColumns`, `groupColumn`, `aggregation`, `intervalSeconds`, `since`, `until`, `sinceExclusive`, `limit`) returns `{ "sql": <generated>, "result": <execution response> }` capped by `DB_TIMESERIES_LIMIT` (default 100000 rows, separate from the 1000-row grid limit). `POST /api/sessions/{id}/cancel` returns `{ "cancelled": true }` or 400 when the plugin lacks the capability.
 
 The reference notebook was studied at D:/develop/_mysql_/shell-plugins/gui/frontend: inline execution contexts, result presentation, and the next prompt informed the behavior. Its class-based architecture was not copied. Obsolete App.jsx/main.jsx files were removed because extensionless imports could resolve to the old dashboard.
 
@@ -206,11 +248,11 @@ Pop-Location
 
 The live check uses temporary tables and connection-local variables against a connection seeded from the DB_* variables (DB_PASSWORD supplies the password). It checks USE, variable persistence, UPDATE, rollback, inline errors, truncation, and a subsequent query; it does not modify the sakila.actor table. Run it once with each MySQL/MariaDB configuration to verify both servers.
 
-Implementation verification: production build passed, twelve backend unit/API tests (executor, plugin loader, connection store, XML import, connections API, session API) and eleven frontend interaction tests passed. The connections home, add-connection dialog, engine grouping, watermarks, XML auto-import, and the password prompt were checked in a browser against the running backend; a wrong password surfaced the MySQL *Access denied* message with a Reconnect action. A PostgreSQL round trip has not yet been run against a live server.
+Implementation verification: production build passed, sixteen backend unit/API tests (executor, plugin loader and capabilities, read-only guard, dialect-specific time-series query generation, cancel and time-series endpoints, connection store, XML import, connections API, session API) and thirty-four frontend tests (notebook, connections home, time-series detection/time zones/nulls/grouping/ordering/duplicates/downsampling/statistics/preferences, live controller scheduling/overlap/abort/cleanup/failure handling, result tabs) passed. Against a live MySQL 8.0 server the Time Series, Statistics, and Visualize tabs, incremental polling (plugin-wrapped `WHERE ts >= …`), server-side one-minute bucketing with dual Y axes, and loop teardown on leaving the notebook were checked in a browser. A PostgreSQL round trip has not yet been run against a live server.
 
 ### Current scope
 
-One SQL statement per execution; semicolon-separated scripts and client DELIMITER commands are not implemented. Stored procedures may return multiple results. The display limit bounds row count, not individual cell size or database execution cost; draining a huge result can still take time. Cancellation, paging, durable history, session expiration, schema browsing, editing saved connections, SSL options, OS credential storage, and multiple tabs remain future work. The API is a local developer service without authentication; run it on loopback.
+One SQL statement per execution; semicolon-separated scripts and client DELIMITER commands are not implemented. Stored procedures may return multiple results. The display limit bounds row count, not individual cell size or database execution cost; draining a huge result can still take time. Time-series fetches are capped by DB_TIMESERIES_LIMIT and the retained-sample setting, so the browser never holds unbounded history. Deferred visualizations: heatmaps, state timelines, event markers/annotations, gauges, and a virtualized data grid. Paging, durable history, session expiration, schema browsing, editing saved connections, SSL options, OS credential storage, native streaming transports, and multiple tabs remain future work. The API is a local developer service without authentication; run it on loopback.
 
 Driver behavior reference: https://pymysql.readthedocs.io/en/latest/modules/cursors.html
 Tailwind integration reference: https://tailwindcss.com/docs/installation/using-vite

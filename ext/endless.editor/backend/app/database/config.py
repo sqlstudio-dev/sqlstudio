@@ -37,9 +37,11 @@ class DatabaseConnectionConfig:
     password: str = field(default="", repr=False)
     database: str = "sakila"
     result_limit: int = 1000
+    #: Row cap for time-series fetches, which may legitimately return far more rows than the grid shows.
+    time_series_limit: int = 100_000
 
     def __post_init__(self) -> None:
-        if not 1 <= self.port <= 65535 or self.result_limit < 1:
+        if not 1 <= self.port <= 65535 or self.result_limit < 1 or self.time_series_limit < 1:
             raise ValueError("Invalid database port or result limit")
 
     @classmethod
@@ -52,6 +54,7 @@ class DatabaseConnectionConfig:
             password=os.getenv("DB_PASSWORD", ""),
             database=os.getenv("DB_DATABASE", "sakila"),
             result_limit=int(os.getenv("DB_RESULT_LIMIT", "1000")),
+            time_series_limit=int(os.getenv("DB_TIMESERIES_LIMIT", "100000")),
         )
 
     def seed_profile(self) -> ConnectionProfile:

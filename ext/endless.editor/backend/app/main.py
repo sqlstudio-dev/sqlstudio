@@ -59,7 +59,7 @@ def initialize_connections(store: ConnectionStore, config: DatabaseConnectionCon
 
 
 initialize_connections(store, config)
-session_manager = SessionManager(store, plugins, config.result_limit)
+session_manager = SessionManager(store, plugins, config.result_limit, config.time_series_limit)
 
 
 @asynccontextmanager

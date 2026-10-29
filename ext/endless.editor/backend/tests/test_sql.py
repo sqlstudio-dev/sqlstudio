@@ -22,9 +22,10 @@
 
 import tempfile
 import unittest
+from collections import namedtuple
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pymysql
 from fastapi import FastAPI
@@ -38,6 +39,7 @@ from app.database.connection_store import ConnectionProfile, ConnectionStore
 from app.database.session import SqlSession
 from app.database.session_manager import SessionManager
 from app.models.responses import cell_to_json
+from app.plugins.base import ConnectorPlugin, TimeSeriesQuerySpec, UnsupportedCapabilityError, is_read_only_statement
 from app.plugins.loader import load_plugins
 from app.services.sql_executor import execute_sql
 
@@ -86,6 +88,8 @@ class StreamingCursor:
         if sql == "INVALID":
             raise pymysql.ProgrammingError(1064, "Invalid SQL")
         self.total = 1001 if sql == "LARGE" else 1
+        if sql.startswith("SELECT `q`.* FROM (UPDATE"):
+            raise AssertionError("non read-only query must be rejected before execution")
         self.position = 0
         self.unread = True
 
@@ -194,11 +198,94 @@ class SqlTests(unittest.TestCase):
         info = {plugin["id"]: plugin for plugin in PLUGINS.to_json()}
         self.assertEqual((info["mysql"]["watermark"], info["mysql"]["defaultPort"]), ("mysql", 3306))
         self.assertEqual((info["postgresql"]["watermark"], info["postgresql"]["defaultPort"]), ("postgresql", 5432))
+        for plugin in info.values():
+            capabilities = plugin["capabilities"]
+            self.assertEqual(capabilities["supportedLiveModes"], ["polling"], plugin["id"])
+            self.assertTrue(capabilities["timeBucketing"] and capabilities["incrementalQueries"] and capabilities["queryCancellation"])
         with tempfile.TemporaryDirectory() as directory:
             Path(directory, "broken_connector.py").write_text("raise RuntimeError('boom')\n", encoding="utf-8")
             Path(directory, "ignored.py").write_text("plugin = None\n", encoding="utf-8")
             with self.assertLogs("endless.plugins", level="WARNING"):
                 self.assertEqual(len(load_plugins(Path(directory))), 0)
+
+    def test_plugin_without_time_series_support_degrades_gracefully(self):
+        class Minimal(ConnectorPlugin):
+            id, name = "minimal", "Minimal"
+            def connect(self, *a): return None
+            def describe_columns(self, d): return []
+            def error_details(self, e): return None
+        plugin = Minimal()
+        self.assertEqual(plugin.to_json()["capabilities"]["supportedLiveModes"], [])
+        with self.assertRaises(UnsupportedCapabilityError):
+            plugin.time_series_query(TimeSeriesQuerySpec(sql="SELECT 1", time_column="t"))
+        with self.assertRaises(UnsupportedCapabilityError):
+            plugin.cancel(None, "h", 1, "u", "")
+        with self.assertRaises(UnsupportedCapabilityError):
+            plugin.subscribe(None, "SELECT 1", lambda batch: None)
+
+    def test_read_only_detection_and_column_kinds(self):
+        self.assertTrue(is_read_only_statement("  -- note\n/* c */ SELECT 1"))
+        self.assertTrue(is_read_only_statement("WITH x AS (SELECT 1) SELECT * FROM x;"))
+        self.assertTrue(is_read_only_statement("(SELECT 1) UNION (SELECT 2)"))
+        self.assertFalse(is_read_only_statement("UPDATE t SET a = 1"))
+        self.assertFalse(is_read_only_statement("SELECTION"))
+        self.assertFalse(is_read_only_statement("DELETE FROM t"))
+        columns = MYSQL.describe_columns([("ts", 12, None, 19, 19, 0, True), ("v", 5, None, 22, 22, 31, True), ("name", 253, None, 80, 80, 0, True),
+                                          ("doc", 252, None, 65535, 65535, 0, True)])
+        self.assertEqual([c["kind"] for c in columns], ["timestamp", "number", "string", "string"])
+        self.assertEqual(columns[0]["type"], "DATETIME")
+        pg = PLUGINS.for_type("postgresql")
+        Column = namedtuple("Column", "name type_code type_display")
+        kinds = pg.describe_columns([Column("ts", 1184, "timestamp with time zone"), Column("n", 1700, "numeric"),
+                                     Column("flag", 16, "boolean"), Column("custom", 99999, "myint8")])
+        self.assertEqual([c["kind"] for c in kinds], ["timestamp", "number", "boolean", "number"])
+
+    def test_time_series_query_generation_per_dialect(self):
+        pg = PLUGINS.for_type("postgresql")
+        base = dict(sql="SELECT * FROM measurements WHERE site = 'a';", time_column="ts", value_columns=("volt`age", "current"),
+                    group_column="device", aggregation="avg", interval_seconds=60, since="2026-01-01T00:00:00", until="2026-01-02")
+        mysql_sql = MYSQL.time_series_query(TimeSeriesQuerySpec(**base))
+        self.assertIn("FROM_UNIXTIME(FLOOR(UNIX_TIMESTAMP(`q`.`ts`) / 60) * 60) AS `ts`", mysql_sql)
+        self.assertIn("AVG(`q`.`volt``age`) AS `volt``age`", mysql_sql)
+        self.assertIn("FROM (SELECT * FROM measurements WHERE site = 'a') AS `q` WHERE `q`.`ts` >= '2026-01-01T00:00:00' AND `q`.`ts` <= '2026-01-02'", mysql_sql)
+        self.assertTrue(mysql_sql.endswith("GROUP BY 1, 2 ORDER BY 1, 2"))
+        pg_sql = pg.time_series_query(TimeSeriesQuerySpec(**base))
+        self.assertIn("date_bin(make_interval(secs => 60), \"q\".\"ts\", '2000-01-01') AS \"ts\"", pg_sql)
+        self.assertIn('avg("q"."volt`age") AS "volt`age"', pg_sql)
+        self.assertIn('"q"."device" AS "device"', pg_sql)
+        incremental = MYSQL.time_series_query(TimeSeriesQuerySpec(sql="SELECT ts, v FROM t", time_column="ts", since="2026-01-01 10:00:00",
+                                                                  since_exclusive=True, limit=500))
+        self.assertEqual(incremental, "SELECT `q`.* FROM (SELECT ts, v FROM t) AS `q` WHERE `q`.`ts` > '2026-01-01 10:00:00' ORDER BY `q`.`ts` LIMIT 500")
+        self.assertEqual(pg.time_series_query(TimeSeriesQuerySpec(sql="SELECT ts FROM t", time_column="ts")),
+                         'SELECT "q".* FROM (SELECT ts FROM t) AS "q" ORDER BY "q"."ts"')
+        self.assertIn("'it''s'", MYSQL.time_series_query(TimeSeriesQuerySpec(sql="SELECT 1", time_column="ts", since="it's")))
+        for plugin in (MYSQL, pg):
+            with self.assertRaises(ValueError):
+                plugin.time_series_query(TimeSeriesQuerySpec(sql="UPDATE t SET a = 1", time_column="ts"))
+
+    def test_cancel_and_time_series_endpoints(self):
+        self.store.add(PROFILE)
+        manager = SessionManager(self.store, PLUGINS, result_limit=10)
+        app = FastAPI()
+        app.include_router(create_sql_router(manager))
+        self.connection.thread_id.return_value = 42
+        self.session.password = "pw"
+        killer = MagicMock()
+        with patch.object(SqlSession, "connect", return_value=self.session), TestClient(app) as client:
+            client.post("/api/sessions", json={"connectionId": "demo", "password": "pw"})
+            key = next(iter(manager._sessions))
+            with patch("pymysql.connect", return_value=killer) as connect:
+                self.assertEqual(client.post(f"/api/sessions/{key}/cancel").json(), {"cancelled": True})
+            self.assertEqual(connect.call_args.kwargs["password"], "pw")
+            killer.cursor.return_value.__enter__.return_value.execute.assert_called_once_with("KILL QUERY %s", (42,))
+            killer.close.assert_called_once()
+            response = client.post(f"/api/sessions/{key}/time-series", json={"sql": "SELECT 1 AS ts;", "timeColumn": "ts", "sinceExclusive": True, "since": "2026-01-01"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["sql"], "SELECT `q`.* FROM (SELECT 1 AS ts) AS `q` WHERE `q`.`ts` > '2026-01-01' ORDER BY `q`.`ts` LIMIT 100000")
+            self.assertEqual(response.json()["result"]["rows"], [[0]])
+            self.assertEqual(client.post(f"/api/sessions/{key}/time-series", json={"sql": "DELETE FROM t", "timeColumn": "ts"}).status_code, 400)
+            self.assertEqual(client.post(f"/api/sessions/{key}/time-series", json={"sql": "SELECT 1", "timeColumn": "ts", "intervalSeconds": 60}).status_code, 400)
+            self.assertEqual(client.post("/api/sessions/missing/cancel").status_code, 404)
 
     def test_xml_import_skips_passwords_and_unknown_drivers(self):
         profiles, skipped = parse_connections_xml(SAMPLE_XML)

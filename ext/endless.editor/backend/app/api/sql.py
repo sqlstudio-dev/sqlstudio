@@ -24,7 +24,8 @@ from fastapi import APIRouter, HTTPException, Response
 from starlette.concurrency import run_in_threadpool
 
 from app.database.session_manager import SessionManager, UnknownConnectionError, UnsupportedEngineError
-from app.models.responses import SessionCreateRequest, SqlExecuteRequest, SqlSessionResponse
+from app.models.responses import SessionCreateRequest, SqlExecuteRequest, SqlSessionResponse, TimeSeriesQueryRequest
+from app.plugins.base import TimeSeriesQuerySpec, UnsupportedCapabilityError
 from app.services.sql_executor import execute_sql
 
 
@@ -60,5 +61,39 @@ def create_sql_router(session_manager: SessionManager) -> APIRouter:
         if not request.sql.strip():
             raise HTTPException(status_code=400, detail="SQL statement must not be empty.")
         return await run_in_threadpool(execute_sql, session, request.sql)
+
+    @router.post("/{session_id}/cancel")
+    async def cancel(session_id: str) -> dict[str, object]:
+        session = session_manager.get(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="SQL session not found.")
+        try:
+            cancelled = await run_in_threadpool(session.cancel)
+        except UnsupportedCapabilityError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except Exception as error:
+            details = session.plugin.error_details(error)
+            raise HTTPException(status_code=503, detail=str(details["message"]) if details else "Cancel request failed.") from error
+        return {"cancelled": bool(cancelled)}
+
+    @router.post("/{session_id}/time-series")
+    async def time_series(session_id: str, request: TimeSeriesQueryRequest) -> dict[str, object]:
+        """Run a plugin-generated window/bucket query derived from the user's read-only SQL."""
+        session = session_manager.get(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="SQL session not found. Reload to start a new session.")
+        spec = TimeSeriesQuerySpec(sql=request.sql, time_column=request.timeColumn, value_columns=tuple(request.valueColumns),
+                                   group_column=request.groupColumn, aggregation=request.aggregation,
+                                   interval_seconds=request.intervalSeconds, since=request.since, until=request.until,
+                                   since_exclusive=request.sinceExclusive, limit=request.limit or session_manager.time_series_limit)
+        if spec.interval_seconds and not spec.value_columns:
+            raise HTTPException(status_code=400, detail="Aggregation needs at least one value column.")
+        try:
+            sql = session.plugin.time_series_query(spec)
+        except UnsupportedCapabilityError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        return {"sql": sql, "result": await run_in_threadpool(execute_sql, session, sql, spec.limit)}
 
     return router

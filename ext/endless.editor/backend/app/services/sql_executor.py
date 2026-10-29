@@ -27,11 +27,12 @@ from app.database.session import SessionClosedError, SqlSession
 from app.models.responses import cell_to_json
 
 
-def execute_sql(session: SqlSession, sql: str) -> dict[str, Any]:
+def execute_sql(session: SqlSession, sql: str, row_limit: int | None = None) -> dict[str, Any]:
     started = perf_counter()
     results: list[dict[str, Any]] = []
     error: dict[str, Any] | None = None
     plugin = session.plugin
+    limit = row_limit if row_limit is not None else session.result_limit
     with session.lock:
         cursor = None
         try:
@@ -48,7 +49,7 @@ def execute_sql(session: SqlSession, sql: str) -> dict[str, Any]:
                     # Drain every row without retaining it: an unread result would
                     # poison the next command on this same physical connection.
                     while batch := cursor.fetchmany(256):
-                        available = max(0, session.result_limit - len(rows))
+                        available = max(0, limit - len(rows))
                         rows.extend([[cell_to_json(v) for v in row] for row in batch[:available]])
                         truncated = truncated or len(batch) > available
                     result = {"type": "resultset", "columns": columns, "rows": rows,

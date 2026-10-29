@@ -24,8 +24,9 @@
 
 export type SqlExecutionStatus = 'pending' | 'success' | 'error';
 export type SqlCell = string | number | boolean | null | { binary: true; size: number };
+export type SqlColumnKind = 'timestamp' | 'date' | 'time' | 'number' | 'boolean' | 'string' | 'binary' | 'other';
 
-export interface SqlColumn { name: string; type?: string }
+export interface SqlColumn { name: string; type?: string; kind?: SqlColumnKind }
 export interface SqlResultSet {
   type: 'resultset'; columns: SqlColumn[]; rows: SqlCell[][]; returnedRows: number;
   truncated: boolean; executionTimeMs: number; warningCount: number;
@@ -47,10 +48,25 @@ export interface ConnectionProfile {
   default: boolean; lastConnected: number | null; options: Record<string, string | number | boolean>;
 }
 export interface ConnectionInput { name: string; type: string; host: string; port: number; username: string; database: string }
+export type LiveQueryMode = 'none' | 'polling' | 'streaming';
+export interface VisualizationCapabilities {
+  timeSeries: boolean; supportedLiveModes: LiveQueryMode[]; serverSideAggregation: boolean; timeBucketing: boolean;
+  incrementalQueries: boolean; latestValueQueries: boolean; queryCancellation: boolean;
+}
+export const noVisualizationCapabilities: VisualizationCapabilities = {
+  timeSeries: true, supportedLiveModes: [], serverSideAggregation: false, timeBucketing: false,
+  incrementalQueries: false, latestValueQueries: false, queryCancellation: false,
+};
 export interface ConnectorPlugin {
   id: string; name: string; defaultPort: number; watermark: string; driver: string; aliases: string[]; available: boolean;
-  unavailableReason: string | null;
+  unavailableReason: string | null; capabilities?: VisualizationCapabilities;
 }
+export type TimeSeriesAggregation = 'avg' | 'sum' | 'min' | 'max' | 'count';
+export interface TimeSeriesQueryRequest {
+  sql: string; timeColumn: string; valueColumns?: string[]; groupColumn?: string | null; aggregation?: TimeSeriesAggregation;
+  intervalSeconds?: number | null; since?: string | null; until?: string | null; sinceExclusive?: boolean; limit?: number | null;
+}
+export interface TimeSeriesQueryResponse { sql: string; result: SqlExecutionResponse }
 export interface ConnectionImportResult { imported: number; duplicates: number; skipped: number; connections: ConnectionProfile[] }
 export type SqlSingleResult = SqlResultSet | SqlCommandResult;
 export type SqlResult = SqlSingleResult | { type: 'batch'; results: SqlSingleResult[]; executionTimeMs: number };

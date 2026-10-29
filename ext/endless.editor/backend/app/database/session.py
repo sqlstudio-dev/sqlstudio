@@ -39,6 +39,8 @@ class SqlSession:
     profile: ConnectionProfile
     plugin: ConnectorPlugin
     result_limit: int = 1000
+    #: Kept in memory only so the plugin can open a side channel for KILL QUERY style cancels.
+    password: str = field(default="", repr=False)
     lock: RLock = field(default_factory=RLock)
     closed: bool = False
 
@@ -46,7 +48,14 @@ class SqlSession:
     def connect(cls, session_id: str, profile: ConnectionProfile, plugin: ConnectorPlugin, password: str,
                 result_limit: int) -> "SqlSession":
         connection = plugin.connect(profile.host, profile.port, profile.username, password, profile.database)
-        return cls(session_id=session_id, connection=connection, profile=profile, plugin=plugin, result_limit=result_limit)
+        return cls(session_id=session_id, connection=connection, profile=profile, plugin=plugin, result_limit=result_limit,
+                   password=password)
+
+    def cancel(self) -> bool:
+        """Ask the plugin to abort the running statement without taking the execution lock."""
+        if self.closed:
+            return False
+        return self.plugin.cancel(self.connection, self.profile.host, self.profile.port, self.profile.username, self.password)
 
     def close(self) -> None:
         with self.lock:

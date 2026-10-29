@@ -23,7 +23,7 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from math import isfinite
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -59,6 +59,21 @@ class ConnectionCreateRequest(BaseModel):
 
 class ConnectionImportRequest(BaseModel):
     xml: str = Field(min_length=1, max_length=5_000_000)
+
+
+class TimeSeriesQueryRequest(BaseModel):
+    """Server-side window or bucket aggregation over a read-only user query."""
+
+    sql: str = Field(min_length=1, max_length=1_000_000)
+    timeColumn: str = Field(min_length=1, max_length=255)
+    valueColumns: list[str] = Field(default_factory=list, max_length=64)
+    groupColumn: str | None = Field(default=None, max_length=255)
+    aggregation: Literal["avg", "sum", "min", "max", "count"] = "avg"
+    intervalSeconds: int | None = Field(default=None, ge=1, le=31_536_000)
+    since: str | None = Field(default=None, max_length=64)
+    until: str | None = Field(default=None, max_length=64)
+    sinceExclusive: bool = False
+    limit: int | None = Field(default=None, ge=1, le=1_000_000)
 
 
 def cell_to_json(value: Any) -> Any:

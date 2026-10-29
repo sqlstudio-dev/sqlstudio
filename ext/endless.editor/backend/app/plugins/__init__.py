@@ -20,7 +20,9 @@
 # along with this program; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
 
-from app.plugins.base import ConnectorPlugin
+from app.plugins.base import (AGGREGATIONS, COLUMN_KINDS, LIVE_MODES, ConnectorPlugin, TimeSeriesQuerySpec,
+                              UnsupportedCapabilityError, is_read_only_statement, strip_statement)
 from app.plugins.loader import PluginRegistry, default_plugins_dir, load_plugins
 
-__all__ = ["ConnectorPlugin", "PluginRegistry", "default_plugins_dir", "load_plugins"]
+__all__ = ["AGGREGATIONS", "COLUMN_KINDS", "LIVE_MODES", "ConnectorPlugin", "TimeSeriesQuerySpec", "UnsupportedCapabilityError",
+           "is_read_only_statement", "strip_statement", "PluginRegistry", "default_plugins_dir", "load_plugins"]

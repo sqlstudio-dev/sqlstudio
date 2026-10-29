@@ -22,7 +22,7 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-import type { ConnectionImportResult, ConnectionInput, ConnectionProfile, ConnectorPlugin, SqlExecutionResponse, SqlSession } from '../models/sql';
+import type { ConnectionImportResult, ConnectionInput, ConnectionProfile, ConnectorPlugin, SqlExecutionResponse, SqlSession, TimeSeriesQueryRequest, TimeSeriesQueryResponse } from '../models/sql';
 
 const apiBase = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
 
@@ -47,7 +47,11 @@ export const sqlApi = {
   importConnections: (xml: string) => request<ConnectionImportResult>('/api/connections/import', { method: 'POST', body: JSON.stringify({ xml }) }),
   createSession: (connectionId: string, password: string) => request<SqlSession>('/api/sessions', { method: 'POST', body: JSON.stringify({ connectionId, password }) }),
   closeSession: (id: string) => request<void>('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE', keepalive: true }),
-  execute: (sessionId: string, sql: string) => request<SqlExecutionResponse>(
-    '/api/sessions/' + encodeURIComponent(sessionId) + '/execute', { method: 'POST', body: JSON.stringify({ sql }) },
+  execute: (sessionId: string, sql: string, signal?: AbortSignal) => request<SqlExecutionResponse>(
+    '/api/sessions/' + encodeURIComponent(sessionId) + '/execute', { method: 'POST', body: JSON.stringify({ sql }), signal },
+  ),
+  cancel: (sessionId: string) => request<{ cancelled: boolean }>('/api/sessions/' + encodeURIComponent(sessionId) + '/cancel', { method: 'POST' }),
+  timeSeries: (sessionId: string, body: TimeSeriesQueryRequest, signal?: AbortSignal) => request<TimeSeriesQueryResponse>(
+    '/api/sessions/' + encodeURIComponent(sessionId) + '/time-series', { method: 'POST', body: JSON.stringify(body), signal },
   ),
 };

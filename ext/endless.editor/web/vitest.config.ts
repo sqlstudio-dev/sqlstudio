@@ -27,5 +27,5 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  test: { environment: 'jsdom', include: ['tests/**/*.test.tsx'], restoreMocks: true },
+  test: { environment: 'jsdom', include: ['tests/**/*.test.tsx'], restoreMocks: true, setupFiles: ['tests/setup.ts'] },
 });

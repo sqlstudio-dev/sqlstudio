@@ -37,10 +37,11 @@ class UnsupportedEngineError(LookupError):
 
 
 class SessionManager:
-    def __init__(self, store: ConnectionStore, plugins: PluginRegistry, result_limit: int = 1000) -> None:
+    def __init__(self, store: ConnectionStore, plugins: PluginRegistry, result_limit: int = 1000, time_series_limit: int = 100_000) -> None:
         self._store = store
         self._plugins = plugins
         self._result_limit = result_limit
+        self.time_series_limit = time_series_limit
         self._sessions: dict[str, SqlSession] = {}
         self._lock = RLock()
 

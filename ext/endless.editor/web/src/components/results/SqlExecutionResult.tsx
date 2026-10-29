@@ -24,15 +24,16 @@
 
 import { CircleAlert, CircleCheck } from 'lucide-react';
 import type { SqlExecution, SqlSingleResult } from '../../models/sql';
+import { ResultTabs } from '../timeseries/ResultTabs';
 import { ResultTableSkeleton } from './ResultTableSkeleton';
 import { SqlResultTable } from './SqlResultTable';
 
 const duration = (value: number) => Math.max(0, Math.round(value)) + ' ms';
 
-function Result({ result }: { result: SqlSingleResult }) {
+function Result({ execution, result }: { execution: SqlExecution; result: SqlSingleResult }) {
   return <div className="execution-output">
     {result.type === 'resultset' ? <>
-      <SqlResultTable result={result} />
+      <ResultTabs executionId={execution.id} sql={execution.sql} result={result}><SqlResultTable result={result} /></ResultTabs>
       <div className="output-status"><CircleCheck size={14} />
         {result.returnedRows} {result.returnedRows === 1 ? 'row' : 'rows'} returned
         {result.truncated && <span className="warning-text"> · result limited to {result.rows.length} rows</span>}
@@ -51,7 +52,7 @@ export function SqlExecutionResult({ execution }: { execution: SqlExecution }) {
   if (execution.status === 'error') {
     const error = execution.error!;
     return <>
-      {execution.partialResults?.map((result, index) => <Result key={index} result={result} />)}
+      {execution.partialResults?.map((result, index) => <Result key={index} execution={execution} result={result} />)}
       <div className="execution-output"><div className="error-panel" role="alert">
         <div className="error-title"><CircleAlert size={15} /> Query failed</div><div className="error-message">{error.message}</div>
         <div className="error-meta">{error.code != null && <span>Code {error.code}</span>}{error.sqlState && <span>SQL state {error.sqlState}</span>}<span>{duration(error.executionTimeMs)}</span></div>
@@ -60,6 +61,6 @@ export function SqlExecutionResult({ execution }: { execution: SqlExecution }) {
   }
   const result = execution.result!;
   return result.type === 'batch'
-    ? <>{result.results.map((item, index) => <Result key={index} result={item} />)}<div className="execution-output output-status muted">Total: {duration(result.executionTimeMs)}</div></>
-    : <Result result={result} />;
+    ? <>{result.results.map((item, index) => <Result key={index} execution={execution} result={item} />)}<div className="execution-output output-status muted">Total: {duration(result.executionTimeMs)}</div></>
+    : <Result execution={execution} result={result} />;
 }
