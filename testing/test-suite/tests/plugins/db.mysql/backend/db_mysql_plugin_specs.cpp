@@ -174,12 +174,7 @@ protected:
 
     data->omf.dontdiff_mask = 3;
 
-    // Modeling uses a default server version, which is not related to any server it might have
-    // reverse engineered content from, nor where it was sync'ed to. So we have to mimic this here.
-    std::string target_version = bec::GRTManager::get()->get_app_option_string("DefaultTargetMySQLVersion");
-    if (target_version.empty())
-      target_version = "8.0.16";
-    data->tester->getRdbms()->version(parse_version(target_version));
+    data->tester->getRdbms()->version(parse_version("8.0.16"));
   }
 
   static void TearDownTestSuite() {
@@ -213,9 +208,9 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32327) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  EXPECT_EQ(script.find("DROP PRIMARY KEY"), std::string::npos) << script;
-  EXPECT_EQ(script.find("ADD PRIMARY KEY"), std::string::npos) << script;
-  EXPECT_EQ(script.find("mypk"), std::string::npos) << script;
+  EXPECT_EQ(script.find("DROP PRIMARY KEY"), std::string::npos);
+  EXPECT_EQ(script.find("ADD PRIMARY KEY"), std::string::npos);
+  EXPECT_EQ(script.find("mypk"), std::string::npos);
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32330) {

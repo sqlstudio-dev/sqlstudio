@@ -22,6 +22,30 @@ and feature ideas are handled through the GitHub repository.
 
 ## Native SQL Editor Tests
 
+The Windows runner saves Google Test XML results under
+`testing\test-suite\TestResults\<Platform>\<Configuration>\last-test-results.xml`,
+including failed runs. To rerun only suites that failed in the previous run:
+
+```powershell
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -RerunFailed
+```
+
+This reruns whole suites, including suite setup/teardown failures, not just failed
+test cases. A passing previous run does not launch tests. Missing or invalid
+reports produce an explicit error. Each execution replaces the previous results;
+listing tests leaves them unchanged. Failed-suite names are also saved immediately
+to `failed-suites.txt` in the same directory. If a later test crashes or the run
+is interrupted before XML is written, `-RerunFailed` uses those recorded failures.
+Tests interrupted before reporting a failure cannot be inferred. History is kept
+outside the build output so rebuilding does not remove it.
+Do not combine `-RerunFailed` with `--gtest_filter` or `--gtest_list_tests`.
+Custom reports save history when using `--gtest_output=xml:<file.xml>`; other
+output formats still run using console failure history with a warning. Relative XML
+paths are based on `testing\test-suite`. Google Test reports only the last
+iteration when repeating tests, so failure history has that same limitation.
+Runner regression checks (no build required):
+`powershell -NoProfile -File .\testing\test-suite\compile.tests.ps1`.
+
 On Windows, run the schema-tree and metadata-fetching unit tests with:
 
 ```powershell
@@ -71,6 +95,8 @@ For offline SQL synchronization regressions, use
 `--gtest_filter=db_mysql_plugin_testTest.*`. These tests check generated DDL
 operations, routine delimiters, view placeholders, and in-memory model changes.
 They require built application runtime resources but no MySQL connection.
+The fixture explicitly targets MySQL 8.0.16 so saved application preferences
+cannot change version-dependent index-generation expectations.
 They no longer execute SQL or reverse-engineer a server, so they do not prove
 server acceptance or schema round-trip equivalence.
 
@@ -92,6 +118,19 @@ propagation without using database environment variables or connecting to MySQL.
 They do not verify server transactions, live connection IDs, or KILL behavior.
 Keep the test-only connector mock signatures aligned with the bundled interfaces;
 methods added by newer connector releases deliberately omit `override`.
+
+Additional offline regressions can be selected with these suite filters:
+
+- `CompactSidebar.*:HomeWelcomeLayout.*`: resource-backed layout checks, including
+  Windows DPI/zoom and first-paint geometry. Run from the test-suite directory
+  (the runner does this automatically); images resolve to the repository assets.
+- `GRTCppModulesTest.*:GRTWrapperStandaloneTest.*`: module registration and wrapper
+  contracts. Each module test registers its own prerequisites and runs independently.
+- `SqlStringTest.*:SyncDiffTest.*:TableEditorInsertsBackendTest.*`: SQL formatting,
+  catalog synchronization, and model INSERT storage. Sync comparisons normalize
+  CRLF but compare the entire script; failures report sizes instead of SQL text.
+- `WbModuleTestsForSqlStudioTest.*`: OS-name matching against the current
+  application support list, not historical platform support.
 
 ## C/C++ Formatting
 

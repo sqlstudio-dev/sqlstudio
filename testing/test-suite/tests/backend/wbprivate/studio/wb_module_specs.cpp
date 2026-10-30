@@ -55,6 +55,7 @@ TEST_F(WbModuleTestsForSqlStudioTest, SupportedOsTest) {
 
   // proxy function for a module call
   grt::Module* module = grt::GRT::get()->get_module("SqlStudio");
+  ASSERT_NE(nullptr, module);
   auto isOsSupportedProxy = [module](std::string const& os) -> bool {
     grt::StringListRef arguments(grt::Initialized);
     arguments.ginsert(grt::StringRef(os));
@@ -73,8 +74,9 @@ TEST_F(WbModuleTestsForSqlStudioTest, SupportedOsTest) {
   EXPECT_FALSE(isOsSupportedProxy("Windows"));
   EXPECT_FALSE(isOsSupportedProxy("Windows 98"));
   EXPECT_FALSE(isOsSupportedProxy("..... Windows 98 ....."));
-  EXPECT_TRUE(isOsSupportedProxy("Windows 10"));
-  EXPECT_TRUE(isOsSupportedProxy("..... Windows 10 ....."));
+  EXPECT_FALSE(isOsSupportedProxy("Windows 10"));
+  EXPECT_FALSE(isOsSupportedProxy("..... Windows 10 ....."));
+  EXPECT_TRUE(isOsSupportedProxy("Microsoft Windows 10 Pro"));
   EXPECT_FALSE(isOsSupportedProxy("..... Windows ..... 10 ....."));
   EXPECT_TRUE(isOsSupportedProxy("..... Windows 11 ....."));
   EXPECT_FALSE(isOsSupportedProxy("..... Windows ..... 11 ....."));
@@ -124,9 +126,9 @@ TEST_F(WbModuleTestsForSqlStudioTest, SupportedOsTest) {
   EXPECT_FALSE(isOsSupportedProxy("..... Red Hat Enterprise Linux release 8 ....."));
   EXPECT_FALSE(isOsSupportedProxy("Red Hat Enterprise Linux release 8.0"));
   EXPECT_FALSE(isOsSupportedProxy("..... Red Hat Enterprise Linux release 8.0"));
-  EXPECT_TRUE(isOsSupportedProxy("..... Red Hat Enterprise Linux release 9 ....."));
-  EXPECT_TRUE(isOsSupportedProxy("Red Hat Enterprise Linux release 9.0"));
-  EXPECT_TRUE(isOsSupportedProxy("..... Red Hat Enterprise Linux release 9.0"));
+  EXPECT_FALSE(isOsSupportedProxy("..... Red Hat Enterprise Linux release 9 ....."));
+  EXPECT_FALSE(isOsSupportedProxy("Red Hat Enterprise Linux release 9.0"));
+  EXPECT_FALSE(isOsSupportedProxy("..... Red Hat Enterprise Linux release 9.0"));
 
   // mac
   EXPECT_FALSE(isOsSupportedProxy("Mac OS"));
@@ -172,6 +174,8 @@ TEST_F(WbModuleTestsForSqlStudioTest, SupportedOsTest) {
   EXPECT_FALSE(isOsSupportedProxy("Fedora release 36 x86_64"));
   EXPECT_FALSE(isOsSupportedProxy("Fedora release 37 x86_64"));
   EXPECT_FALSE(isOsSupportedProxy("Fedora release 38 x86_64"));
-  EXPECT_TRUE(isOsSupportedProxy("Fedora release 39 x86_64"));
-  EXPECT_TRUE(isOsSupportedProxy("Fedora release 40 x86_64"));
+  EXPECT_FALSE(isOsSupportedProxy("Fedora release 39 x86_64"));
+  EXPECT_FALSE(isOsSupportedProxy("Fedora release 40 x86_64"));
+  EXPECT_TRUE(isOsSupportedProxy("Fedora release 44 x86_64"));
+  EXPECT_TRUE(isOsSupportedProxy("Fedora release 45 x86_64"));
 }

@@ -43,6 +43,9 @@ Arguments forwarded to studio.testing.exe when Action=run.
 .PARAMETER SkipBuild
 Skip build/preparation steps when Action=run or Action=test.
 
+.PARAMETER RerunFailed
+Run only suites with failures in the previous XML report for this configuration.
+
 .PARAMETER Help
 Print script usage text.
 
@@ -77,6 +80,7 @@ param(
     [int]$Jobs = [Math]::Max(1, [Environment]::ProcessorCount),
     [string[]]$TestArgs = @(),
     [switch]$SkipBuild,
+    [switch]$RerunFailed,
     [Alias("h", "?")]
     [switch]$Help
 )
@@ -114,6 +118,7 @@ function Show-Usage {
     Write-Host "  -Jobs <n>                         Default: CPU count" -ForegroundColor Gray
     Write-Host "  -TestArgs <args>                  Extra args passed to studio.testing.exe" -ForegroundColor Gray
     Write-Host "  -SkipBuild                        For -Action run or -Action test" -ForegroundColor Gray
+    Write-Host "  -RerunFailed                      Run suites that failed in the previous run" -ForegroundColor Gray
     Write-Host "  -Help                             Show this text" -ForegroundColor Gray
     Write-Host "" 
     Write-Host "Notes:" -ForegroundColor Yellow
@@ -123,6 +128,7 @@ function Show-Usage {
     Write-Host "  .\testing\test-suite\compile.ps1 -Action build -Configuration Debug" -ForegroundColor Green
     Write-Host "  .\testing\test-suite\compile.ps1 -Action run -Configuration Debug -TestArgs --gtest_filter=*mysqlcanvas*" -ForegroundColor Green
     Write-Host "  .\testing\test-suite\compile.ps1 -Action test -Configuration Debug" -ForegroundColor Green
+    Write-Host "  .\testing\test-suite\compile.ps1 -Action test -SkipBuild -RerunFailed" -ForegroundColor Green
 }
 
 function Get-VSWhere {
@@ -225,12 +231,20 @@ function Get-DefaultBundleDir {
     throw "Could not find a 3rd-party bundle directory. Pass -BundleDir or set MSS_3DPARTY_PATH."
 }
 
-function Invoke-LoggedCommand([string]$Label, [string]$FilePath, [string[]]$Arguments, [string]$WorkingDirectory) {
+function Invoke-LoggedCommand([string]$Label, [string]$FilePath, [string[]]$Arguments, [string]$WorkingDirectory,
+                              [scriptblock]$OutputHandler) {
     Write-Info ("{0}: {1} {2}" -f $Label, $FilePath, ($Arguments -join " "))
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     Push-Location $WorkingDirectory
     try {
-        & $FilePath @Arguments
+        if ($OutputHandler) {
+            & $FilePath @Arguments | ForEach-Object {
+                & $OutputHandler ([string]$_)
+                $_
+            }
+        } else {
+            & $FilePath @Arguments
+        }
         $exitCode = $LASTEXITCODE
         if ($null -eq $exitCode) { $exitCode = 0 }
     }
@@ -293,6 +307,43 @@ function Get-TestExecutablePath {
     return Join-Path $script:ScriptDir ("bin\{0}\{1}\studio.testing.exe" -f $Platform, $Configuration)
 }
 
+function Get-FailedSuiteFilter([string]$ReportPath) {
+    if (-not (Test-Path -LiteralPath $ReportPath -PathType Leaf)) {
+        throw "No previous test report was found: $ReportPath. Run tests once without -RerunFailed."
+    }
+
+    $report = New-Object System.Xml.XmlDocument
+    $report.XmlResolver = $null
+    $report.Load($ReportPath)
+    if ($report.DocumentElement.LocalName -ne "testsuites") {
+        throw "Invalid Google Test XML report: $ReportPath"
+    }
+
+    $failedSuites = @($report.SelectNodes("/testsuites/testsuite") | Where-Object {
+        $_.SelectNodes("testcase/failure | testcase/error").Count -gt 0 -or
+        [int]$_.GetAttribute("failures") -gt 0 -or [int]$_.GetAttribute("errors") -gt 0
+    } | ForEach-Object {
+        $name = $_.GetAttribute("name")
+        if ($name -eq "NonTestSuiteFailure" -or $name -notmatch '^[A-Za-z0-9_/]+$') {
+            throw "Failure '$name' cannot be selected as a test suite. Run tests without -RerunFailed."
+        }
+        "$name.*"
+    } | Sort-Object -Unique)
+    return $failedSuites -join ":"
+}
+
+function Save-FailedSuite([string]$Line, [string]$Path) {
+    if ($Line -match '^\[\s*FAILED\s*\]\s+([A-Za-z0-9_/]+)(?:\.[^\s]+|:\s+SetUpTestSuite|:\s+TearDownTestSuite)') {
+        $suite = $Matches[1]
+        if ($suite -eq "NonTestSuiteFailure") {
+            throw "A global test-environment failure cannot be rerun as an individual suite."
+        }
+        if (@(Get-Content -LiteralPath $Path) -notcontains $suite) {
+            Add-Content -LiteralPath $Path -Value $suite
+        }
+    }
+}
+
 function Run-TestSuite {
     $testExe = Get-TestExecutablePath
     if (-not (Test-Path -LiteralPath $testExe -PathType Leaf)) {
@@ -301,9 +352,101 @@ function Run-TestSuite {
 
     $studioOutputDir = Join-Path $script:ProjectRoot ("bin\{0}\{1}" -f $Platform, $Configuration)
     $testOutputDir = Join-Path $script:ScriptDir ("bin\{0}\{1}" -f $Platform, $Configuration)
+    $historyDir = Join-Path $script:ScriptDir ("TestResults\{0}\{1}" -f $Platform, $Configuration)
+    $historyPath = Join-Path $historyDir "last-test-results.xml"
+    $failurePath = Join-Path $historyDir "failed-suites.txt"
+    $reportPath = Join-Path $testOutputDir "current-test-results.xml"
+    $arguments = @($TestArgs)
+    if ($RerunFailed) {
+        if (@($arguments | Where-Object { $_ -match '^--gtest_(filter|list_tests)(=|$)' }).Count -gt 0) {
+            throw "-RerunFailed cannot be combined with --gtest_filter or --gtest_list_tests."
+        }
+        if (Test-Path -LiteralPath $historyPath -PathType Leaf) {
+            $filter = Get-FailedSuiteFilter -ReportPath $historyPath
+        } elseif (Test-Path -LiteralPath $failurePath -PathType Leaf) {
+            $suites = @(Get-Content -LiteralPath $failurePath | Where-Object { $_ })
+            if ($suites.Count -eq 0) {
+                throw "The previous run produced no XML and recorded no completed failures. Run tests without -RerunFailed."
+            }
+            foreach ($suite in $suites) {
+                if ($suite -notmatch '^[A-Za-z0-9_/]+$') {
+                    throw "Invalid suite name in failure history: $failurePath"
+                }
+            }
+            $filter = ($suites | Sort-Object -Unique | ForEach-Object { "$_.*" }) -join ":"
+            Write-Warn "The previous run did not finish its XML report; rerunning failures recorded before it stopped."
+        } else {
+            throw "No previous test report was found: $historyPath. Run tests once without -RerunFailed."
+        }
+        if (-not $filter) {
+            Write-Ok "The previous run had no failed test suites. Nothing to rerun."
+            return
+        }
+        $arguments += "--gtest_filter=$filter"
+    }
+
+    $listing = @($arguments | Where-Object { $_ -match '^--gtest_list_tests(=|$)' }).Count -gt 0
+    $trackResults = -not $listing
+    $outputArgs = @($arguments | Where-Object { $_ -match '^--gtest_output=' })
+    if ($outputArgs.Count -gt 1) {
+        throw "Pass --gtest_output at most once."
+    }
+    if ($outputArgs.Count -eq 1) {
+        if ($outputArgs[0] -match '^--gtest_output=xml:(.+\.xml)$') {
+            $reportPath = $Matches[1]
+            if (-not [System.IO.Path]::IsPathRooted($reportPath)) {
+                $reportPath = Join-Path $script:ScriptDir $reportPath
+            }
+            $reportPath = [System.IO.Path]::GetFullPath($reportPath)
+        } else {
+            $trackResults = $false
+            if (-not $listing) {
+                Write-Warn "Full results require --gtest_output=xml:<file.xml>; this run will record console failures only."
+            }
+        }
+    } elseif (-not $listing) {
+        $arguments += "--gtest_output=xml:$reportPath"
+    }
+    if ($trackResults) {
+        New-Item -ItemType Directory -Path (Split-Path -Parent $reportPath) -Force | Out-Null
+        if (Test-Path -LiteralPath $reportPath) {
+            Remove-Item -LiteralPath $reportPath
+        }
+        if (-not $listing) {
+            New-Item -ItemType Directory -Path $historyDir -Force | Out-Null
+            if (Test-Path -LiteralPath $historyPath) {
+                Remove-Item -LiteralPath $historyPath
+            }
+            Set-Content -LiteralPath $failurePath -Value "" -Encoding UTF8
+            Write-Info "Recording failed suites: $failurePath"
+        }
+    }
     $env:PATH = "$testOutputDir;$studioOutputDir;$($script:BundleDir)\bin;$($script:BundleDir)\lib;$($script:BundleDir)\debug\lib;$env:PATH"
 
-    Invoke-LoggedCommand -Label "run studio.testing" -FilePath $testExe -Arguments $TestArgs -WorkingDirectory $script:ScriptDir
+    try {
+        $outputHandler = $null
+        if (-not $listing) {
+            $outputHandler = { param($line) Save-FailedSuite -Line $line -Path $failurePath }
+        }
+        Invoke-LoggedCommand -Label "run studio.testing" -FilePath $testExe -Arguments $arguments -WorkingDirectory $script:ScriptDir -OutputHandler $outputHandler
+    }
+    finally {
+        if (-not $listing) {
+            if ($trackResults -and (Test-Path -LiteralPath $reportPath -PathType Leaf)) {
+                if ($reportPath -ne $historyPath) {
+                    Copy-Item -LiteralPath $reportPath -Destination $historyPath -Force
+                }
+                Write-Info "Test results saved: $historyPath"
+            } else {
+                if (Test-Path -LiteralPath $historyPath) {
+                    Remove-Item -LiteralPath $historyPath
+                }
+                if ($trackResults) {
+                    Write-Warn "No XML report was produced. Completed failures remain recorded in $failurePath; unfinished tests cannot be inferred."
+                }
+            }
+        }
+    }
 }
 
 function Test-IsTestBuildUpToDate {
@@ -334,6 +477,10 @@ function Invoke-Testing {
 if ($Help) {
     Show-Usage
     exit 0
+}
+
+if ($RerunFailed -and $Action -eq "build") {
+    throw "-RerunFailed requires -Action run or -Action test."
 }
 
 if (-not (Test-Path -LiteralPath $script:ProjectPath -PathType Leaf)) {

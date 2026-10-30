@@ -230,13 +230,7 @@ namespace {
     test_result.append(base::sqlstring("!", base::QuoteOnlyIfNeeded) << long_random_string.c_str());
 
     quoted = base::escape_backticks(long_random_string.c_str());
-    if (quoted == long_random_string.c_str())
-      temp_long_random_string.append(quoted);
-    else {
-      temp_long_random_string.append(quoted);
-      temp_long_random_string.insert(0, "`");
-      temp_long_random_string.insert(temp_long_random_string.size(), "`");
-    }
+    temp_long_random_string = base::quoteIdentifierIfNeeded(quoted, '`', base::MySQLVersion::MySQL57);
 
     EXPECT_EQ(test_result, temp_long_random_string);
 

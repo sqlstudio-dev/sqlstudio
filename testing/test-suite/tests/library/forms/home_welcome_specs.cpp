@@ -5,6 +5,7 @@
 #include "stub/stub_mforms.h"
 #include <cmath>
 #include <vector>
+#include <filesystem>
 
 #ifdef _MSC_VER
 #include <cairo/cairo-win32.h>
@@ -15,6 +16,8 @@ int welcomeWidth = 1600;
 int welcomeHeight = 600;
 
 TEST(HomeWelcomeLayout, FirstPaintFitsAllContentWithoutRelayout) {
+  const auto imageDir = std::filesystem::absolute(std::filesystem::path("..") / ".." / "images" / "home").u8string();
+  ASSERT_TRUE(std::filesystem::exists(std::filesystem::path(imageDir) / "home_screen_close_light.png"));
   mforms::stub::init(nullptr);
   auto factory = mforms::ControlFactory::get_instance();
   auto originalView = factory->_view_impl;
@@ -28,7 +31,11 @@ TEST(HomeWelcomeLayout, FirstPaintFitsAllContentWithoutRelayout) {
   factory->_view_impl.get_width = [](const mforms::View *) { return welcomeWidth; };
   factory->_view_impl.get_height = [](const mforms::View *) { return welcomeHeight; };
   factory->_app_impl.backing_scale_factor = [](mforms::App *) { return 1.0f; };
-  factory->_app_impl.get_resource_path = [](mforms::App *, const std::string &name) { return "images/home/" + name; };
+  static std::string resourceDir;
+  resourceDir = imageDir;
+  factory->_app_impl.get_resource_path = [](mforms::App *, const std::string &name) {
+    return (std::filesystem::path(resourceDir) / name).u8string();
+  };
 
   const bool nativeSurfaces[] = {false,
 #ifdef _MSC_VER

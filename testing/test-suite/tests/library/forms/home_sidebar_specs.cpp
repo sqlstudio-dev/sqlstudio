@@ -5,6 +5,7 @@
 #include "mforms/utilities.h"
 #include "stub/stub_mforms.h"
 #include <cmath>
+#include <filesystem>
 
 #ifdef _MSC_VER
 namespace {
@@ -13,6 +14,8 @@ int sidebarHeight = 400;
 float screenScale = 1.5f;
 
 TEST(CompactSidebar, IconsHavePaddingAndHitAreasFollowDpiAndZoom) {
+  const auto imageDir = std::filesystem::absolute(std::filesystem::path("..") / ".." / "images" / "home").u8string();
+  ASSERT_TRUE(std::filesystem::exists(std::filesystem::path(imageDir) / "sidebar_wb.png"));
   mforms::stub::init(nullptr);
   auto factory = mforms::ControlFactory::get_instance();
   auto originalView = factory->_view_impl;
@@ -27,7 +30,11 @@ TEST(CompactSidebar, IconsHavePaddingAndHitAreasFollowDpiAndZoom) {
   factory->_view_impl.get_width = [](const mforms::View *) { return sidebarWidth; };
   factory->_view_impl.get_height = [](const mforms::View *) { return sidebarHeight; };
   factory->_app_impl.backing_scale_factor = [](mforms::App *) { return screenScale; };
-  factory->_app_impl.get_resource_path = [](mforms::App *, const std::string &name) { return "images/home/" + name; };
+  static std::string resourceDir;
+  resourceDir = imageDir;
+  factory->_app_impl.get_resource_path = [](mforms::App *, const std::string &name) {
+    return (std::filesystem::path(resourceDir) / name).u8string();
+  };
 
   for (int dpi : {96, 120, 144, 168, 192}) for (double zoom : {1.0, 1.5}) {
     screenScale = dpi / 96.0f;
@@ -62,8 +69,6 @@ TEST(CompactSidebar, IconsHavePaddingAndHitAreasFollowDpiAndZoom) {
       entry->accessibilityDoDefaultAction();
     }
     EXPECT_EQ(3, clicks);
-    if (dpi == 144 && zoom == 1.0)
-      EXPECT_EQ(CAIRO_STATUS_SUCCESS, cairo_surface_write_to_png(surface, "build/compact-sidebar-144dpi.png"));
     cairo_destroy(cr);
     cairo_surface_destroy(surface);
   }
