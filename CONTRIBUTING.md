@@ -60,6 +60,13 @@ For SQL-to-model diff/apply tests, use
 to the `all_objects.mwb` model fixture in memory. It requires the built application
 runtime resources, but does not connect to MySQL or execute SQL against a server.
 
+For forward-engineering SQL export tests, use
+`--gtest_filter=ForwardEngineerTest.*`. These tests initialize the application
+runtime, load SqlStudio model fixtures, and compare generated SQL with the checked-in
+expected scripts without connecting to MySQL.
+The export target is pinned to MySQL 8.0, matching the expected index-visibility
+syntax. Comparisons normalize CRLF to LF but otherwise require exact SQL output.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:
