@@ -34,6 +34,18 @@ schema, column, index, trigger and foreign-key processing without connecting to 
 creating databases, loading application runtime XML, or waiting for background work.
 It does not cover live connector behavior or the complete SQL editor UI.
 
+For model-document integration tests, use:
+
+```powershell
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=SqlStudio_model_document_integration_testsTest.*'
+```
+
+These tests require the built application runtime resources. Their fixture and
+runtime paths are resolved before model operations can change the working directory,
+and the test context creates the output directory for saved models. The model
+fixtures used by this suite use the SqlStudio format marker and `studio.*` class
+names; this does not add support for opening legacy MySQL Workbench documents.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:

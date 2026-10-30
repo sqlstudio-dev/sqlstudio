@@ -127,18 +127,8 @@ namespace {
     MetadataFixture metadata;
     std::unique_ptr<mforms::TreeView> view;
     std::shared_ptr<SqlEditorTreeController> controller;
-    grt::ValueRef previous_wb;
 
     void SetUp() override {
-      previous_wb = grt::GRT::get()->get("/wb");
-      auto wb = grt::DictRef(true);
-      auto options = grt::DictRef(true);
-      auto values = grt::DictRef(true);
-      values.set("SqlEditor:AutoFetchColumnInfo", grt::IntegerRef(0));
-      options.set("options", values);
-      wb.set("options", options);
-      grt::GRT::get()->set("/wb", wb);
-
       mforms::stub::init(nullptr);
       view = std::make_unique<mforms::TreeView>(
         mforms::TreeNoColumns | mforms::TreeNoBorder | mforms::TreeSidebar | mforms::TreeNoHeader);
@@ -155,7 +145,6 @@ namespace {
       EXPECT_EQ(metadata.active_sessions, 0);
       controller.reset();
       view.reset();
-      grt::GRT::get()->set("/wb", previous_wb);
     }
 
     Tree *tree() { return controller->get_schema_tree(); }

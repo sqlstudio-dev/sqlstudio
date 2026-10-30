@@ -25,6 +25,7 @@
 #include "context.h"
 #include <fstream>
 #include <stdexcept>
+#include <filesystem>
 #include "rapidjson/document.h"
 
 // Helper: load a JSON file if present.
@@ -45,7 +46,8 @@ void load_json_config(const std::string& path, rapidjson::Document& doc) {
 namespace testing {
 
   Context::Context() {
-    _baseDir = ".."; // TODO: inject actual base directory.
+    _baseDir = std::filesystem::absolute("..").lexically_normal().u8string();
+    std::filesystem::create_directories(outputDir());
     auto* doc = new rapidjson::Document(rapidjson::kObjectType);
     load_json_config(_baseDir + "/test-config.json", *doc);
     _configuration_impl = doc;

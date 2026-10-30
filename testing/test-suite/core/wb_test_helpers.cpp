@@ -24,6 +24,7 @@
  */
 
 #include "base/log.h"
+#include <filesystem>
 #include "helpers.h"
 
 #include "grtdb/db_helpers.h"
@@ -160,7 +161,7 @@ SqlStudioTester::SqlStudioTester(bool initPython, const base::Size &apage_size,
   else
     configuration = "Release_OSS";
 
-  wboptions->basedir = "../../bin/x64/" + configuration;
+  wboptions->basedir = std::filesystem::absolute("../../bin/x64/" + configuration).lexically_normal().u8string();
 
   // This code was added to setup the python environment
   TCHAR szPath[MAX_PATH];
@@ -225,6 +226,7 @@ SqlStudioTester::~SqlStudioTester() {
   wbui->finalize();
   wbui->cleanUp();
   wb = nullptr;
+  bec::GRTManager::get()->set_app_option_slots({}, {});
 
   SqlStudioTester::reinitGRT();
 }

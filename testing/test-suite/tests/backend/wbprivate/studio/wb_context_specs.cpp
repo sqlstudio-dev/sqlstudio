@@ -96,7 +96,7 @@ protected:
 
   static void SetUpTestSuite() {
     data = std::make_unique<WbContextData>();
-        data->tester.reset(new SqlStudioTester());
+    data->tester.reset(new SqlStudioTester());
     data->tester->initializeRuntime();
 
     // Modeling uses a default server version, which is not related to any server it might have
@@ -129,7 +129,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Test_creating_new_documen
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Test_loading_documents) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/test_model_xml.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/test_model_xml.mwb"));
 
   studio_SqlStudioRef root(data->tester->wb->get_root());
 
@@ -159,12 +159,12 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Saving_and_loading_of_a_d
   EXPECT_EQ(data->tester->wb->get_document()->physicalModels()[0]->diagrams()[0]->figures().count(), 1U);
   EXPECT_EQ(data->tester->wb->get_document()->physicalModels()[0]->diagrams()[0]->rootLayer()->figures().count(), 1U);
   data->tester->syncView();
-  EXPECT_TRUE(data->tester->wb->save_as(data->outputDir + "/test1_doc.mwb"));
+  ASSERT_TRUE(data->tester->wb->save_as(data->outputDir + "/test1_doc.mwb"));
 
   EXPECT_TRUE(data->tester->closeDocument());
   data->tester->wb->close_document_finish();
 
-  EXPECT_TRUE(data->tester->wb->open_document(data->outputDir + "/test1_doc.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->outputDir + "/test1_doc.mwb"));
 
   EXPECT_EQ(data->tester->wb->get_document()->physicalModels().count(), 1U);
   EXPECT_EQ(data->tester->wb->get_document()->physicalModels()[0]->diagrams().count(), 1U);
@@ -192,11 +192,11 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_opening_a_model_with_
 
   EXPECT_EQ(view->selection().count(), 1U);
 
-  data->tester->wb->save_as(data->outputDir + "/test4.mwb");
+  ASSERT_TRUE(data->tester->wb->save_as(data->outputDir + "/test4.mwb"));
   EXPECT_TRUE(data->tester->closeDocument());
   data->tester->wb->close_document_finish();
 
-  EXPECT_TRUE(data->tester->wb->open_document(data->outputDir + "/test4.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->outputDir + "/test4.mwb"));
 
   view = data->tester->getPmodel()->diagrams()[0];
 
@@ -210,7 +210,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_opening_a_model_with_
 TEST_F(SqlStudio_model_document_integration_testsTest, Bug_dragging_related_tables_to_the_view_wont_create_the_connection) {
   // test dragging the table with fk 1st
   {
-    EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
+    ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
     EXPECT_TRUE(data->tester->wb->get_document().is_valid());
     EXPECT_EQ(data->tester->getSchema()->tables().count(), 2U);
     EXPECT_EQ(data->tester->getPview()->figures().count(), 0U);
@@ -246,7 +246,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_dragging_related_tabl
 
   // test dragging the table with fk last
   {
-    EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
+    ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
     EXPECT_TRUE(data->tester->wb->get_document().is_valid());
     EXPECT_EQ(data->tester->getSchema()->tables().count(), 2U);
     EXPECT_EQ(data->tester->getPview()->figures().count(), 0U);
@@ -277,7 +277,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_dragging_related_tabl
 
   // test dragging both tables
   {
-    EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
+    ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
     EXPECT_TRUE(data->tester->wb->get_document().is_valid());
     EXPECT_EQ(data->tester->getSchema()->tables().count(), 2U);
     EXPECT_EQ(data->tester->getPview()->figures().count(), 0U);
@@ -301,7 +301,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_dragging_related_tabl
 
   // test with a recursive relationship
   {
-    EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
+    ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
     EXPECT_TRUE(data->tester->wb->get_document().is_valid());
     EXPECT_EQ(data->tester->getSchema()->tables().count(), 2U);
     EXPECT_EQ(data->tester->getPview()->figures().count(), 0U);
@@ -330,7 +330,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_dragging_related_tabl
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Bug_deleting_tables_with_relationship_wont_delete_the_connection) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_1fk.mwb"));
   EXPECT_TRUE(data->tester->wb->get_document().is_valid());
   EXPECT_EQ(data->tester->getSchema()->tables().count(), 2U);
   EXPECT_EQ(data->tester->getPview()->figures().count(), 0U);
@@ -510,7 +510,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_copy_paste_object_acr
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Bug_deleting_an_identifying_relationship_doesnt_delete_indexes) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/identifying_relationship.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/identifying_relationship.mwb"));
   data->tester->openAllDiagrams();
   data->tester->syncView();
 
@@ -537,7 +537,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_deleting_an_identifyi
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Delete_column_from_table) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/identifying_relationship.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/identifying_relationship.mwb"));
   data->tester->openAllDiagrams();
   data->tester->syncView();
 
@@ -621,7 +621,7 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Creation_of_a_simple_mode
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Bug_loading_a_model_with_layers_and_then_hitting_new_crashes) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_conn_layer.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/2tables_conn_layer.mwb"));
   EXPECT_TRUE(data->tester->closeDocument());
   data->tester->wb->close_document_finish();
   data->tester->wb->new_document();
@@ -634,17 +634,17 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Bug_loading_a_model_with_
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Bug_loading_model_twice_causes_bad_internal_state_in_GUI) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/sakila.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/sakila.mwb"));
   EXPECT_TRUE(data->tester->closeDocument());
   data->tester->wb->close_document_finish();
 
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/sakila.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/sakila.mwb"));
   EXPECT_TRUE(data->tester->closeDocument());
   data->tester->wb->close_document_finish();
 }
 
 TEST_F(SqlStudio_model_document_integration_testsTest, Bug_loading_a_model_with_selection_wont_reselect_the_items_in_the_canvas) {
-  EXPECT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/selected_table.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/selected_table.mwb"));
   data->tester->openAllDiagrams();
   data->tester->syncView();
 
@@ -674,12 +674,12 @@ TEST_F(SqlStudio_model_document_integration_testsTest, Stored_note_management) {
   set_note_content(data->tester->getPmodel()->notes().get(0), "hello world");
   std::string filename = data->tester->getPmodel()->notes().get(0)->filename();
 
-  data->tester->wb->save_as(data->outputDir + "/notetest.mwb");
+  ASSERT_TRUE(data->tester->wb->save_as(data->outputDir + "/notetest.mwb"));
   EXPECT_TRUE(data->tester->closeDocument());
   data->tester->wb->close_document_finish();
 
   // check if stored on disk
-  EXPECT_TRUE(data->tester->wb->open_document(data->outputDir + "/notetest.mwb"));
+  ASSERT_TRUE(data->tester->wb->open_document(data->outputDir + "/notetest.mwb"));
 
   EXPECT_EQ(data->tester->getPmodel()->notes().count(), 1U);
   EXPECT_EQ(*data->tester->getPmodel()->notes().get(0)->filename(), filename);
