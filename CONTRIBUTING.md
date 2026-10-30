@@ -80,6 +80,10 @@ do not affect stored definitions. Catalog comparisons remain exact; SQL-definiti
 failures report the member path, lengths, and first differing byte instead of SQL.
 These tests do not write generated catalog XML into the fixture directories.
 
+For SQL editor context-help tests, use `--gtest_filter=SqlEditorHelpTest.*`.
+Topic entries use inclusive lower and exclusive upper version bounds. The main
+cases target MySQL 8.0.0, with additional checks on both sides of that boundary.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:
