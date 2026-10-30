@@ -240,7 +240,6 @@ function Invoke-LoggedCommand([string]$Label, [string]$FilePath, [string[]]$Argu
         if ($OutputHandler) {
             & $FilePath @Arguments | ForEach-Object {
                 & $OutputHandler ([string]$_)
-                $_
             }
         } else {
             & $FilePath @Arguments
@@ -258,6 +257,23 @@ function Invoke-LoggedCommand([string]$Label, [string]$FilePath, [string[]]$Argu
     }
 
     Write-Ok ("{0} ({1:n1}s)" -f $Label, $sw.Elapsed.TotalSeconds)
+}
+
+function Write-TestOutput([string]$Line, [bool]$UseColor = $true) {
+    if ($UseColor -and $Line -match '^(\[\s*(OK|PASSED|RUN|FAILED|SKIPPED|==========|----------)\s*\])(.*)$') {
+        $marker = $Matches[1]
+        $status = $Matches[2]
+        $remainder = $Matches[3]
+        $color = switch ($status) {
+            "FAILED" { "Red" }
+            "SKIPPED" { "Yellow" }
+            default { "Green" }
+        }
+        Write-Host $marker -ForegroundColor $color -NoNewline
+        Write-Host $remainder
+    } else {
+        Write-Host $Line
+    }
 }
 
 function Build-TestSuite {
@@ -426,7 +442,16 @@ function Run-TestSuite {
     try {
         $outputHandler = $null
         if (-not $listing) {
-            $outputHandler = { param($line) Save-FailedSuite -Line $line -Path $failurePath }
+            $colorMode = $env:GTEST_COLOR
+            foreach ($argument in $arguments) {
+                if ($argument -match '^--gtest_color=(.*)$') { $colorMode = $Matches[1] }
+            }
+            $useColor = $colorMode -notin @("no", "false", "0")
+            $outputHandler = {
+                param($line)
+                Save-FailedSuite -Line $line -Path $failurePath
+                Write-TestOutput -Line $line -UseColor $useColor
+            }
         }
         Invoke-LoggedCommand -Label "run studio.testing" -FilePath $testExe -Arguments $arguments -WorkingDirectory $script:ScriptDir -OutputHandler $outputHandler
     }

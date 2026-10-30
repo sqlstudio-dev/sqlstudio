@@ -26,6 +26,42 @@ function Assert-Throws([scriptblock]$Action, [string]$Expected) {
     Assert-True ($message -like "*$Expected*") "Expected '$Expected', got '$message'"
 }
 
+$script:HostWrites = @()
+function Write-Host {
+    param($Object, $ForegroundColor, [switch]$NoNewline)
+    $script:HostWrites += [pscustomobject]@{
+        Text = [string]$Object
+        Color = [string]$ForegroundColor
+        NoNewline = [bool]$NoNewline
+    }
+}
+try {
+    foreach ($case in @(
+        @("[       OK ] Suite.Test (1 ms)", "Green"),
+        @("[  PASSED  ] 2 tests.", "Green"),
+        @("[ RUN      ] Suite.Test", "Green"),
+        @("[  FAILED  ] Suite.Test", "Red"),
+        @("[  SKIPPED ] Suite.Test", "Yellow"),
+        @("[----------] 2 tests from Suite", "Green"),
+        @("[==========] Running 2 tests.", "Green")
+    )) {
+        $script:HostWrites = @()
+        Write-TestOutput -Line $case[0]
+        Assert-True ($script:HostWrites[0].Color -eq $case[1]) "Incorrect test status color"
+        Assert-True ($script:HostWrites[0].NoNewline) "Status prefix must share its output line"
+        Assert-True (($script:HostWrites.Text -join "") -eq $case[0]) "Colored output changed test text"
+    }
+    $script:HostWrites = @()
+    Write-TestOutput -Line "[       OK ] Suite.Test" -UseColor $false
+    Assert-True ($script:HostWrites.Count -eq 1 -and $script:HostWrites[0].Color -eq "") "Color opt-out was ignored"
+    $script:HostWrites = @()
+    Write-TestOutput -Line "Diagnostic text"
+    Assert-True ($script:HostWrites[0].Text -eq "Diagnostic text" -and $script:HostWrites[0].Color -eq "") "Diagnostics changed"
+}
+finally {
+    Remove-Item Function:\Write-Host
+}
+
 function Invoke-LoggedCommand {
     param($Label, $FilePath, [string[]]$Arguments, $WorkingDirectory, [scriptblock]$OutputHandler)
     $script:Invocations++

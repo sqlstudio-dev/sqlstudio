@@ -38,6 +38,9 @@ to `failed-suites.txt` in the same directory. If a later test crashes or the run
 is interrupted before XML is written, `-RerunFailed` uses those recorded failures.
 Tests interrupted before reporting a failure cannot be inferred. History is kept
 outside the build output so rebuilding does not remove it.
+While recording output, the runner preserves colored Google Test status markers:
+green for success/progress, red for failures, and yellow for skips.
+Use `--gtest_color=no` (or `GTEST_COLOR=no`) to disable these colors.
 Do not combine `-RerunFailed` with `--gtest_filter` or `--gtest_list_tests`.
 Custom reports save history when using `--gtest_output=xml:<file.xml>`; other
 output formats still run using console failure history with a warning. Relative XML
