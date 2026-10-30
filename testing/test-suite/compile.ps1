@@ -188,7 +188,11 @@ function Enter-VsEnvironment {
     Write-Info "Loading Visual Studio environment from $vsPath"
     Push-Location (Split-Path -Parent $vcVars)
     try {
-        cmd /c "`"$vcVars`" x64 >nul && set" | ForEach-Object {
+        $environment = cmd /c "`"$vcVars`" x64 >nul && set"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Visual Studio environment initialization failed (exit code $LASTEXITCODE)."
+        }
+        $environment | ForEach-Object {
             if ($_ -match "=") {
                 $parts = $_ -split "=", 2
                 [Environment]::SetEnvironmentVariable($parts[0], $parts[1], "Process")
@@ -351,7 +355,12 @@ $script:BundleDir = [System.IO.Path]::GetFullPath($BundleDir)
 [Environment]::SetEnvironmentVariable("MSS_3DPARTY_PATH", $script:BundleDir, "Process")
 [Environment]::SetEnvironmentVariable("WB_3DPARTY_LIB", $script:BundleDir, "Process")
 
-Enter-VsEnvironment
+if ($SkipBuild -and $Action -in @("run", "test")) {
+    $script:ResolvedPlatformToolset = Resolve-PlatformToolset -VsPath (Get-VSInstallPath)
+}
+else {
+    Enter-VsEnvironment
+}
 
 Write-Section "Configuration"
 Write-Info "Action            : $Action"

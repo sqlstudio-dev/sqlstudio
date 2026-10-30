@@ -33,6 +33,9 @@ uses an injected metadata session with canned query results: it exercises the re
 schema, column, index, trigger and foreign-key processing without connecting to MySQL,
 creating databases, loading application runtime XML, or waiting for background work.
 It does not cover live connector behavior or the complete SQL editor UI.
+The fixture initializes GRT's notification center itself, so the suite can run
+alone without another suite initializing the application first. `-SkipBuild`
+does not load the Visual Studio build environment when running tests.
 
 For model-document integration tests, use:
 

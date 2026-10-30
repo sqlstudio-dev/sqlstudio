@@ -129,6 +129,8 @@ namespace {
     std::shared_ptr<SqlEditorTreeController> controller;
 
     void SetUp() override {
+      // GRT installs the notification center used by the controller's observers.
+      grt::GRT::get();
       mforms::stub::init(nullptr);
       view = std::make_unique<mforms::TreeView>(
         mforms::TreeNoColumns | mforms::TreeNoBorder | mforms::TreeSidebar | mforms::TreeNoHeader);
