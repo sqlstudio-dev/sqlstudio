@@ -63,11 +63,28 @@ class MYSQLWBBACKEND_PUBLIC_FUNC SqlEditorTreeController :
   public std::enable_shared_from_this<SqlEditorTreeController> {
 #if defined(ENABLE_TESTING)
   friend class EditorFormTester;
-  friend class LocalEditorFormTester;
 #endif
+  friend class LocalEditorFormTester;
   friend class db_query_EditorConcreteImplData;
 
 public:
+  struct MetadataResult {
+    virtual ~MetadataResult() = default;
+    virtual bool next() = 0;
+    virtual std::string getString(unsigned int column) = 0;
+    virtual int getInt(unsigned int column) = 0;
+    virtual bool isNull(unsigned int column) = 0;
+  };
+
+  // A session keeps the connection lock and statement alive until its results have been consumed.
+  struct MetadataSession {
+    virtual ~MetadataSession() = default;
+    virtual std::unique_ptr<MetadataResult> schemata() = 0;
+    virtual std::unique_ptr<MetadataResult> query(const std::string &sql) = 0;
+    virtual bool supports_index_visibility() const = 0;
+  };
+  using MetadataSessionFactory = std::function<std::unique_ptr<MetadataSession>()>;
+
   static std::shared_ptr<SqlEditorTreeController> create(SqlEditorForm *owner);
   virtual ~SqlEditorTreeController();
 
@@ -75,9 +92,15 @@ public:
   void prepare_close();
 
 private:
-  SqlEditorTreeController(SqlEditorForm *owner);
+  // Allows metadata tests to supply query results without initializing an editor or opening connections.
+  static std::shared_ptr<SqlEditorTreeController> create(base::MySQLVersion version,
+                                                        MetadataSessionFactory metadata_session_factory,
+                                                        SqlEditorForm *owner);
+  SqlEditorTreeController(SqlEditorForm *owner, base::MySQLVersion version,
+                          MetadataSessionFactory metadata_session_factory);
 
   SqlEditorForm *_owner;
+  MetadataSessionFactory _metadata_session_factory;
 
   wb::AdvancedSidebar *_schema_side_bar;
   wb::SimpleSidebar *_admin_side_bar;

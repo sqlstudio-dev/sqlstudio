@@ -115,8 +115,59 @@ static const char *EXCEPTION_MSG_FORMAT = _("Error: %s");
 
 //----------------------------------------------------------------------------------------------------------------------
 
+namespace {
+  class SqlMetadataResult : public SqlEditorTreeController::MetadataResult {
+    std::unique_ptr<sql::ResultSet> _result;
+
+  public:
+    explicit SqlMetadataResult(sql::ResultSet *result) : _result(result) {
+    }
+
+    bool next() override { return _result->next(); }
+    std::string getString(unsigned int column) override { return _result->getString(column); }
+    int getInt(unsigned int column) override { return _result->getInt(column); }
+    bool isNull(unsigned int column) override { return _result->isNull(column); }
+  };
+
+  class SqlMetadataSession : public SqlEditorTreeController::MetadataSession {
+    sql::Dbc_connection_handler::Ref _connection;
+    base::RecMutexLock _lock;
+    std::unique_ptr<sql::Statement> _statement;
+    bool _supports_index_visibility;
+
+  public:
+    explicit SqlMetadataSession(SqlEditorForm *owner)
+      : _lock(owner->ensure_valid_aux_connection(_connection)),
+        _supports_index_visibility(owner->rdbms_version().is_valid() &&
+                                  is_supported_mysql_version_at_least(owner->rdbms_version(), 8, 0, 0)) {
+    }
+
+    std::unique_ptr<SqlEditorTreeController::MetadataResult> schemata() override {
+      return std::make_unique<SqlMetadataResult>(_connection->ref->getMetaData()->getSchemata());
+    }
+
+    std::unique_ptr<SqlEditorTreeController::MetadataResult> query(const std::string &sql) override {
+      if (!_statement)
+        _statement.reset(_connection->ref->createStatement());
+      return std::make_unique<SqlMetadataResult>(_statement->executeQuery(sql));
+    }
+
+    bool supports_index_visibility() const override { return _supports_index_visibility; }
+  };
+}
+
 std::shared_ptr<SqlEditorTreeController> SqlEditorTreeController::create(SqlEditorForm *owner) {
-  std::shared_ptr<SqlEditorTreeController> instance(new SqlEditorTreeController(owner));
+  return create(bec::versionToEnum(owner->rdbms_version()),
+                [owner]() { return std::make_unique<SqlMetadataSession>(owner); }, owner);
+}
+
+std::shared_ptr<SqlEditorTreeController> SqlEditorTreeController::create(
+  base::MySQLVersion version, MetadataSessionFactory metadata_session_factory, SqlEditorForm *owner) {
+  if (!metadata_session_factory)
+    throw std::invalid_argument("A schema metadata session factory is required");
+
+  std::shared_ptr<SqlEditorTreeController> instance(
+    new SqlEditorTreeController(owner, version, std::move(metadata_session_factory)));
 
   instance->_base_schema_tree.set_delegate(instance);
   instance->_base_schema_tree.set_fetch_delegate(instance);
@@ -130,15 +181,17 @@ std::shared_ptr<SqlEditorTreeController> SqlEditorTreeController::create(SqlEdit
 
 //----------------------------------------------------------------------------------------------------------------------
 
-SqlEditorTreeController::SqlEditorTreeController(SqlEditorForm *owner)
+SqlEditorTreeController::SqlEditorTreeController(SqlEditorForm *owner, base::MySQLVersion version,
+                                                 MetadataSessionFactory metadata_session_factory)
   : _owner(owner),
+    _metadata_session_factory(std::move(metadata_session_factory)),
     _schema_side_bar(nullptr),
     _admin_side_bar(nullptr),
     _task_tabview(nullptr),
     _taskbar_box(nullptr),
     _schema_tree(&_base_schema_tree),
-    _base_schema_tree(bec::versionToEnum(owner->rdbms_version())),
-    _filtered_schema_tree(bec::versionToEnum(owner->rdbms_version())),
+    _base_schema_tree(version),
+    _filtered_schema_tree(version),
     live_schema_fetch_task(GrtThreadedTask::create()),
     live_schemata_refresh_task(GrtThreadedTask::create()),
     _is_refreshing_schema_tree(false),
@@ -165,13 +218,15 @@ SqlEditorTreeController::SqlEditorTreeController(SqlEditorForm *owner)
 
   live_schemata_refresh_task->desc("Live Schema Refresh Task");
   live_schemata_refresh_task->send_task_res_msg(false);
-  live_schemata_refresh_task->msg_cb(std::bind(&SqlEditorForm::add_log_message, _owner, std::placeholders::_1,
-                                               std::placeholders::_2, std::placeholders::_3, ""));
 
   live_schema_fetch_task->desc("Live Schema Fetch Task");
   live_schema_fetch_task->send_task_res_msg(false);
-  live_schema_fetch_task->msg_cb(std::bind(&SqlEditorForm::add_log_message, _owner, std::placeholders::_1,
-                                           std::placeholders::_2, std::placeholders::_3, ""));
+  if (_owner) {
+    live_schemata_refresh_task->msg_cb(std::bind(&SqlEditorForm::add_log_message, _owner, std::placeholders::_1,
+                                                std::placeholders::_2, std::placeholders::_3, ""));
+    live_schema_fetch_task->msg_cb(std::bind(&SqlEditorForm::add_log_message, _owner, std::placeholders::_1,
+                                            std::placeholders::_2, std::placeholders::_3, ""));
+  }
 }
 
 //----------------------------------------------------------------------------------------------------------------------
@@ -378,7 +433,6 @@ bool SqlEditorTreeController::fetch_data_for_filter(
   std::string wb_internal_schema = bec::GRTManager::get()->get_app_option_string("studio:InternalSchema");
 
   sql::Dbc_connection_handler::Ref conn;
-
   RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
 
   InternalSchema internal_schema(wb_internal_schema, conn);
@@ -433,13 +487,11 @@ std::vector<std::string> SqlEditorTreeController::fetch_schema_list() {
 
   std::vector<std::string> schemata_names;
   try {
-    sql::Dbc_connection_handler::Ref conn;
-
-    RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
+    auto session = _metadata_session_factory();
 
     bool showSystemSchemas = bec::GRTManager::get()->get_app_option_int("DbSqlEditor:ShowMetadataSchemata", 0) != 0;
 
-    std::unique_ptr<sql::ResultSet> rs(conn->ref->getMetaData()->getSchemata());
+    auto rs = session->schemata();
     while (rs->next()) {
       std::string name = rs->getString(1);
       if (name[0] == '.')
@@ -448,7 +500,17 @@ std::vector<std::string> SqlEditorTreeController::fetch_schema_list() {
         schemata_names.push_back(name);
     }
   }
-  CATCH_ANY_EXCEPTION_AND_DISPATCH(_("Get schemata"))
+  catch (const sql::SQLException &error) {
+    const auto message = strfmt(SQL_EXCEPTION_MSG_FORMAT, error.getErrorCode(), error.what());
+    if (_owner)
+      _owner->add_log_message(DbSqlEditorLog::ErrorMsg, message, _("Get schemata"), "");
+    logError("SQLException executing %s: %s\n", _("Get schemata"), message.c_str());
+  }
+  catch (const std::exception &error) {
+    if (_owner)
+      _owner->add_log_message(DbSqlEditorLog::ErrorMsg, strfmt(EXCEPTION_MSG_FORMAT, error.what()), _("Get schemata"), "");
+    logError("Error getting schemata: %s\n", error.what());
+  }
   return schemata_names;
 }
 
@@ -505,14 +567,10 @@ grt::StringRef SqlEditorTreeController::do_fetch_live_schema_contents(
       return grt::StringRef("");
 
     {
-      sql::Dbc_connection_handler::Ref conn;
-      RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
-      std::unique_ptr<sql::Statement> stmt(conn->ref->createStatement());
+      auto session = _metadata_session_factory();
 
       {
-        std::unique_ptr<sql::Statement> stmt(conn->ref->createStatement());
-        std::unique_ptr<sql::ResultSet> rs(
-          stmt->executeQuery(std::string(sqlstring("SHOW FULL TABLES FROM !", 0) << schema_name)));
+        auto rs = session->query(std::string(sqlstring("SHOW FULL TABLES FROM !", 0) << schema_name));
         while (rs->next()) {
           std::string name = rs->getString(1);
           std::string type = rs->getString(2);
@@ -524,8 +582,7 @@ grt::StringRef SqlEditorTreeController::do_fetch_live_schema_contents(
         }
       }
         {
-          std::unique_ptr<sql::ResultSet> rs(
-            stmt->executeQuery(std::string(sqlstring("SHOW PROCEDURE STATUS WHERE Db=?", 0) << schema_name)));
+          auto rs = session->query(std::string(sqlstring("SHOW PROCEDURE STATUS WHERE Db=?", 0) << schema_name));
 
           while (rs->next()) {
             std::string name = rs->getString(2);
@@ -533,8 +590,7 @@ grt::StringRef SqlEditorTreeController::do_fetch_live_schema_contents(
           }
         }
         {
-          std::unique_ptr<sql::ResultSet> rs(
-            stmt->executeQuery(std::string(sqlstring("SHOW FUNCTION STATUS WHERE Db=?", 0) << schema_name)));
+          auto rs = session->query(std::string(sqlstring("SHOW FUNCTION STATUS WHERE Db=?", 0) << schema_name));
           while (rs->next()) {
             std::string name = rs->getString(2);
             functions->push_back(name);
@@ -549,10 +605,12 @@ grt::StringRef SqlEditorTreeController::do_fetch_live_schema_contents(
     }
 
     // Let the owner form know we got fresh schema meta data. Can be used to update caches.
-    _owner->schema_meta_data_refreshed(schema_name, tables, views, procedures, functions);
+    if (_owner)
+      _owner->schema_meta_data_refreshed(schema_name, tables, views, procedures, functions);
   } catch (const sql::SQLException &e) {
-    _owner->add_log_message(DbSqlEditorLog::ErrorMsg, strfmt(SQL_EXCEPTION_MSG_FORMAT, e.getErrorCode(), e.what()),
-                            "Error loading schema content", "");
+    if (_owner)
+      _owner->add_log_message(DbSqlEditorLog::ErrorMsg, strfmt(SQL_EXCEPTION_MSG_FORMAT, e.getErrorCode(), e.what()),
+                              "Error loading schema content", "");
     logError("SQLException executing %s: %s\n", std::string("Error loading schema content").c_str(),
              strfmt(SQL_EXCEPTION_MSG_FORMAT, e.getErrorCode(), e.what()).c_str());
 
@@ -668,13 +726,8 @@ void SqlEditorTreeController::fetch_column_data(const std::string &schema_name, 
   logDebug3("Fetching column data for %s.%s\n", schema_name.c_str(), obj_name.c_str());
 
   try {
-    sql::Dbc_connection_handler::Ref conn;
-
-    RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
-
-    std::unique_ptr<sql::Statement> stmt(conn->ref->createStatement());
-    std::unique_ptr<sql::ResultSet> rs(
-      stmt->executeQuery(std::string(base::sqlstring("SHOW FULL COLUMNS FROM !.!", 0) << schema_name << obj_name)));
+    auto session = _metadata_session_factory();
+    auto rs = session->query(std::string(base::sqlstring("SHOW FULL COLUMNS FROM !.!", 0) << schema_name << obj_name));
 
     while (rs->next()) {
       LiveSchemaTree::ColumnData col_node(type);
@@ -771,13 +824,8 @@ void SqlEditorTreeController::fetch_trigger_data(const std::string &schema_name,
   std::map<std::string, LiveSchemaTree::TriggerData> trigger_data_dict;
 
   try {
-    sql::Dbc_connection_handler::Ref conn;
-
-    RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
-
-    std::unique_ptr<sql::Statement> stmt(conn->ref->createStatement());
-    std::unique_ptr<sql::ResultSet> rs(
-      stmt->executeQuery(std::string(base::sqlstring("SHOW TRIGGERS FROM ! LIKE ?", 0) << schema_name << obj_name)));
+    auto session = _metadata_session_factory();
+    auto rs = session->query(std::string(base::sqlstring("SHOW TRIGGERS FROM ! LIKE ?", 0) << schema_name << obj_name));
 
     while (rs->next()) {
       wb::LiveSchemaTree::TriggerData trigger_node;
@@ -829,15 +877,10 @@ void SqlEditorTreeController::fetch_index_data(const std::string &schema_name, c
   std::map<std::string, LiveSchemaTree::IndexData> index_data_dict;
 
   try {
-    sql::Dbc_connection_handler::Ref conn;
+    auto session = _metadata_session_factory();
+    auto rs = session->query(std::string(base::sqlstring("SHOW INDEXES FROM !.!", 0) << schema_name << obj_name));
 
-    RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
-
-    std::unique_ptr<sql::Statement> stmt(conn->ref->createStatement());
-    std::unique_ptr<sql::ResultSet> rs(
-      stmt->executeQuery(std::string(base::sqlstring("SHOW INDEXES FROM !.!", 0) << schema_name << obj_name)));
-
-    bool supportVisibility = _owner->rdbms_version().is_valid() && is_supported_mysql_version_at_least(_owner->rdbms_version(), 8, 0, 0);
+    bool supportVisibility = session->supports_index_visibility();
 
     while (rs->next()) {
       LiveSchemaTree::IndexData index_data;
@@ -895,14 +938,10 @@ void SqlEditorTreeController::fetch_foreign_key_data(const std::string &schema_n
   StringListPtr foreign_keys(new std::list<std::string>());
   std::map<std::string, LiveSchemaTree::FKData> fk_data_dict;
 
-  sql::Dbc_connection_handler::Ref conn;
-
-  RecMutexLock aux_dbc_conn_mutex(_owner->ensure_valid_aux_connection(conn));
+  auto session = _metadata_session_factory();
 
   try {
-    std::unique_ptr<sql::Statement> stmt(conn->ref->createStatement());
-    std::unique_ptr<sql::ResultSet> rs(
-      stmt->executeQuery(std::string(base::sqlstring("SHOW CREATE TABLE !.!", 0) << schema_name << obj_name)));
+    auto rs = session->query(std::string(base::sqlstring("SHOW CREATE TABLE !.!", 0) << schema_name << obj_name));
 
     while (rs->next()) {
       std::string statement = rs->getString(2);

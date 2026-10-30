@@ -20,6 +20,20 @@ and feature ideas are handled through the GitHub repository.
 4. Verify the relevant build and tests pass before submitting.
 5. Open a pull request on GitHub against the `develop` branch.
 
+## Native SQL Editor Tests
+
+On Windows, run the schema-tree and metadata-fetching unit tests with:
+
+```powershell
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=SQL_Editor_FormTest.*:Live_Schema_TreeTest.*'
+```
+
+Build the native test executable first when sources have changed. `SQL_Editor_FormTest`
+uses an injected metadata session with canned query results: it exercises the real
+schema, column, index, trigger and foreign-key processing without connecting to MySQL,
+creating databases, loading application runtime XML, or waiting for background work.
+It does not cover live connector behavior or the complete SQL editor UI.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:
