@@ -255,6 +255,7 @@ function Build-TestSuite {
     )
 
     Invoke-LoggedCommand -Label "build studio.testing" -FilePath $script:MSBuildPath -Arguments $msbuildArgs -WorkingDirectory $script:ProjectRoot
+    Prepare-TestRuntime
 }
 
 function Build-StudioTarget {
@@ -323,7 +324,6 @@ function Test-IsTestBuildUpToDate {
 function Invoke-Testing {
     Build-StudioTarget
     Build-TestSuite
-    Prepare-TestRuntime
     Run-TestSuite
 }
 
@@ -371,14 +371,12 @@ switch ($Action) {
         Write-Section "Build"
         Build-StudioTarget
         Build-TestSuite
-        Prepare-TestRuntime
     }
     "run" {
         Write-Section "Run"
         if (-not $SkipBuild) {
             Build-StudioTarget
             Build-TestSuite
-            Prepare-TestRuntime
         }
         Run-TestSuite
     }

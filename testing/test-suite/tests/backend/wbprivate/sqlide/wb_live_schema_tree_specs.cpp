@@ -169,17 +169,12 @@ namespace wb {
         _expect_tree_alter_objects(false),
         _expect_tree_drop_objects(false),
         _expect_tree_refresh(false),
+        _mock_call_back_slot(false),
         _mock_call_back_slot_columns(false),
         _mock_call_back_slot_indexes(false),
         _mock_call_back_slot_triggers(false),
         _mock_call_back_slot_foreign_keys(false),
         _mock_just_append(false) {
-    }
-
-    virtual ~LiveTreeTestDelegate() {
-    }
-
-    void expect_fetch_schema_contents_call() {
       _mock_schema_list = base::StringListPtr(new std::list<std::string>());
       _mock_table_list = base::StringListPtr(new std::list<std::string>());
       _mock_view_list = base::StringListPtr(new std::list<std::string>());
@@ -189,6 +184,25 @@ namespace wb {
       _mock_index_list = base::StringListPtr(new std::list<std::string>());
       _mock_trigger_list = base::StringListPtr(new std::list<std::string>());
       _mock_fk_list = base::StringListPtr(new std::list<std::string>());
+    }
+
+    virtual ~LiveTreeTestDelegate() {
+    }
+
+    void expect_fetch_schema_list_call() {
+      _mock_schema_list->clear();
+      _expect_fetch_schema_list_call = true;
+    }
+
+    void expect_fetch_schema_contents_call() {
+      _mock_table_list->clear();
+      _mock_view_list->clear();
+      _mock_procedure_list->clear();
+      _mock_function_list->clear();
+      _mock_column_list->clear();
+      _mock_index_list->clear();
+      _mock_trigger_list->clear();
+      _mock_fk_list->clear();
       _expect_fetch_schema_contents_call = true;
     }
 
@@ -197,7 +211,8 @@ namespace wb {
       _expect_fetch_schema_list_call = false;
 
       std::vector<std::string> slist;
-      slist.assign(_mock_schema_list->begin(), _mock_schema_list->end());
+      if (_mock_schema_list)
+        slist.assign(_mock_schema_list->begin(), _mock_schema_list->end());
       return slist;
     }
 
@@ -210,6 +225,18 @@ namespace wb {
         << _check_id + " : Unexpected schema filter on fetch_schema_list";
       EXPECT_EQ(_mock__object_pattern, _object_pattern)
         << _check_id + " : Unexpected object filter on fetch_schema_list";
+
+      if (_mock_call_back_slot) {
+        if (_mock_schema_list && !_mock_schema_list->empty()) {
+          for (const auto& schema : *_mock_schema_list) {
+            arrived_slot(schema, _mock_table_list, _mock_view_list, _mock_procedure_list, _mock_function_list,
+                         _mock_just_append);
+          }
+        } else {
+          arrived_slot(_mock_schema_name, _mock_table_list, _mock_view_list, _mock_procedure_list, _mock_function_list,
+                       _mock_just_append);
+        }
+      }
 
       return true;
     }
@@ -402,18 +429,18 @@ namespace wb {
     }
 
     void check_and_reset(const std::string& check_id) {
-      EXPECT_TRUE(_expect_fetch_schema_list_call) << check_id + " : Missed call to fetch_schema_list";
-      EXPECT_TRUE(_expect_fetch_schema_contents_call) << check_id + " : Missed call to fetch_schema_contents";
-      EXPECT_TRUE(_expect_fetch_object_details_call) << check_id + " : Missed call to fetch_object_details";
+      EXPECT_FALSE(_expect_fetch_schema_list_call) << check_id + " : Missed call to fetch_schema_list";
+      EXPECT_FALSE(_expect_fetch_schema_contents_call) << check_id + " : Missed call to fetch_schema_contents";
+      EXPECT_FALSE(_expect_fetch_object_details_call) << check_id + " : Missed call to fetch_object_details";
       EXPECT_EQ(_mock_expected_changes.size(), 0U) << check_id + " : Missing expected changes.";
 
-      EXPECT_TRUE(_expect_tree_refresh) << check_id + " : Missed call to tree_refresh";
-      EXPECT_TRUE(_expect_tree_activate_objects) << check_id + " : Missed call to tree_activate_objects";
-      EXPECT_TRUE(_expect_tree_alter_objects) << check_id + " : Missed call to tree_alter_objects";
-      EXPECT_TRUE(_expect_tree_create_object) << check_id + " : Missed call to tree_create_object";
-      EXPECT_TRUE(_expect_tree_drop_objects) << check_id + " : Missed call to tree_drop_objects";
-      EXPECT_TRUE(_expect_plugin_item_call) << check_id + " : Missed call to plugin_item_call";
-      EXPECT_TRUE(_expect_fetch_data_for_filter) << check_id + " : Missed call to fetch_data_for_filter";
+      EXPECT_FALSE(_expect_tree_refresh) << check_id + " : Missed call to tree_refresh";
+      EXPECT_FALSE(_expect_tree_activate_objects) << check_id + " : Missed call to tree_activate_objects";
+      EXPECT_FALSE(_expect_tree_alter_objects) << check_id + " : Missed call to tree_alter_objects";
+      EXPECT_FALSE(_expect_tree_create_object) << check_id + " : Missed call to tree_create_object";
+      EXPECT_FALSE(_expect_tree_drop_objects) << check_id + " : Missed call to tree_drop_objects";
+      EXPECT_FALSE(_expect_plugin_item_call) << check_id + " : Missed call to plugin_item_call";
+      EXPECT_FALSE(_expect_fetch_data_for_filter) << check_id + " : Missed call to fetch_data_for_filter";
 
       _expect_fetch_schema_list_call = false;
       _expect_fetch_schema_contents_call = false;

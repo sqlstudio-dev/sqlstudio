@@ -236,3 +236,6 @@ build/*.log
 /build/xcode/
 ext/endless.editor/web/node_modules
 ext/endless.editor/web/dist
+testing/output/
+testing/test-suite/output/
+testing/data/studio/
