@@ -30,6 +30,7 @@
 #include "grtsqlparser/mysql_parser_services.h"
 
 #include "gtest/gtest.h"
+#include "gtest/gtest-spi.h"
 #include "context.h"
 #include "wb_test_helpers.h"
 
@@ -55,6 +56,7 @@ namespace {
       // Set filenames & messages based on test number.
       std::string number_string = std::to_string(test_no);
       std::string test_sql_filename = dataDir + number_string + ".sql";
+      const std::string sql = base::replaceString(base::getTextFileContent(test_sql_filename), "\r\n", "\n");
 
       // We have actually 2 parser tests here for now: the old server based parser and the new ANTLR one.
       // First parse the sql with the old parser.
@@ -65,7 +67,6 @@ namespace {
         // /*
         std::string failureMessage = "SQL old (" + number_string + ")";
         std::string test_catalog_state_filename = dataDir + number_string + ".xml";
-        std::string res_catalog_state_filename = dataDir + number_string + "_res.xml";
 
         if (g_file_test(test_catalog_state_filename.c_str(),
                         G_FILE_TEST_EXISTS)) { // Some newer tests are only done for the new parser.
@@ -75,14 +76,14 @@ namespace {
           res_catalog->defaultCollationName("utf8_general_ci");
           grt::replace_contents(res_catalog->simpleDatatypes(), tester->getRdbms()->simpleDatatypes());
 
-          sqlFacade->parseSqlScriptFileEx(res_catalog, test_sql_filename, options);
+          // Legacy snapshots include recovery from duplicate objects and unsupported statements.
+          const int expectedErrors = test_no == 17 ? 4 : (test_no == 702 || test_no == 900 ? 1 : 0);
+          ASSERT_EQ(expectedErrors, sqlFacade->parseSqlScriptStringEx(res_catalog, sql, options))
+            << "Legacy parser failed for fixture " << number_string;
 
           // Rename the schema if asked.
           if (old_schema_name && new_schema_name)
             sqlFacade->renameSchemaReferences(res_catalog, old_schema_name, new_schema_name);
-
-          // Serialize the catalog to file (not necessary for this test, but for manual checks).
-          grt::GRT::get()->serialize(res_catalog, res_catalog_state_filename);
 
           // Unserialize the result so we can compare that with the generated catalog.
           db_mysql_CatalogRef test_catalog =
@@ -103,7 +104,6 @@ namespace {
         //*
         std::string failureMessage = "SQL new (" + number_string + ")";
         std::string test_catalog_state_filename = dataDir + number_string + "a.xml";
-        std::string res_catalog_state_filename = dataDir + number_string + "a_res.xml";
 
         db_mysql_CatalogRef res_catalog(grt::Initialized);
         res_catalog->version(bec::parse_version("5.7.10"));
@@ -111,16 +111,12 @@ namespace {
         res_catalog->defaultCollationName("utf8_general_ci");
         grt::replace_contents(res_catalog->simpleDatatypes(), tester->getRdbms()->simpleDatatypes());
 
-        std::string sql = base::getTextFileContent(test_sql_filename);
-        EXPECT_EQ(0U, services->parseSQLIntoCatalog(context, res_catalog, sql, options))
-          << "Script failed to parse (" + number_string + "):\n" + sql + "\n";
+        ASSERT_EQ(0U, services->parseSQLIntoCatalog(context, res_catalog, sql, options))
+          << "Parser failed for fixture " << number_string;
 
         // Rename the schema if asked.
         if (old_schema_name && new_schema_name)
           services->renameSchemaReferences(context, res_catalog, old_schema_name, new_schema_name);
-
-        // Serialize the catalog to file (not necessary for this test, but for manual checks).
-        grt::GRT::get()->serialize(res_catalog, res_catalog_state_filename);
 
         // Unserialize the result so we can compare that with the generated catalog.
         db_mysql_CatalogRef test_catalog =
@@ -167,6 +163,27 @@ protected:
 TEST_F(MySqlParserTest, TableParsing) {
   for (int i = 0; i <= 18; ++i)
     data->testImportSQL(i);
+}
+
+TEST_F(MySqlParserTest, SqlDefinitionMismatchDoesNotPrintSql) {
+  db_mysql_ViewRef actual(Initialized);
+  actual->sqlDefinition("SELECT actual_sql_marker");
+  db_mysql_ViewRef expected = copy_object(actual);
+  expected->sqlDefinition("SELECT expected_sql_marker");
+
+  testing::TestPartResultArray results;
+  {
+    testing::ScopedFakeTestPartResultReporter reporter(
+      testing::ScopedFakeTestPartResultReporter::INTERCEPT_ONLY_CURRENT_THREAD, &results);
+    testing::deepCompareGrtValues("SQL diagnostic", actual, expected);
+  }
+
+  ASSERT_EQ(results.size(), 1);
+  const std::string message = results.GetTestPartResult(0).message();
+  EXPECT_TRUE(message.find("sqlDefinition") != std::string::npos);
+  EXPECT_TRUE(message.find("SQL differs at byte 7") != std::string::npos);
+  EXPECT_TRUE(message.find("actual_sql_marker") == std::string::npos);
+  EXPECT_TRUE(message.find("expected_sql_marker") == std::string::npos);
 }
 
   TEST_F(MySqlParserTest, IndexParsing) {

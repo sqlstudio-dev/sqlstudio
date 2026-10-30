@@ -74,6 +74,12 @@ They require built application runtime resources but no MySQL connection.
 They no longer execute SQL or reverse-engineer a server, so they do not prove
 server acceptance or schema round-trip equivalence.
 
+For SQL parser catalog regressions, use `--gtest_filter=MySqlParserTest.*`.
+Fixture SQL is normalized from CRLF to LF before parsing so Git checkout settings
+do not affect stored definitions. Catalog comparisons remain exact; SQL-definition
+failures report the member path, lengths, and first differing byte instead of SQL.
+These tests do not write generated catalog XML into the fixture directories.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:
