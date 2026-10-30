@@ -23,249 +23,250 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <cppconn/prepared_statement.h>
-#include <cppconn/connection.h>
-#include <cppconn/statement.h>
-#include <cppconn/resultset.h>
-#include <cppconn/metadata.h>
+#include "connector_mocks.h"
 #include "cdbc/src/driver_manager.h"
-#include "wb_connection_helpers.h"
 #include "wb_test_helpers.h"
-#include "helpers.h"
-#include "gtest/gtest.h"
-
-extern void register_all_metaclasses();
 
 namespace {
+using namespace testing;
+using namespace sql::test;
 
+template <typename T>
+StrictMock<T> *newMock() {
+  auto mock = new StrictMock<T>();
+  EXPECT_CALL(*mock, destroyed());
+  return mock;
+}
 
-  class DbcConnectionTest : public ::testing::Test {
-  protected:
-    std::unique_ptr<SqlStudioTester> tester;
-    db_mgmt_ConnectionRef connectionProperties;
+// Keep unconsumed results owned if connection initialization fails before requesting them.
+template <typename T>
+auto transferOwnership(T *mock) {
+  auto owner = std::make_shared<std::unique_ptr<T>>(mock);
+  return [owner] { return owner->release(); };
+}
 
-    void SetUp() override {
-      tester.reset(new SqlStudioTester);
-      register_all_metaclasses();
-      grt::GRT::get()->scan_metaclasses_in("../../res/grt/");
-      grt::GRT::get()->end_loading_metaclasses();
-      EXPECT_EQ((size_t)INT_METACLASS_COUNT, grt::GRT::get()->get_metaclasses().size());
+class DbcConnectionTest : public Test {
+protected:
+  std::unique_ptr<SqlStudioTester> tester;
+  StrictMock<MockDriver> driver;
+  std::unique_ptr<sql::DriverManager> manager;
+  db_mgmt_ConnectionRef connectionProperties;
 
-      connectionProperties = db_mgmt_ConnectionRef(grt::Initialized);
-      setupConnectionEnvironment(connectionProperties);
-    }
+  void SetUp() override {
+    grt::GRT::get();
+    tester = std::make_unique<SqlStudioTester>();
+    manager = std::make_unique<sql::DriverManager>([this] { return &driver; });
+    connectionProperties = db_mgmt_ConnectionRef(grt::Initialized);
+    db_mgmt_DriverRef profile(grt::Initialized);
+    profile->name("MysqlNative");
+    profile->driverLibraryName("mysqlcppconn");
+    connectionProperties->driver(profile);
+    auto params = connectionProperties->parameterValues();
+    params.set("hostName", grt::StringRef("mock.invalid"));
+    params.set("userName", grt::StringRef("test_user"));
+    params.set("port", grt::IntegerRef(3306));
+    EXPECT_CALL(driver, getMajorVersion()).WillRepeatedly(Return(8));
+    EXPECT_CALL(driver, getMinorVersion()).WillRepeatedly(Return(0));
+    EXPECT_CALL(driver, getPatchVersion()).WillRepeatedly(Return(42));
+    EXPECT_CALL(driver, destroyed());
+  }
 
-    void TearDown() override {
-      SqlStudioTester::reinitGRT();
-    }
-  };
+  void TearDown() override {
+    manager.reset();
+    connectionProperties = db_mgmt_ConnectionRef();
+    tester.reset();
+  }
+
+  MockConnection *expectConnection(bool utf8mb4 = true,
+                                   std::function<void(sql::ConnectOptionsMap &)> inspectOptions = {}) {
+    auto connection = newMock<MockConnection>();
+    auto takeConnection = transferOwnership(connection);
+    EXPECT_CALL(driver, connect(A<sql::ConnectOptionsMap &>()))
+      .WillOnce([takeConnection, inspectOptions](sql::ConnectOptionsMap &options) -> sql::Connection * {
+        if (inspectOptions)
+          inspectOptions(options);
+        return takeConnection();
+      }).RetiresOnSaturation();
+
+    auto userStatement = newMock<MockStatement>();
+    auto userResult = newMock<MockResultSet>();
+    EXPECT_CALL(*userStatement, executeQuery(sql::SQLString("SELECT current_user()")))
+      .WillOnce(transferOwnership(userResult));
+    EXPECT_CALL(*userResult, next()).WillOnce(Return(true));
+    EXPECT_CALL(*userResult, getString(uint32_t(1))).WillOnce(Return(sql::SQLString("test_user@mock")));
+
+    auto charsetStatement = newMock<MockStatement>();
+    auto charsetResult = newMock<MockResultSet>();
+    EXPECT_CALL(*charsetStatement, executeQuery(sql::SQLString("show character set where charset = 'utf8mb4'")))
+      .WillOnce(transferOwnership(charsetResult));
+    EXPECT_CALL(*charsetResult, rowsCount()).WillOnce(Return(utf8mb4 ? 1 : 0));
+    EXPECT_CALL(*charsetStatement, executeUpdate(sql::SQLString(utf8mb4 ? "SET NAMES 'utf8mb4'" : "SET NAMES 'utf8'")))
+      .WillOnce(Return(0));
+    EXPECT_CALL(*connection, createStatement())
+      .WillOnce(transferOwnership(userStatement))
+      .WillOnce(transferOwnership(charsetStatement));
+    return connection;
+  }
+};
 
 TEST_F(DbcConnectionTest, TestInitializationOfConnectionAndDestruction) {
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  EXPECT_NE(nullptr, dm);
+  auto connection = expectConnection();
+  std::weak_ptr<sql::Connection> lifetime;
+  {
+    auto wrapper = manager->getConnection(connectionProperties);
+    EXPECT_EQ(connection, wrapper.get());
+    EXPECT_EQ("C++ 8.0.42", manager->getClientLibVersion());
+    lifetime = wrapper.get_ptr();
+    auto copy = wrapper;
+    wrapper.reset();
+    EXPECT_EQ(nullptr, wrapper.get());
+    EXPECT_FALSE(lifetime.expired());
+    EXPECT_EQ(connection, copy.get());
+  }
+  EXPECT_TRUE(lifetime.expired());
+  EXPECT_CALL(driver, threadEnd());
+  manager->thread_cleanup();
 }
 
 TEST_F(DbcConnectionTest, TestInitializationOfStatementAndDestruction) {
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  EXPECT_NE(nullptr, dm);
-
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  EXPECT_NE(nullptr, wrapper.get());
-  sql::Connection *connection = wrapper.get();
-  {
-    std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-    EXPECT_NE(nullptr, stmt.get());
-  }
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  auto statement = newMock<MockStatement>();
+  EXPECT_CALL(*connection, createStatement()).WillOnce(transferOwnership(statement));
+  std::unique_ptr<sql::Statement> owned(wrapper->createStatement());
+  EXPECT_EQ(statement, owned.get());
 }
 
 TEST_F(DbcConnectionTest, TestConstructionOfMetadataObject) {
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  EXPECT_NE(nullptr, dm);
-
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  EXPECT_NE(nullptr, wrapper.get());
-  sql::Connection *connection = wrapper.get();
-  {
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-  }
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  StrictMock<MockDatabaseMetaData> metadata;
+  EXPECT_CALL(metadata, destroyed());
+  EXPECT_CALL(*connection, getMetaData()).WillOnce(Return(&metadata));
+  EXPECT_EQ(&metadata, wrapper->getMetaData());
 }
 
 TEST_F(DbcConnectionTest, TestAutocommit) {
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  EXPECT_NE(nullptr, dm);
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  InSequence sequence;
+  EXPECT_CALL(*connection, commit());
+  EXPECT_CALL(*connection, rollback());
+  EXPECT_CALL(*connection, getAutoCommit()).WillOnce(Return(false));
+  EXPECT_CALL(*connection, setAutoCommit(true));
+  EXPECT_CALL(*connection, getAutoCommit()).WillOnce(Return(true));
+  EXPECT_CALL(*connection, commit());
+  EXPECT_CALL(*connection, setAutoCommit(false));
+  EXPECT_CALL(*connection, getAutoCommit()).WillOnce(Return(false));
 
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  EXPECT_NE(nullptr, wrapper.get());
-
-  sql::Connection *connection = wrapper.get();
-  try {
-    connection->commit();
-    connection->rollback();
-
-    bool hadAutoCommit = connection->getAutoCommit();
-    connection->setAutoCommit(true);
-    EXPECT_TRUE(connection->getAutoCommit());
-
-    connection->commit();
-    connection->setAutoCommit(false);
-    EXPECT_FALSE(connection->getAutoCommit());
-
-    connection->commit();
-    /* Try to set an invalid mode */
-    // try {
-    //  conn->setAutoCommit(-1);
-    //  ensure("sql::InvalidArgumentException expected but not thrown", false);
-    //} catch (sql::InvalidArgumentException &e) {
-    //  /* Correctly thrown exception */
-    //}
-    /* Last valid was 0, we should leave it 0 */
-    EXPECT_FALSE(connection->getAutoCommit());
-
-    /* Leave the connection in the same state */
-    connection->setAutoCommit(hadAutoCommit);
-    EXPECT_EQ(hadAutoCommit, connection->getAutoCommit());
-
-  } catch (sql::SQLException &e) {
-    printf("ERR: Caught sql::SQLException: %s\n", e.what());
-    throw;
-  }
+  wrapper->commit();
+  wrapper->rollback();
+  const bool original = wrapper->getAutoCommit();
+  wrapper->setAutoCommit(true);
+  EXPECT_TRUE(wrapper->getAutoCommit());
+  wrapper->commit();
+  wrapper->setAutoCommit(original);
+  EXPECT_EQ(original, wrapper->getAutoCommit());
 }
 
 TEST_F(DbcConnectionTest, TestClearWarnings) {
-  // db_mgmt_ConnectionRef connectionProperties;
-  // setupConnectionEnvironment(connectionProperties);
-
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  EXPECT_NE(nullptr, dm);
-
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  EXPECT_NE(nullptr, wrapper.get());
-  sql::Connection *connection = wrapper.get();
-
-  /* Clear tripple times */ // WHY? ml
-  connection->clearWarnings();
-  connection->clearWarnings();
-  connection->clearWarnings();
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  EXPECT_CALL(*connection, clearWarnings()).Times(3);
+  wrapper->clearWarnings();
+  wrapper->clearWarnings();
+  wrapper->clearWarnings();
 }
 
 TEST_F(DbcConnectionTest, Test2Connections) {
+  auto first = expectConnection();
+  auto firstWrapper = manager->getConnection(connectionProperties);
+  auto second = expectConnection();
+  auto secondWrapper = manager->getConnection(connectionProperties);
+  EXPECT_EQ(first, firstWrapper.get());
+  EXPECT_EQ(second, secondWrapper.get());
+  EXPECT_NE(firstWrapper.get(), secondWrapper.get());
+  firstWrapper.reset();
+  EXPECT_EQ(second, secondWrapper.get());
+}
+
+TEST_F(DbcConnectionTest, ConnectionFailurePropagates) {
+  EXPECT_CALL(driver, connect(A<sql::ConnectOptionsMap &>()))
+    .WillOnce(Throw(sql::SQLException("Mock connection rejected", "HY000", 2003)));
   try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper1 = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper1.get());
-    sql::Connection *connection1 = wrapper1.get();
-
-    sql::ConnectionWrapper wrapper2 = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper2.get());
-    sql::Connection *connection2 = wrapper2.get();
-
-    std::unique_ptr<sql::Statement> stmt1(connection1->createStatement());
-    EXPECT_NE(nullptr, stmt1.get());
-
-    std::unique_ptr<sql::Statement> stmt2(connection2->createStatement());
-    EXPECT_NE(nullptr, stmt2.get());
-
-    std::unique_ptr<sql::ResultSet> rset1(stmt1->executeQuery("SELECT CONNECTION_ID()"));
-    EXPECT_NE(nullptr, rset1.get());
-
-    std::unique_ptr<sql::ResultSet> rset2(stmt2->executeQuery("SELECT CONNECTION_ID()"));
-    EXPECT_NE(nullptr, rset2.get());
-
-    EXPECT_TRUE(rset1->next());
-    EXPECT_TRUE(rset2->next());
-
-    EXPECT_NE(rset2->getInt(1), rset1->getInt(1));
-  } catch (sql::SQLException &e) {
-    printf("ERR: Caught sql::SQLException: %s\n", e.what());
-    throw;
+    manager->getConnection(connectionProperties);
+    FAIL() << "Expected connector failure";
+  } catch (const sql::SQLException &error) {
+    EXPECT_EQ(2003, error.getErrorCode());
+    EXPECT_EQ(sql::SQLString("HY000"), error.getSQLState());
+    EXPECT_STREQ("Mock connection rejected", error.what());
   }
 }
 
-TEST_F(DbcConnectionTest, TestKillOurselves1) {
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper1 = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper1.get());
-    sql::Connection *connection = wrapper1.get();
-
-    std::unique_ptr<sql::Statement> stmt1(connection->createStatement());
-    EXPECT_NE(nullptr, stmt1.get());
-
-    std::unique_ptr<sql::ResultSet> rset1(stmt1->executeQuery("SELECT CONNECTION_ID()"));
-    EXPECT_NE(nullptr, rset1.get());
-
-    EXPECT_TRUE(rset1->next());
-    // DBC is not supposed to check that, instead DBC user has to check validity of connection when needed
-    // snprintf(buff, sizeof(buff), "KILL %d", rset1->getInt(1));
-    // try
-    //{
-    //  stmt1->execute(buff);
-    //  fail("An exception should have shown up.");
-    //}
-    // catch (sql::SQLException &e) {
-    //  // Expected.
-    //  ensure_equals("Unexpected exception", e.what(), "Commands out of sync; you can't run this command now");
-    //}
-  } catch (sql::SQLException &e) {
-    printf("ERR: Caught sql::SQLException: %s\n", e.what());
-    throw;
-  }
+TEST_F(DbcConnectionTest, QueryFailurePropagatesWithoutInvalidatingOtherConnection) {
+  auto first = expectConnection();
+  auto firstWrapper = manager->getConnection(connectionProperties);
+  auto second = expectConnection();
+  auto secondWrapper = manager->getConnection(connectionProperties);
+  auto statement = newMock<MockStatement>();
+  EXPECT_CALL(*first, createStatement()).WillOnce(transferOwnership(statement));
+  std::unique_ptr<sql::Statement> owned(firstWrapper->createStatement());
+  EXPECT_CALL(*statement, executeQuery(_))
+    .WillOnce(Throw(sql::SQLException("Mock connection lost", "HY000", 2013)));
+  EXPECT_THROW(owned->executeQuery("SELECT 1"), sql::SQLException);
+  EXPECT_CALL(*second, clearWarnings());
+  secondWrapper->clearWarnings();
 }
 
-TEST_F(DbcConnectionTest, TestKillOurselves2KillAndQueryThereafter) {
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper1 = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper1.get());
-    sql::Connection *connection = wrapper1.get();
-
-    std::unique_ptr<sql::Statement> stmt1(connection->createStatement());
-    EXPECT_NE(nullptr, stmt1.get());
-
-    std::unique_ptr<sql::ResultSet> rset1(stmt1->executeQuery("SELECT CONNECTION_ID()"));
-    EXPECT_NE(nullptr, rset1.get());
-
-    EXPECT_TRUE(rset1->next());
-
-    // DBC is not supposed to check that, instead DBC user has to check validity of connection when needed
-    // snprintf(buff, sizeof(buff), "KILL %d", rset1->getInt(1));
-    // try
-    //{
-    //  // Kill the connection. This will give us an exception.
-    //  stmt1->execute(buff);
-    //  fail("An exception should have shown up.");
-    //}
-    // catch (sql::SQLException &e) {
-    //  // Expected.
-    //  ensure_equals("Unexpected exception", e.what(), "Commands out of sync; you can't run this command now");
-    //}
-
-    // Try another statement. This should give us another exception
-    try {
-      std::unique_ptr<sql::ResultSet> rset2(stmt1->executeQuery("SELECT CONNECTION_ID()"));
-    } catch (sql::SQLException &e) {
-      // Expected.
-      EXPECT_STREQ("Commands out of sync; you can't run this command now", e.what());
-    }
-  } catch (sql::SQLException &e) {
-    printf("ERR: Caught sql::SQLException: %s\n", e.what());
-    throw;
-  }
-}
+TEST_F(DbcConnectionTest, SessionInitializationFailureReleasesConnectionAndStatement) {
+  auto connection = newMock<MockConnection>();
+  auto statement = newMock<MockStatement>();
+  EXPECT_CALL(driver, connect(A<sql::ConnectOptionsMap &>())).WillOnce(transferOwnership(connection));
+  EXPECT_CALL(*connection, createStatement()).WillOnce(transferOwnership(statement));
+  EXPECT_CALL(*statement, executeQuery(_))
+    .WillOnce(Throw(sql::SQLException("Mock session initialization failed", "HY000", 2013)));
+  EXPECT_THROW(manager->getConnection(connectionProperties), sql::SQLException);
 }
 
+TEST_F(DbcConnectionTest, ConnectionOptionsAreConvertedAndInitializerRuns) {
+  auto params = connectionProperties->parameterValues();
+  params.set("schema", grt::StringRef("test_schema"));
+  params.set("CLIENT_COMPRESS", grt::IntegerRef(1));
+  // Inspect the options without dumping their contents (which can include passwords).
+  auto connection = expectConnection(true, [](sql::ConnectOptionsMap &options) {
+    EXPECT_EQ(sql::SQLString("[mock.invalid]"), *options.at("hostName").get<sql::SQLString>());
+    EXPECT_EQ(3306, *options.at("port").get<int>());
+    EXPECT_EQ(60, *options.at("OPT_CONNECT_TIMEOUT").get<int>());
+    EXPECT_EQ(30, *options.at("OPT_READ_TIMEOUT").get<int>());
+    EXPECT_TRUE(*options.at("CLIENT_COMPRESS").get<bool>());
+  });
+  EXPECT_CALL(*connection, setSchema(sql::SQLString("test_schema")));
+  EXPECT_CALL(*connection, clearWarnings());
+  bool initialized = false;
+  auto wrapper = manager->getConnection(connectionProperties,
+    [&](sql::Connection *actual, const db_mgmt_ConnectionRef &properties) {
+      EXPECT_EQ(connection, actual);
+      EXPECT_EQ(connectionProperties, properties);
+      actual->clearWarnings();
+      initialized = true;
+    });
+  EXPECT_TRUE(initialized);
+  EXPECT_EQ(connection, wrapper.get());
+}
+
+TEST_F(DbcConnectionTest, FallsBackToUtf8ForOlderServers) {
+  expectConnection(false);
+  auto wrapper = manager->getConnection(connectionProperties);
+  EXPECT_NE(nullptr, wrapper.get());
+}
+
+TEST_F(DbcConnectionTest, RejectsMissingDriverBeforeConnecting) {
+  connectionProperties->driver(db_mgmt_DriverRef());
+  EXPECT_THROW(manager->getConnection(connectionProperties), sql::SQLException);
+}
+
+TEST_F(DbcConnectionTest, RejectsNullDriverFactoryResult) {
+  sql::DriverManager unavailable([]() -> sql::Driver * { return nullptr; });
+  EXPECT_THROW(unavailable.getConnection(connectionProperties), sql::SQLException);
+}
+} // namespace

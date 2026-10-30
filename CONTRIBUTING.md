@@ -84,6 +84,15 @@ For SQL editor context-help tests, use `--gtest_filter=SqlEditorHelpTest.*`.
 Topic entries use inclusive lower and exclusive upper version bounds. The main
 cases target MySQL 8.0.0, with additional checks on both sides of that boundary.
 
+For offline connector-contract tests, use `--gtest_filter=DbcConnectionTest.*`.
+An instance-local native driver factory supplies strict Connector/C++ mocks to the
+real connection manager. These tests cover option conversion, session startup,
+initialization callbacks, connection ownership, wrapper forwarding, and error
+propagation without using database environment variables or connecting to MySQL.
+They do not verify server transactions, live connection IDs, or KILL behavior.
+Keep the test-only connector mock signatures aligned with the bundled interfaces;
+methods added by newer connector releases deliberately omit `override`.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:

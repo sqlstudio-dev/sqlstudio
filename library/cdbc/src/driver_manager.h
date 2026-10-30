@@ -132,6 +132,10 @@ namespace sql {
 
     DriverManager();
 
+    // Overrides mysqlcppconn resolution; the driver must outlive this manager and its connections.
+    using DriverFactory = std::function<Driver *()>;
+    explicit DriverManager(DriverFactory driver_factory);
+
     // Sets the path to the directory where drivers are located
     void set_driver_dir(const std::string &path);
 
@@ -185,6 +189,7 @@ namespace sql {
     time_t _cacheTime;
     std::string _versionInfo;
     bool _testing;
+    DriverFactory _driverFactory;
   };
 
   class Dbc_connection_handler {

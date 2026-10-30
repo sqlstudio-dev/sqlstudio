@@ -110,6 +110,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="core\context.h" />
+    <ClInclude Include="tests\library\cdbc\connector_mocks.h" />
     <ClInclude Include="core\grt_test_helpers.h" />
     <ClInclude Include="core\grt_values_test_data.h" />
     <ClInclude Include="core\helpers.h" />
