@@ -34,6 +34,7 @@
 #include "gtest/gtest.h"
 #include "grt_test_helpers.h"
 #include "wb_test_helpers.h"
+#include <filesystem>
 
 using namespace bec;
 using namespace wb;
@@ -118,22 +119,22 @@ struct TestData {
 
 class UndoRedoForDiagramActionsInSqlStudioTest : public ::testing::Test {
 protected:
-  TestData *data = new TestData();
+  std::unique_ptr<TestData> data = std::make_unique<TestData>();
 
   void SetUp() override {
 
     data->tester.reset(new SqlStudioTester());
     data->tester->initializeRuntime();
-    data->dataDir = ".";
+    data->dataDir = std::filesystem::absolute("data").lexically_normal().u8string();
 
     data->um = grt::GRT::get()->get_undo_manager();
     data->overview = wb::WBContextUI::get()->get_physical_overview();
 
     data->lastUndoStackSize = 0;
     data->lastRedoStackSize = 0;
-    bool flag = data->tester->wb->open_document(data->dataDir + "/studio/undo_test_model1.mwb");
-    EXPECT_TRUE(flag) << "open_document";
-    EXPECT_EQ(data->tester->getCatalog()->schemata().count(), 1U) << "schemas";
+    ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/undo_test_model1.mwb"))
+      << "open_document";
+    ASSERT_EQ(data->tester->getCatalog()->schemata().count(), 1U) << "schemas";
 
     db_SchemaRef schema(data->tester->getCatalog()->schemata()[0]);
 
@@ -142,7 +143,7 @@ protected:
     EXPECT_EQ(schema->views().count(), 1U) << "views";
     EXPECT_EQ(schema->routineGroups().count(), 1U) << "groups";
 
-    EXPECT_EQ(data->tester->getPmodel()->diagrams().count(), 1U) << "diagrams";
+    ASSERT_EQ(data->tester->getPmodel()->diagrams().count(), 1U) << "diagrams";
     data->diagram = data->tester->getPmodel()->diagrams()[0];
 
     EXPECT_EQ(data->diagram->figures().count(), 5U) << "figures";
@@ -152,7 +153,7 @@ protected:
     data->tester->syncView();
 
     data->diagramForm = data->tester->wb->get_model_context()->get_diagram_form_for_diagram_id(data->tester->getPview().id());
-    EXPECT_NE(data->diagramForm, nullptr) << "Diagram form is invalid";
+    ASSERT_NE(data->diagramForm, nullptr) << "Diagram form is invalid";
 
     mforms::ToolBar *toolbar = data->diagramForm->get_tools_toolbar();
     EXPECT_NE(toolbar, nullptr) << "Toolbar creation failed";
@@ -160,7 +161,7 @@ protected:
     wb::WBContextUI::get()->set_active_form(data->diagramForm);
     EXPECT_EQ(data->um->get_undo_stack().size(), 0U) << "undo stack is empty";
 
-    // Model file not closed by intention. It's used in following test cases.
+    // Keep the model open for this test's diagram actions.
   }
 
   void TearDown() override {

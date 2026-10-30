@@ -46,6 +46,12 @@ and the test context creates the output directory for saved models. The model
 fixtures used by this suite use the SqlStudio format marker and `studio.*` class
 names; this does not add support for opening legacy MySQL Workbench documents.
 
+For diagram undo/redo integration tests, use the same runner with
+`--gtest_filter=UndoRedoForDiagramActionsInSqlStudioTest.*`. Each test opens
+`testing\test-suite\data\studio\undo_test_model1.mwb` and releases its application
+test context afterward. These tests also require the built runtime resources,
+but do not require a MySQL connection.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:
