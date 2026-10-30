@@ -67,6 +67,13 @@ expected scripts without connecting to MySQL.
 The export target is pinned to MySQL 8.0, matching the expected index-visibility
 syntax. Comparisons normalize CRLF to LF but otherwise require exact SQL output.
 
+For offline SQL synchronization regressions, use
+`--gtest_filter=db_mysql_plugin_testTest.*`. These tests check generated DDL
+operations, routine delimiters, view placeholders, and in-memory model changes.
+They require built application runtime resources but no MySQL connection.
+They no longer execute SQL or reverse-engineer a server, so they do not prove
+server acceptance or schema round-trip equivalence.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:

@@ -1,18 +1,18 @@
 <?xml version="1.0"?>
 <data grt_format="2.0">
-  <value type="object" struct-name="db.mysql.Catalog" id="695C3303-2E00-4D0C-B254-67DF686A447A" struct-checksum="0x82ad3466">
-    <value _ptr_="0x7fab487dad00" type="list" content-type="object" content-struct-name="db.mysql.LogFileGroup" key="logFileGroups"/>
-    <value _ptr_="0x7fab487d9fe0" type="list" content-type="object" content-struct-name="db.mysql.Schema" key="schemata">
-      <value type="object" struct-name="db.mysql.Schema" id="4C3EE391-3357-4FAA-B18E-9B1F4CCCA684" struct-checksum="0x20b94c22">
-        <value _ptr_="0x7fab487886b0" type="list" content-type="object" content-struct-name="db.mysql.RoutineGroup" key="routineGroups"/>
-        <value _ptr_="0x7fab48788710" type="list" content-type="object" content-struct-name="db.mysql.Routine" key="routines">
-          <value type="object" struct-name="db.mysql.Routine" id="30029286-A22C-4BBF-A189-276199F10302" struct-checksum="0x991f611c">
-            <value _ptr_="0x7fab48778bb0" type="list" content-type="object" content-struct-name="db.mysql.RoutineParam" key="params">
-              <value type="object" struct-name="db.mysql.RoutineParam" id="8B15FD9C-9318-4521-8E41-77DBFA8CCD8A" struct-checksum="0x3f238dee">
+  <value type="object" struct-name="db.mysql.Catalog" id="{ED72474C-19F1-4F51-96E2-0B60328CEE21}" struct-checksum="0x82ad3466">
+    <value _ptr_="000001EF1F993960" type="list" content-type="object" content-struct-name="db.mysql.LogFileGroup" key="logFileGroups"/>
+    <value _ptr_="000001EF1F993A10" type="list" content-type="object" content-struct-name="db.mysql.Schema" key="schemata">
+      <value type="object" struct-name="db.mysql.Schema" id="{DD3623BB-F2CD-4E5F-B529-98526F6DF79F}" struct-checksum="0x20b94c22">
+        <value _ptr_="000001EF1F99F670" type="list" content-type="object" content-struct-name="db.mysql.RoutineGroup" key="routineGroups"/>
+        <value _ptr_="000001EF1F99DC50" type="list" content-type="object" content-struct-name="db.mysql.Routine" key="routines">
+          <value type="object" struct-name="db.mysql.Routine" id="{51D966A0-D668-4E80-814F-F54A2D80ED7D}" struct-checksum="0x991f611c">
+            <value _ptr_="000001EF1F99EF90" type="list" content-type="object" content-struct-name="db.mysql.RoutineParam" key="params">
+              <value type="object" struct-name="db.mysql.RoutineParam" id="{6990A28A-8A60-4F60-82E1-CABFB525DC16}" struct-checksum="0x3f238dee">
                 <value type="string" key="datatype">INTEGER</value>
                 <value type="string" key="paramType">IN</value>
                 <value type="string" key="name">p1</value>
-                <link type="object" struct-name="GrtObject" key="owner">30029286-A22C-4BBF-A189-276199F10302</link>
+                <link type="object" struct-name="GrtObject" key="owner">{51D966A0-D668-4E80-814F-F54A2D80ED7D}</link>
               </value>
             </value>
             <value type="string" key="returnDatatype"></value>
@@ -22,57 +22,57 @@
             <value type="int" key="sequenceNumber">0</value>
             <value type="string" key="definer">`serg`@`%`</value>
             <value type="string" key="sqlBody"></value>
-            <value type="string" key="sqlDefinition">CREATE
-DEFINER=`serg`@`%`
-PROCEDURE test.proc1 (IN p1 INTEGER)
-LANGUAGE SQL
-NOT DETERMINISTIC
-MODIFIES SQL DATA
-SQL SECURITY INVOKER
-COMMENT 'procedure desc'
-BEGIN
-INSERT INTO table1(id) values (p1);
-INSERT INTO table1(id) values (p1+1);
+            <value type="string" key="sqlDefinition">CREATE&#xD;
+DEFINER=`serg`@`%`&#xD;
+PROCEDURE test.proc1 (IN p1 INTEGER)&#xD;
+LANGUAGE SQL&#xD;
+NOT DETERMINISTIC&#xD;
+MODIFIES SQL DATA&#xD;
+SQL SECURITY INVOKER&#xD;
+COMMENT 'procedure desc'&#xD;
+BEGIN&#xD;
+INSERT INTO table1(id) values (p1);&#xD;
+INSERT INTO table1(id) values (p1+1);&#xD;
 END</value>
             <value type="int" key="commentedOut">0</value>
-            <value type="string" key="createDate">2018-02-08 13:35</value>
-            <value _ptr_="0x7fab48778b50" type="dict" key="customData"/>
-            <value type="string" key="lastChangeDate">2018-02-08 13:35</value>
+            <value type="string" key="createDate">2026-10-30 21:57</value>
+            <value _ptr_="000001EF1F99EC20" type="dict" key="customData"/>
+            <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
             <value type="int" key="modelOnly">0</value>
-            <link type="object" struct-name="GrtNamedObject" key="owner">4C3EE391-3357-4FAA-B18E-9B1F4CCCA684</link>
+            <link type="object" struct-name="GrtNamedObject" key="owner">{DD3623BB-F2CD-4E5F-B529-98526F6DF79F}</link>
             <value type="string" key="temp_sql"></value>
             <value type="string" key="comment">procedure desc</value>
-            <value type="string" key="oldName"></value>
+            <value type="string" key="oldName">proc1</value>
           </value>
         </value>
-        <value _ptr_="0x7fab48788770" type="list" content-type="object" content-struct-name="db.mysql.Sequence" key="sequences"/>
-        <value _ptr_="0x7fab4877efd0" type="list" content-type="object" content-struct-name="db.mysql.StructuredDatatype" key="structuredTypes"/>
-        <value _ptr_="0x7fab4877f030" type="list" content-type="object" content-struct-name="db.mysql.Synonym" key="synonyms"/>
-        <value _ptr_="0x7fab4877f090" type="list" content-type="object" content-struct-name="db.mysql.Table" key="tables"/>
-        <value _ptr_="0x7fab4877f0f0" type="list" content-type="object" content-struct-name="db.mysql.View" key="views"/>
+        <value _ptr_="000001EF1F99DBA0" type="list" content-type="object" content-struct-name="db.mysql.Sequence" key="sequences"/>
+        <value _ptr_="000001EF1F99F9E0" type="list" content-type="object" content-struct-name="db.mysql.StructuredDatatype" key="structuredTypes"/>
+        <value _ptr_="000001EF1F99E750" type="list" content-type="object" content-struct-name="db.mysql.Synonym" key="synonyms"/>
+        <value _ptr_="000001EF1F99FB40" type="list" content-type="object" content-struct-name="db.mysql.Table" key="tables"/>
+        <value _ptr_="000001EF1F99DD00" type="list" content-type="object" content-struct-name="db.mysql.View" key="views"/>
         <value type="string" key="defaultCharacterSetName">utf8</value>
         <value type="string" key="defaultCollationName"></value>
-        <value _ptr_="0x7fab48788650" type="list" content-type="object" content-struct-name="db.Event" key="events"/>
+        <value _ptr_="000001EF1F99DDB0" type="list" content-type="object" content-struct-name="db.Event" key="events"/>
         <value type="int" key="commentedOut">0</value>
-        <value type="string" key="createDate">2018-02-08 13:35</value>
-        <value _ptr_="0x7fab4877c940" type="dict" key="customData"/>
-        <value type="string" key="lastChangeDate">2018-02-08 13:35</value>
+        <value type="string" key="createDate">2026-10-30 21:57</value>
+        <value _ptr_="000001EF1F99D2B0" type="dict" key="customData"/>
+        <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
         <value type="int" key="modelOnly">0</value>
         <value type="string" key="name">test</value>
-        <link type="object" struct-name="GrtNamedObject" key="owner">695C3303-2E00-4D0C-B254-67DF686A447A</link>
+        <link type="object" struct-name="GrtNamedObject" key="owner">{ED72474C-19F1-4F51-96E2-0B60328CEE21}</link>
         <value type="string" key="temp_sql"></value>
         <value type="string" key="comment"></value>
         <value type="string" key="oldName">test</value>
       </value>
     </value>
-    <value _ptr_="0x7fab487d9c50" type="list" content-type="object" content-struct-name="db.mysql.ServerLink" key="serverLinks"/>
-    <value _ptr_="0x7fab487db330" type="list" content-type="object" content-struct-name="db.mysql.Tablespace" key="tablespaces"/>
-    <value _ptr_="0x7fab487da670" type="list" content-type="object" content-struct-name="db.CharacterSet" key="characterSets"/>
-    <value _ptr_="0x7fab487db090" type="dict" key="customData"/>
+    <value _ptr_="000001EF1F992D00" type="list" content-type="object" content-struct-name="db.mysql.ServerLink" key="serverLinks"/>
+    <value _ptr_="000001EF1F993AC0" type="list" content-type="object" content-struct-name="db.mysql.Tablespace" key="tablespaces"/>
+    <value _ptr_="000001EF1F992200" type="list" content-type="object" content-struct-name="db.CharacterSet" key="characterSets"/>
+    <value _ptr_="000001EF1F9931D0" type="dict" key="customData"/>
     <value type="string" key="defaultCharacterSetName">utf8</value>
     <value type="string" key="defaultCollationName">utf8_general_ci</value>
-    <value _ptr_="0x7fab487da9f0" type="list" content-type="object" content-struct-name="db.Role" key="roles"/>
-    <value _ptr_="0x7fab48760120" type="list" content-type="object" content-struct-name="db.SimpleDatatype" key="simpleDatatypes">
+    <value _ptr_="000001EF1F9935F0" type="list" content-type="object" content-struct-name="db.Role" key="roles"/>
+    <value _ptr_="000001EF1F992DB0" type="list" content-type="object" content-struct-name="db.SimpleDatatype" key="simpleDatatypes">
       <link type="object">com.mysql.rdbms.mysql.datatype.tinyint</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.smallint</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.mediumint</link>
@@ -118,13 +118,13 @@ END</value>
       <link type="object">com.mysql.rdbms.mysql.datatype.enum</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.set</link>
     </value>
-    <value _ptr_="0x7fab487d98e0" type="list" content-type="object" content-struct-name="db.UserDatatype" key="userDatatypes"/>
-    <value _ptr_="0x7fab426bd8e0" type="list" content-type="object" content-struct-name="db.User" key="users"/>
-    <value type="object" struct-name="GrtVersion" id="06B29C5D-194E-4ABB-A961-16896306B126" struct-checksum="0x7aaa4ede" key="version">
+    <value _ptr_="000001EF1F9928E0" type="list" content-type="object" content-struct-name="db.UserDatatype" key="userDatatypes"/>
+    <value _ptr_="000001EF1F993D80" type="list" content-type="object" content-struct-name="db.User" key="users"/>
+    <value type="object" struct-name="GrtVersion" id="{C3582DE4-852B-4581-AD82-0D5C77C4B9E8}" struct-checksum="0x7aaa4ede" key="version">
       <value type="int" key="buildNumber">-1</value>
       <value type="int" key="majorNumber">5</value>
-      <value type="int" key="minorNumber">6</value>
-      <value type="int" key="releaseNumber">30</value>
+      <value type="int" key="minorNumber">7</value>
+      <value type="int" key="releaseNumber">10</value>
       <value type="int" key="status">0</value>
       <value type="string" key="name">Version</value>
     </value>
