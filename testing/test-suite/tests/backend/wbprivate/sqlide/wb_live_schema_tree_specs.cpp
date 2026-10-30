@@ -55,27 +55,6 @@ using namespace wb;
 
 #define VIEW_COLUMN 131072
 
-#define SET_DEF_SCH 1
-#define FIL_TO_SCH 2
-#define COPY_TC 4
-#define SEND_TE 8
-#define CREATE 16
-#define ALTER 32
-#define DROP 64
-#define REFRESH 128
-#define SEL_ROWS 256
-#define EDIT 512
-
-#define SUB_NAME 1
-#define SUB_NAME_S 2
-#define SUB_NAME_L 4
-#define SUB_CREATE 8
-#define SUB_SEL_ALL 16
-#define SUB_INSERT 32
-#define SUB_UPDATE 64
-#define SUB_DELETE 128
-#define SUB_SEL_COL 256
-
 namespace wb {
 
   class LiveSchemaTreeTestHelper : public LiveSchemaTree {
@@ -115,13 +94,10 @@ namespace wb {
     bool _expect_fetch_schema_contents_call;
     bool _expect_fetch_object_details_call;
     bool _expect_fetch_data_for_filter;
-    bool _expect_plugin_item_call;
-
     bool _expect_tree_activate_objects;
-    bool _expect_tree_create_object;
-    bool _expect_tree_alter_objects;
-    bool _expect_tree_drop_objects;
     bool _expect_tree_refresh;
+    bool _expect_sidebar_action = false;
+    bool _mock_sidebar_action_result = true;
 
     std::string _mock_schema_name;
     std::string _mock_object_name;
@@ -163,11 +139,7 @@ namespace wb {
         _expect_fetch_schema_contents_call(false),
         _expect_fetch_object_details_call(false),
         _expect_fetch_data_for_filter(false),
-        _expect_plugin_item_call(false),
         _expect_tree_activate_objects(false),
-        _expect_tree_create_object(false),
-        _expect_tree_alter_objects(false),
-        _expect_tree_drop_objects(false),
         _expect_tree_refresh(false),
         _mock_call_back_slot(false),
         _mock_call_back_slot_columns(false),
@@ -373,11 +345,14 @@ namespace wb {
     }
 
     virtual bool sidebar_action(const std::string& action) {
-      return true;
+      EXPECT_TRUE(_expect_sidebar_action) << _check_id + " : Unexpected call to sidebar_action.";
+      EXPECT_EQ(action, _mock_expected_action) << _check_id + " : Unexpected sidebar action.";
+      _expect_sidebar_action = false;
+      return _mock_sidebar_action_result;
     }
 
     void check_expected_changes(const std::string& change, const std::vector<LiveSchemaTree::ChangeRecord>& changes) {
-      EXPECT_EQ(changes.size(), _mock_expected_changes.size())
+      ASSERT_EQ(changes.size(), _mock_expected_changes.size())
         << _check_id + " : Unexpected number of objects " + change;
 
       for (size_t index = 0; index < changes.size(); index++) {
@@ -404,30 +379,6 @@ namespace wb {
       check_expected_changes("activated", changes);
     }
 
-    virtual void tree_alter_objects(const std::vector<LiveSchemaTree::ChangeRecord>& changes) {
-      EXPECT_TRUE(_expect_tree_alter_objects) << _check_id + " : Unexpected call to tree_alter_objects.";
-      _expect_tree_alter_objects = false;
-      check_expected_changes("altered", changes);
-    }
-
-    virtual void tree_create_object(LiveSchemaTree::ObjectType type, const std::string& schema_name,
-                                    const std::string& object_name) {
-      EXPECT_TRUE(_expect_tree_create_object) << _check_id + " : Unexpected call to tree_create_object.";
-      EXPECT_EQ(schema_name, _mock_expected_changes[0].schema) << _check_id + " : Unexpected schema name.";
-      EXPECT_EQ(type, _mock_expected_changes[0].type) << _check_id + " : Unexpected object type.";
-      EXPECT_EQ(object_name, _mock_expected_changes[0].name) << _check_id + " : Unexpected object name.";
-
-      _mock_expected_changes.erase(_mock_expected_changes.begin());
-
-      _expect_tree_create_object = false;
-    }
-
-    virtual void tree_drop_objects(const std::vector<LiveSchemaTree::ChangeRecord>& changes) {
-      EXPECT_TRUE(_expect_tree_drop_objects) << _check_id + " : Unexpected call to tree_drop_objects.";
-      _expect_tree_drop_objects = false;
-      check_expected_changes("dropped", changes);
-    }
-
     void check_and_reset(const std::string& check_id) {
       EXPECT_FALSE(_expect_fetch_schema_list_call) << check_id + " : Missed call to fetch_schema_list";
       EXPECT_FALSE(_expect_fetch_schema_contents_call) << check_id + " : Missed call to fetch_schema_contents";
@@ -435,17 +386,13 @@ namespace wb {
       EXPECT_EQ(_mock_expected_changes.size(), 0U) << check_id + " : Missing expected changes.";
 
       EXPECT_FALSE(_expect_tree_refresh) << check_id + " : Missed call to tree_refresh";
+      EXPECT_FALSE(_expect_sidebar_action) << check_id + " : Missed call to sidebar_action";
       EXPECT_FALSE(_expect_tree_activate_objects) << check_id + " : Missed call to tree_activate_objects";
-      EXPECT_FALSE(_expect_tree_alter_objects) << check_id + " : Missed call to tree_alter_objects";
-      EXPECT_FALSE(_expect_tree_create_object) << check_id + " : Missed call to tree_create_object";
-      EXPECT_FALSE(_expect_tree_drop_objects) << check_id + " : Missed call to tree_drop_objects";
-      EXPECT_FALSE(_expect_plugin_item_call) << check_id + " : Missed call to plugin_item_call";
       EXPECT_FALSE(_expect_fetch_data_for_filter) << check_id + " : Missed call to fetch_data_for_filter";
 
       _expect_fetch_schema_list_call = false;
       _expect_fetch_schema_contents_call = false;
       _expect_fetch_object_details_call = false;
-      _expect_plugin_item_call = false;
     }
   };
 
@@ -735,150 +682,11 @@ namespace wb {
     if (PROCEDURES & flags)
       nodes.push_back(schema_node->get_child(LiveSchemaTree::PROCEDURES_NODE_INDEX));
 
+    if (PROCEDURE & flags)
+      nodes.push_back(schema_node->get_child(LiveSchemaTree::PROCEDURES_NODE_INDEX)->get_child(0));
+
     if (FUNCTION & flags)
       nodes.push_back(schema_node->get_child(LiveSchemaTree::FUNCTIONS_NODE_INDEX)->get_child(0));
-  }
-
-  bool ensureItemExists(const bec::MenuItemList& items, const std::string& item_caption) {
-    bool found = false;
-
-    for (size_t index = 0; !found && index < items.size(); index++) {
-      found = (items[index].caption == item_caption);
-    }
-
-    return found;
-  }
-
-  bool ensureSubItemExists(const std::string& item_caption, const bec::MenuItemList& items,
-                           const std::string& subitem_caption) {
-    bool found = false;
-
-    for (size_t index = 0; !found && index < items.size(); index++) {
-      if (items[index].caption == item_caption)
-        found = ensureItemExists(items[index].subitems, subitem_caption);
-    }
-
-    return found;
-  }
-
-  void ensureMenuItemsExist(const std::string check, const bec::MenuItemList& items, int main_items, int sub_items,
-                            const std::string& single, const std::string& multi) {
-    std::string custom_caption = single;
-
-    if (SET_DEF_SCH & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Set as Default Schema")) << check + ": Expected \"Set as Default Schema\" menu item not found";
-    }
-
-    if (FIL_TO_SCH & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Filter to This Schema"))
-        << check + ": Expected \"Filter to This Schema\" menu item not found1";
-    }
-
-    if (COPY_TC & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Copy to Clipboard"))
-        << check + ": Expected \"Copy to Clipboard\" menu item not found";
-    }
-
-    if (SEND_TE & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Send to SQL Editor"))
-        << check + ": Expected \"Send to SQL Editor\" menu item not found";
-    }
-
-    if (CREATE & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Create " + custom_caption + "..."))
-        << check + ": Expected \"Create " + custom_caption + "...\" menu item not found";
-    }
-
-    if (multi.length() > 0)
-      custom_caption = multi;
-
-    if (ALTER & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Alter " + custom_caption + "..."))
-        << check + ": Expected \"Alter " + custom_caption + "...\" menu item not found";
-    }
-
-    if (DROP & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Drop " + custom_caption + "..."))
-        << check + ": Expected \"Drop " + custom_caption + "...\" menu item not found";
-    }
-
-    if (REFRESH & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Refresh All"))
-        << check + ": Expected \"Refresh All\" menu item not found";
-    }
-
-    if (SEL_ROWS & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Select Rows"))
-        << check + ": Expected \"Select Rows\" menu item not found";
-    }
-
-    if (EDIT & main_items) {
-      EXPECT_TRUE(ensureItemExists(items, "Edit Table Data"))
-        << check + ": Expected \"Edit Table Data\" menu item not found";
-    }
-
-    if (SUB_NAME & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Name"))
-        << check + ": Expected \"Copy to Clipboard\\Name\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Name"))
-        << check + ": Expected \"Send to SQL Editor\\Name\" menu item not found";
-    }
-
-    if (SUB_NAME_S & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Name (short)"))
-        << check + ": Expected \"Copy to Clipboard\\Name (short)\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Name (short)"))
-        << check + ": Expected \"Send to SQL Editor\\Name (short)\" menu item not found";
-    }
-
-    if (SUB_NAME_L & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Name (long)"))
-        << check + ": Expected \"Copy to Clipboard\\Name (long)\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Name (long)"))
-        << check + ": Expected \"Send to SQL Editor\\Name (long)\" menu item not found";
-    }
-
-    if (SUB_SEL_ALL & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Select All Statement"))
-        << check + ": Expected \"Copy to Clipboard\\Select All Statement\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Select All Statement"))
-        << check + ": Expected \"Send to SQL Editor\\Select All Statement\" menu item not found";
-    }
-
-    if (SUB_SEL_COL & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Select Columns Statement"))
-        << check + ": Expected \"Copy to Clipboard\\Select Columns Statement\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Select Columns Statement"))
-        << check + ": Expected \"Send to SQL Editor\\Select Columns Statement\" menu item not found";
-    }
-
-    if (SUB_CREATE & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Create Statement"))
-        << check + ": Expected \"Copy to Clipboard\\Create Statement\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Create Statement"))
-        << check + ": Expected \"Send to SQL Editor\\Create Statement\" menu item not found";
-    }
-
-    if (SUB_INSERT & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Insert Statement"))
-        << check + ": Expected \"Copy to Clipboard\\Insert Statement\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Insert Statement"))
-        << check + ": Expected \"Send to SQL Editor\\Insert Statement\" menu item not found";
-    }
-
-    if (SUB_UPDATE & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Update Statement"))
-        << check + ": Expected \"Copy to Clipboard\\Update Statement\" menu item not";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Update Statement"))
-        << check + ": Expected \"Send to SQL Editor\\Update Statement\" menu item not found";
-    }
-
-    if (SUB_DELETE & sub_items) {
-      EXPECT_TRUE(ensureSubItemExists("Copy to Clipboard", items, "Delete Statement"))
-        << check + ": Expected \"Copy to Clipboard\\Delete Statement\" menu item not found";
-      EXPECT_TRUE(ensureSubItemExists("Send to SQL Editor", items, "Delete Statement"))
-        << check + ": Expected \"Send to SQL Editor\\Delete Statement\" menu item not found";
-    }
   }
 
   void setChangeRecords(std::vector<LiveSchemaTree::ChangeRecord>& change_records, int flags) {
@@ -982,9 +790,9 @@ namespace wb {
 
 class Live_Schema_TreeTest : public ::testing::Test {
 protected:
-  static std::unique_ptr<TestData> data;
+  std::unique_ptr<TestData> data = std::make_unique<TestData>();
 
-  static void SetUpTestSuite() {
+  void SetUp() override {
     data->delegate.reset(new TestData::LiveTreeTestDelegate());
     data->delegateFiltered.reset(new TestData::LiveTreeTestDelegate());
 
@@ -992,6 +800,8 @@ protected:
     GRT::get()->set("/wb/options", DictRef(true));
     GRT::get()->set("/wb/options/options", DictRef(true));
     GRT::get()->set("/wb/options/options/SqlEditor:AutoFetchColumnInfo", IntegerRef(1));
+    GRT::get()->set("/wb/options/options/SqlEditor:LimitRows", IntegerRef(0));
+    GRT::get()->set("/wb/options/options/SqlEditor:LimitRowsCount", IntegerRef(1000));
 
     mforms::stub::init(nullptr);
     data->pModelView =
@@ -1012,7 +822,7 @@ protected:
     data->delegateFiltered->ptree = &data->treeTestHelperFiltered;
   }
 
-  static void TearDownTestSuite() {
+  void TearDown() override {
     if (data->schemaPattern != nullptr) {
       g_pattern_spec_free(data->schemaPattern);
     }
@@ -1020,11 +830,15 @@ protected:
     if (data->objectPattern != nullptr) {
       g_pattern_spec_free(data->objectPattern);
     }
+
+    data->treeTestHelperFiltered.set_base(nullptr);
+    data->treeTestHelperFiltered.set_model_view(nullptr);
+    data->treeTestHelper.set_model_view(nullptr);
+    delete data->pModelViewFiltered;
+    delete data->pModelView;
   }
 
 };
-
-std::unique_ptr<TestData> Live_Schema_TreeTest::data = std::make_unique<TestData>();
 
 TEST_F(Live_Schema_TreeTest, General_node_tests) {
   mforms::TreeNodeRef test_node_ref = data->pModelView->root_node();
@@ -3443,372 +3257,113 @@ TEST_F(Live_Schema_TreeTest, Activating_a_tree_node) {
 }
 
 TEST_F(Live_Schema_TreeTest, Getting_popup_items_for_nodes) {
-  GTEST_SKIP() << "test code was never enabled and needs fixes";
-
-  bec::MenuItemList items;
-  std::list<mforms::TreeNodeRef> nodes;
-  mforms::TreeNodeRef schema_node;
-  mforms::TreeNodeRef object_node;
-
   data->fillBasicSchema("Getting popup items for nodes");
 
-  data->setNodes(&data->treeTestHelper, nodes, SCHEMA);
+  struct ExpectedItem {
+    const char* name;
+    const char* caption;
+    bec::MenuItemType type;
+    bool enabled;
+  };
 
-  //================= Schema and Schema's Collection Nodes =================//
-  // Reviewing items for a schema
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
+  // Python extensions add the clipboard, editor and DDL actions after the native menu is built.
+  auto check_menu = [&](int flags, int copies, const std::vector<ExpectedItem>& expected) {
+    SCOPED_TRACE(::testing::Message() << "flags=" << flags << ", copies=" << copies);
+    std::list<mforms::TreeNodeRef> nodes;
+    for (int i = 0; i < copies; ++i)
+      data->setNodes(&data->treeTestHelper, nodes, flags);
+    const auto items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
+    ASSERT_EQ(items.size(), expected.size());
+    for (size_t i = 0; i < expected.size(); ++i) {
+      EXPECT_EQ(items[i].internalName, expected[i].name);
+      EXPECT_EQ(items[i].caption, expected[i].caption);
+      EXPECT_EQ(items[i].type, expected[i].type);
+      EXPECT_EQ(items[i].enabled, expected[i].enabled);
+      EXPECT_TRUE(items[i].subitems.empty());
+    }
+  };
 
-  // 8 Real items plus 3 separators
-  EXPECT_EQ(items.size(), 11U);
-  data->ensureMenuItemsExist("TF028CHK002", items,
-                             SET_DEF_SCH | FIL_TO_SCH | COPY_TC | SEND_TE | CREATE | ALTER | DROP | REFRESH,
-                             SUB_NAME | SUB_CREATE, "Schema", "");
+  const std::vector<ExpectedItem> refresh_menu = {
+    {"bottom_plugins_separator", "", bec::MenuSeparator, true},
+    {"refresh", "Refresh All", bec::MenuAction, true}
+  };
+  for (int copies : {1, 2}) {
+    check_menu(SCHEMA, copies, {
+      {"set_active_schema", "Set as Default Schema", bec::MenuAction, copies == 1},
+      {"filter_schema", "Filter to This Schema", bec::MenuAction, copies == 1},
+      {"builtins_separator", "", bec::MenuSeparator, true},
+      refresh_menu[0], refresh_menu[1]
+    });
+    for (int flags : {TABLE, VIEW, TABLE_COLUMN, VIEW_COLUMN}) {
+      check_menu(flags, copies, {
+        {"select_data", "Select Rows", bec::MenuAction, copies == 1 || flags == TABLE_COLUMN || flags == VIEW_COLUMN},
+        {"builtins_separator", "", bec::MenuSeparator, true},
+        refresh_menu[0], refresh_menu[1]
+      });
+    }
+    for (int flags : {0, TABLES, VIEWS, PROCEDURES, FUNCTIONS, PROCEDURE, FUNCTION, COLUMNS, INDEXES, INDEX,
+                     TRIGGERS, TRIGGER, FKS, FK})
+      check_menu(flags, copies, refresh_menu);
+  }
 
-  // Reviewing items for multiple schemas
-  data->setNodes(&data->treeTestHelper, nodes, SCHEMA);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
+  check_menu(SCHEMA | TABLE | VIEW, 1, {
+    {"set_active_schema", "Set as Default Schema", bec::MenuAction, false},
+    {"filter_schema", "Filter to This Schema", bec::MenuAction, false},
+    {"builtins_separator", "", bec::MenuSeparator, true},
+    refresh_menu[0], refresh_menu[1]
+  });
 
-  // 6 Real items plus 2 separators
-  EXPECT_EQ(items.size(), 8U);
-  data->ensureMenuItemsExist("TF028CHK003", items, COPY_TC | SEND_TE | CREATE | ALTER | DROP | REFRESH,
-                             SUB_NAME | SUB_CREATE, "Schema", "2 Schemas");
-
-  // Testing the schema table collection options
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, TABLES);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 2 Real items plus 1 separators
-  EXPECT_EQ(items.size(), 3U);
-  data->ensureMenuItemsExist("TF028CHK004", items, CREATE | REFRESH, 0, "Table", "");
-
-  // Testing the schema view collection options
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, VIEWS);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 2 Real items plus 1 separators
-  EXPECT_EQ(items.size(), 3U);
-  data->ensureMenuItemsExist("TF028CHK005", items, CREATE | REFRESH, 0, "View", "");
-
-  // Testing the schema procedures collection options
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, PROCEDURES);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 3 Real items plus 1 separators
-  EXPECT_EQ(items.size(), 3U);
-  data->ensureMenuItemsExist("TF028CHK006", items, CREATE | REFRESH, 0, "Procedure", "");
-
-  // Testing the schema procedures collection options
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, FUNCTIONS);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 3 Real items plus 1 separators
-  EXPECT_EQ(items.size(), 3U);
-  data->ensureMenuItemsExist("TF028CHK006", items, CREATE | REFRESH, 0, "Function", "");
-
-  //================= Table, Table's Collection Nodes  and Nodes on each collection =================//
-  // Testing for a single schema node
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, TABLE);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 7 Real items plus 2 separators
-  EXPECT_EQ(items.size(), 10U);
-  data->ensureMenuItemsExist(
-    "TF028CHK007", items, SEL_ROWS | EDIT | COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-    SUB_NAME_S | SUB_NAME_L | SUB_SEL_ALL | SUB_INSERT | SUB_UPDATE | SUB_DELETE | SUB_CREATE, "Table", "");
-
-  // Testing for multiple Table nodes...
-  data->setNodes(&data->treeTestHelper, nodes, TABLE);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 7 Real items plus 2 separators
-  EXPECT_EQ(items.size(), 9U);
-  data->ensureMenuItemsExist(
-    "TF028CHK008", items, SEL_ROWS | EDIT | COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-    SUB_NAME_S | SUB_NAME_L | SUB_SEL_ALL | SUB_INSERT | SUB_UPDATE | SUB_DELETE | SUB_CREATE, "Table", "2 Tables");
-
-  // Columns collection...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, COLUMNS);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 5 Real items plus 1 separators
-  EXPECT_EQ(items.size(), 6U);
-  data->ensureMenuItemsExist("TF028CHK009", items, SEL_ROWS | EDIT | COPY_TC | SEND_TE | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_SEL_COL | SUB_INSERT | SUB_UPDATE, "Table", "2 Tables");
-
-  // Column Node
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, TABLE_COLUMN);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 5 Real items plus 1 separators
-  EXPECT_EQ(items.size(), 6U);
-  data->ensureMenuItemsExist("TF028CHK010", items, SEL_ROWS | EDIT | COPY_TC | SEND_TE | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_SEL_COL | SUB_INSERT | SUB_UPDATE, "Table", "2 Tables");
-
-  // Multiple Column Nodes
-  data->setNodes(&data->treeTestHelper, nodes, TABLE_COLUMN);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Just like a single column.
-  EXPECT_EQ(items.size(), 6U);
-  data->ensureMenuItemsExist("TF028CHK010", items, SEL_ROWS | EDIT | COPY_TC | SEND_TE | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_SEL_COL | SUB_INSERT | SUB_UPDATE, "Table", "2 Tables");
-
-  // Index collection...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, INDEXES);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK012", items, REFRESH, 0, "", "");
-
-  // Index Node...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, INDEX);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK013", items, REFRESH, 0, "", "");
-
-  // Multiple Index Nodes...
-  data->setNodes(&data->treeTestHelper, nodes, INDEX);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK014", items, REFRESH, 0, "", "");
-
-  // Trigger collection...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, TRIGGERS);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK015", items, REFRESH, 0, "", "");
-
-  // Trigger Node...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, TRIGGER);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK016", items, REFRESH, 0, "", "");
-
-  // Multiple Trigger Nodes...
-  data->setNodes(&data->treeTestHelper, nodes, TRIGGER);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK017", items, REFRESH, 0, "", "");
-
-  // Foreign Key collection...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, FKS);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK018", items, REFRESH, 0, "", "");
-
-  // Foreign Key Node...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, FK);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK019", items, REFRESH, 0, "", "");
-
-  // Multiple Foreign Key Nodes...
-  data->setNodes(&data->treeTestHelper, nodes, FK);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // Refresh All
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK020", items, REFRESH, 0, "", "");
-
-  //================= View Nodes =================//
-  // Single View Node...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, VIEW);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 7 Real items plus 2 separators
-  EXPECT_EQ(items.size(), 9U);
-  data->ensureMenuItemsExist("TF028CHK021", items, SEL_ROWS | COPY_TC | SEND_TE | CREATE | ALTER | DROP | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_SEL_ALL | SUB_CREATE, "View", "");
-
-  // Multiple View Nodes...
-  data->setNodes(&data->treeTestHelper, nodes, VIEW);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  // 5 Real items plus 2 separators
-  EXPECT_EQ(items.size(), 7U);
-  data->ensureMenuItemsExist("TF028CHK022", items, COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_SEL_ALL | SUB_CREATE, "View", "2 Views");
-
-  //================= Procedure Nodes =================//
-  // Single Procedure Node...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, PROCEDURE);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  EXPECT_EQ(items.size(), 8U);
-  data->ensureMenuItemsExist("TF028CHK023", items, COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_CREATE, "Procedure", "");
-
-  // Multiple Procedure Nodes...
-  data->setNodes(&data->treeTestHelper, nodes, PROCEDURE);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  EXPECT_EQ(items.size(), 7U);
-  data->ensureMenuItemsExist("TF028CHK024", items, COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_CREATE, "Procedure", "2 Procedures");
-
-  //================= Function Nodes =================//
-  // Single Function Node...
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, FUNCTION);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  EXPECT_EQ(items.size(), 8U);
-  data->ensureMenuItemsExist("TF028CHK025", items, COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_CREATE, "Function", "");
-
-  // Multiple Function Nodes...
-  data->setNodes(&data->treeTestHelper, nodes, FUNCTION);
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-
-  EXPECT_EQ(items.size(), 7U);
-  data->ensureMenuItemsExist("TF028CHK026", items, COPY_TC | SEND_TE | ALTER | DROP | REFRESH,
-                             SUB_NAME_S | SUB_NAME_L | SUB_CREATE, "Function", "2 Functions");
-
-  //================= No Nodes =================//
-  nodes.clear();
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-  EXPECT_EQ(items.size(), 1U);
-  data->ensureMenuItemsExist("TF028CHK027", items, REFRESH, 0, "", "");
-
-  //================= Multiple Nodes of Different Type =================//
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, SCHEMA | TABLES | TABLE);
-  data->setNodes(&data->treeTestHelper, nodes, TABLE | TABLE_COLUMN | VIEW | PROCEDURE | FUNCTION);
-
-  items = data->treeTestHelper.get_popup_items_for_nodes(nodes);
-  EXPECT_EQ(items.size(), 4U);
-  data->ensureMenuItemsExist("TF028CHK028", items, COPY_TC | SEND_TE | REFRESH, SUB_NAME_S | SUB_NAME_L, "",
-                             "6 Objects");
+  GRT::get()->set("/wb/options/options/SqlEditor:LimitRows", IntegerRef(1));
+  for (int limit : {100, 0, -1}) {
+    GRT::get()->set("/wb/options/options/SqlEditor:LimitRowsCount", IntegerRef(limit));
+    check_menu(TABLE, 1, {
+      {"select_data", limit > 0 ? "Select Rows - Limit 100" : "Select Rows", bec::MenuAction, true},
+      {"builtins_separator", "", bec::MenuSeparator, true},
+      refresh_menu[0], refresh_menu[1]
+    });
+  }
 
   data->pModelView->root_node()->remove_children();
 }
 
 TEST_F(Live_Schema_TreeTest, Activating_a_popup_item_for_a_node) {
-  GTEST_SKIP() << "test code was never enabled and needs fixes";
 
   std::list<mforms::TreeNodeRef> nodes;
-  mforms::TreeNodeRef schema_node;
-  mforms::TreeNodeRef object_node;
-  LiveSchemaTree::ChangeRecord change;
-
   data->fillBasicSchema("Activating a popup item for a node");
 
   // Tests the Refresh All function.
   data->delegate->_expect_tree_refresh = true;
   data->delegate->_check_id = "TF029CHK002";
-  data->treeTestHelper.activate_popup_item_for_nodes("refresh", nodes);
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("refresh", nodes));
   data->delegate->check_and_reset("TF029CHK002");
 
-  //================= Performs the action for multiple nodes of different type =================//
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, SCHEMA | TABLE);
-  data->setNodes(&data->treeTestHelper, nodes, TABLE | TABLE_COLUMN | VIEW | PROCEDURE | FUNCTION);
-
-  // Tests the Alter function
-  data->setChangeRecords(data->delegate->_mock_expected_changes, SCHEMA | TABLE);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW | PROCEDURE | FUNCTION);
-
-  data->delegate->_check_id = "TF029CHK003";
-  data->delegate->_expect_tree_alter_objects = true;
-  data->treeTestHelper.activate_popup_item_for_nodes("alter", nodes);
-  data->delegate->check_and_reset("TF029CHK003");
-
-  // Tests the Drop function
-  data->setChangeRecords(data->delegate->_mock_expected_changes, SCHEMA | TABLE);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW | PROCEDURE | FUNCTION);
-
-  data->delegate->_check_id = "TF029CHK004";
-  data->delegate->_expect_tree_drop_objects = true;
-  data->treeTestHelper.activate_popup_item_for_nodes("drop", nodes);
-  data->delegate->check_and_reset("TF029CHK004");
-
-  // Tests the edit data option with tables
-  nodes.clear();
+  // Native selection actions report the selected objects to the delegate.
   data->setNodes(&data->treeTestHelper, nodes, TABLE);
   data->setNodes(&data->treeTestHelper, nodes, TABLE);
-
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
-
-  data->delegate->_check_id = "TF029CHK005";
-  data->delegate->_expect_tree_activate_objects = true;
-  data->delegate->_mock_expected_action = "edit_data";
-  data->treeTestHelper.activate_popup_item_for_nodes("edit_data", nodes);
-  data->delegate->check_and_reset("TF029CHK005");
 
   data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
   data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
   data->delegate->_check_id = "TF029CHK005.1";
   data->delegate->_expect_tree_activate_objects = true;
   data->delegate->_mock_expected_action = "select_data";
-  data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes);
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes));
   data->delegate->check_and_reset("TF029CHK005.1");
 
-  // Tests the edit data option with views
+  // Collection nodes are ignored; schema objects retain their object types.
   nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, TABLE | VIEW | PROCEDURE | FUNCTION);
-
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW | PROCEDURE | FUNCTION);
-
-  data->delegate->_check_id = "TF029CHK006";
-  data->delegate->_expect_tree_activate_objects = true;
-  data->delegate->_mock_expected_action = "edit_data";
-  data->treeTestHelper.activate_popup_item_for_nodes("edit_data", nodes);
-  data->delegate->check_and_reset("TF029CHK006");
+  data->setNodes(&data->treeTestHelper, nodes, TABLES | TABLE | VIEW | PROCEDURE | FUNCTION);
 
   data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW | PROCEDURE | FUNCTION);
 
   data->delegate->_check_id = "TF029CHK006.1";
   data->delegate->_expect_tree_activate_objects = true;
   data->delegate->_mock_expected_action = "select_data";
-  data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes);
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes));
   data->delegate->check_and_reset("TF029CHK006.1");
 
-  // Tests the edit data option with table columns
+  // Column selections carry the column names and use the column-selection action.
   nodes.clear();
   data->setNodes(&data->treeTestHelper, nodes, COLUMNS | TABLE_COLUMN | VIEW_COLUMN);
-
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW);
-  data->delegate->_mock_expected_changes[0].detail = "table_column1";
-  data->delegate->_mock_expected_changes[1].detail = "table_column1";
-  data->delegate->_mock_expected_changes[2].detail = "view_column1";
-
-  data->delegate->_check_id = "TF029CHK007";
-  data->delegate->_expect_tree_activate_objects = true;
-  data->delegate->_mock_expected_action = "edit_data_columns";
-  data->treeTestHelper.activate_popup_item_for_nodes("edit_data_columns", nodes);
-  data->delegate->check_and_reset("TF029CHK007");
 
   data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
   data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW);
@@ -3819,73 +3374,34 @@ TEST_F(Live_Schema_TreeTest, Activating_a_popup_item_for_a_node) {
   data->delegate->_check_id = "TF029CHK007.1";
   data->delegate->_expect_tree_activate_objects = true;
   data->delegate->_mock_expected_action = "select_data_columns";
-  data->treeTestHelper.activate_popup_item_for_nodes("select_data_columns", nodes);
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes));
   data->delegate->check_and_reset("TF029CHK007.1");
 
-  // Tests the edit data option with the nodes that should be ignored
+  // A column collection selects all of its columns without an explicit column-node selection.
+  nodes.clear();
+  data->setNodes(&data->treeTestHelper, nodes, COLUMNS);
+  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE);
+  data->delegate->_mock_expected_changes[0].detail = "table_column1";
+  data->delegate->_expect_tree_activate_objects = true;
+  data->delegate->_mock_expected_action = "select_data";
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes));
+  data->delegate->check_and_reset("Selecting a column collection");
+
   nodes.clear();
   data->setNodes(&data->treeTestHelper, nodes,
                  SCHEMA | TABLES | VIEWS | PROCEDURES | FUNCTIONS | INDEXES | INDEX | TRIGGERS | TRIGGER | FKS | FK);
 
-  data->delegate->_check_id = "TF029CHK008";
-  data->treeTestHelper.activate_popup_item_for_nodes("edit_data", nodes);
-  data->delegate->check_and_reset("TF029CHK008");
-
   data->delegate->_check_id = "TF029CHK008.1";
-  data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes);
+  data->delegate->_expect_tree_activate_objects = true;
+  data->delegate->_mock_expected_action = "select_data";
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes));
   data->delegate->check_and_reset("TF029CHK008.1");
 
-  // Tests the create function without objects
+  // An empty selection still dispatches the native selection action with no changes.
   nodes.clear();
-  data->setChangeRecords(data->delegate->_mock_expected_changes, SCHEMA);
-  data->delegate->_mock_expected_changes[0].schema = "";
-  data->delegate->_mock_expected_changes[0].name = "";
-
-  data->delegate->_check_id = "TF029CHK009";
-  data->delegate->_expect_tree_create_object = true;
-  data->treeTestHelper.activate_popup_item_for_nodes("create", nodes);
-  data->delegate->check_and_reset("TF029CHK009");
-
-  // Tests the create functions for schema object
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, SCHEMA | TABLES | TABLE | VIEWS | VIEW | PROCEDURE | FUNCTION);
-
-  data->setChangeRecords(data->delegate->_mock_expected_changes, SCHEMA | TABLE);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, TABLE | VIEW);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, VIEW | PROCEDURE | FUNCTION);
-
-  data->delegate->_mock_expected_changes[0].schema = "";
-  while (data->delegate->_mock_expected_changes.size()) {
-    data->delegate->_mock_expected_changes[0].name = "";
-    data->delegate->_check_id = "TF029CHK010";
-    data->delegate->_expect_tree_create_object = true;
-    data->treeTestHelper.activate_popup_item_for_nodes("create", nodes);
-    nodes.erase(nodes.begin());
-  }
-
-  data->delegate->check_and_reset("TF029CHK010");
-
-  // Testing create in routines collection produces a procedure node.
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, PROCEDURES);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, PROCEDURE);
-
-  data->delegate->_check_id = "TF029CHK011";
-  data->delegate->_expect_tree_create_object = true;
-  data->delegate->_mock_expected_changes[0].name = "";
-  data->treeTestHelper.activate_popup_item_for_nodes("create", nodes);
-  data->delegate->check_and_reset("TF029CHK011");
-
-  // Testing create in routines collection produces a procedure node.
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, FUNCTIONS);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, FUNCTION);
-
-  data->delegate->_check_id = "TF029CHK012";
-  data->delegate->_expect_tree_create_object = true;
-  data->delegate->_mock_expected_changes[0].name = "";
-  data->treeTestHelper.activate_popup_item_for_nodes("create", nodes);
-  data->delegate->check_and_reset("TF029CHK012");
+  data->delegate->_expect_tree_activate_objects = true;
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("select_data", nodes));
+  data->delegate->check_and_reset("Selecting no nodes");
 
   // Tests the set active schema function.
   nodes.clear();
@@ -3897,7 +3413,7 @@ TEST_F(Live_Schema_TreeTest, Activating_a_popup_item_for_a_node) {
   data->delegate->_check_id = "TF029CHK013";
   data->delegate->_expect_tree_activate_objects = true;
   data->delegate->_mock_expected_action = "activate";
-  data->treeTestHelper.activate_popup_item_for_nodes("set_active_schema", nodes);
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("set_active_schema", nodes));
   data->delegate->check_and_reset("TF029CHK013");
 
   // Tests the set filter schema function.
@@ -3908,50 +3424,24 @@ TEST_F(Live_Schema_TreeTest, Activating_a_popup_item_for_a_node) {
   data->delegate->_check_id = "TF029CHK014";
   data->delegate->_expect_tree_activate_objects = true;
   data->delegate->_mock_expected_action = "filter";
-  data->treeTestHelper.activate_popup_item_for_nodes("filter_schema", nodes);
+  EXPECT_TRUE(data->treeTestHelper.activate_popup_item_for_nodes("filter_schema", nodes));
   data->delegate->check_and_reset("TF029CHK014");
 
-  //////////////////////////////////////////////////////////////////////
-  //  deprecated
-  //////////////////////////////////////////////////////////////////////
-
-  // Tests a custom functions for the database objects.
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes, SCHEMA | TABLE | VIEW | PROCEDURE | FUNCTION);
-  data->setChangeRecords(data->delegate->_mock_expected_changes, SCHEMA | TABLE | VIEW | PROCEDURE | FUNCTION);
-  data->delegate->_mock_expected_changes[0].detail = "schema";
-  data->delegate->_mock_expected_changes[1].detail = "table";
-  data->delegate->_mock_expected_changes[2].detail = "view";
-  data->delegate->_mock_expected_changes[3].detail = "routine";
-  data->delegate->_mock_expected_changes[4].detail = "routine";
-  data->delegate->_mock_expected_changes[0].schema = "schema1";
-  data->delegate->_mock_expected_changes[0].name = "";
-
-  EXPECT_EQ(data->delegate->_mock_expected_changes.size(), nodes.size());
-  while (data->delegate->_mock_expected_changes.size()) {
-    data->delegate->_expect_plugin_item_call = true;
-
-    data->delegate->_check_id = "TF029CHK015";
-    data->delegate->_mock_expected_action = "whatever";
-    data->treeTestHelper.activate_popup_item_for_nodes("whatever", nodes);
-    nodes.erase(nodes.begin());
+  // Other actions are forwarded once to sidebar_action, including its handled/unhandled result.
+  for (const char* action : {"alter", "drop", "create", "edit_data", "select_data_columns", "whatever"}) {
+    for (bool handled : {true, false}) {
+      SCOPED_TRACE(action);
+      data->delegate->_mock_expected_action = action;
+      data->delegate->_expect_sidebar_action = true;
+      data->delegate->_mock_sidebar_action_result = handled;
+      EXPECT_EQ(data->treeTestHelper.activate_popup_item_for_nodes(action, nodes), handled);
+      data->delegate->check_and_reset("Forwarding sidebar actions");
+    }
   }
 
-  data->delegate->check_and_reset("TF029CHK015");
-
-  // Ensures custom doesn't work for non database nodes.
-  nodes.clear();
-  data->setNodes(&data->treeTestHelper, nodes,
-                 TABLES | VIEWS | PROCEDURES | COLUMNS | TABLE_COLUMN | INDEXES | INDEX | TRIGGERS | TRIGGER | FKS |
-                   FK | VIEW_COLUMN);
-
-  while (nodes.size()) {
-    data->delegate->_check_id = "TF029CHK016";
-    data->treeTestHelper.activate_popup_item_for_nodes("whatever", nodes);
-    nodes.erase(nodes.begin());
-  }
-
-  data->delegate->check_and_reset("TF029CHK016");
+  data->treeTestHelper.set_delegate(std::shared_ptr<LiveSchemaTree::Delegate>());
+  EXPECT_FALSE(data->treeTestHelper.activate_popup_item_for_nodes("refresh", nodes));
+  EXPECT_FALSE(data->treeTestHelper.activate_popup_item_for_nodes("whatever", nodes));
   data->pModelView->root_node()->remove_children();
 }
 
@@ -4104,7 +3594,14 @@ TEST_F(Live_Schema_TreeTest, Children_copies_when_switching_filters) {
 
   // Ensure no matter the type, all the children are copied if no filter is specified.
   EXPECT_EQ(root_node_f->count(), 0);
+  const guint log_handler = g_log_set_handler(
+    "GLib", G_LOG_LEVEL_CRITICAL,
+    [](const gchar*, GLogLevelFlags, const gchar* message, gpointer) {
+      ADD_FAILURE() << "Unexpected GLib critical while copying unfiltered children: " << message;
+    },
+    nullptr);
   data->treeTestHelper.filter_children(LiveSchemaTree::Schema, root_node, root_node_f);
+  g_log_remove_handler("GLib", log_handler);
   EXPECT_EQ(root_node_f->count(), root_node->count());
 
   for (int schema_index = 0; schema_index < root_node->count(); schema_index++) {
