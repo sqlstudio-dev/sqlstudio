@@ -55,6 +55,11 @@ For diagram undo/redo integration tests, use the same runner with
 test context afterward. These tests also require the built runtime resources,
 but do not require a MySQL connection.
 
+For SQL-to-model diff/apply tests, use
+`--gtest_filter=db_mysql_pluginTest.*`. The suite parses SQL and applies changes
+to the `all_objects.mwb` model fixture in memory. It requires the built application
+runtime resources, but does not connect to MySQL or execute SQL against a server.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:
