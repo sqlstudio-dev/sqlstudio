@@ -23,185 +23,140 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <cppconn/prepared_statement.h>
-#include <cppconn/connection.h>
-#include <cppconn/statement.h>
-#include <cppconn/resultset.h>
-#include <cppconn/metadata.h>
+#include "connector_test_fixture.h"
 
-#include "grt.h"
-#include "cdbc/src/driver_manager.h"
-#include "wb_connection_helpers.h"
-#include "wb_test_helpers.h"
-
-#include "helpers.h"
-#include "gtest/gtest.h"
-
-extern void register_all_metaclasses();
+#include <cppconn/exception.h>
 
 namespace {
+using namespace testing;
+using namespace sql::test;
 
-  class DbcMetadataTest : public ::testing::Test {
-  protected:
-    void SetUp() override {
-      register_all_metaclasses();
-      grt::GRT::get()->scan_metaclasses_in("../../res/grt/");
-      grt::GRT::get()->end_loading_metaclasses();
-      EXPECT_EQ((size_t)INT_METACLASS_COUNT, grt::GRT::get()->get_metaclasses().size());
-    }
+class DbcMetadataTest : public MockConnectorFixture {
+protected:
+  StrictMock<MockDatabaseMetaData> metadata;
+  sql::ConnectionWrapper connection;
+  sql::DatabaseMetaData *meta = nullptr;
 
-    void TearDown() override {
-      SqlStudioTester::reinitGRT();
-    }
-  };
+  void SetUp() override {
+    EXPECT_CALL(metadata, destroyed());
+    MockConnectorFixture::SetUp();
+    auto mockConnection = expectConnection();
+    connection = manager->getConnection(connectionProperties);
+    EXPECT_CALL(*mockConnection, getMetaData()).WillOnce(Return(&metadata));
+    meta = connection->getMetaData();
+    ASSERT_NE(nullptr, meta);
+  }
+
+  void TearDown() override {
+    meta = nullptr;
+    connection.reset();
+    MockConnectorFixture::TearDown();
+  }
+};
 
 TEST_F(DbcMetadataTest, TestDatabaseMetaDataGetCatalogs) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
+  auto result = newMock<MockResultSet>();
+  EXPECT_CALL(metadata, getCatalogs()).WillOnce(transferOwnership(result));
+  EXPECT_CALL(*result, rowsCount()).WillOnce(Return(1));
+  EXPECT_CALL(*result, next()).WillOnce(Return(true)).WillOnce(Return(false));
+  EXPECT_CALL(*result, getString(sql::SQLString("TABLE_CAT"))).WillOnce(Return(sql::SQLString("def")));
 
-  setupConnectionEnvironment(connectionProperties);
-
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper.get());
-
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-
-    // TODO: getCatalogs() is not implemented.
-    // std::auto_ptr<sql::Statement> rset(meta->getCatalogs());
-    // ensure("rset is not NULL", rset.get() != NULL);
-    // while (rset->next());
-  } catch (sql::SQLException &) {
-    printf("ERR: Caught sql::SQLException\n");
-    throw;
-  } catch (...) {
-    printf("ERR: Caught unknown exception\n");
-    throw;
-  }
+  std::unique_ptr<sql::ResultSet> catalogs(meta->getCatalogs());
+  ASSERT_NE(nullptr, catalogs.get());
+  EXPECT_EQ(1U, catalogs->rowsCount());
+  ASSERT_TRUE(catalogs->next());
+  EXPECT_EQ(sql::SQLString("def"), catalogs->getString("TABLE_CAT"));
+  EXPECT_FALSE(catalogs->next());
 }
 
 TEST_F(DbcMetadataTest, TestDatabaseMetaDataGetDatabaseProductName) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-  setupConnectionEnvironment(connectionProperties);
-
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper.get());
-
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-
-    meta->getDatabaseProductName();
-  } catch (sql::SQLException &) {
-    printf("ERR: Caught sql::SQLException\n");
-  }
+  const sql::SQLString name("MySQL");
+  EXPECT_CALL(metadata, getDatabaseProductName()).WillOnce(ReturnRef(name));
+  EXPECT_EQ(sql::SQLString("MySQL"), meta->getDatabaseProductName());
 }
 
 TEST_F(DbcMetadataTest, TestDatabaseMetaDataGetDatabaseProductVersion) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-  setupConnectionEnvironment(connectionProperties);
-
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper.get());
-
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-
-    meta->getDatabaseProductVersion();
-  } catch (sql::SQLException &) {
-    printf("ERR: Caught sql::SQLException\n");
-    throw;
-  }
+  EXPECT_CALL(metadata, getDatabaseProductVersion()).WillOnce(Return(sql::SQLString("8.0.44")));
+  EXPECT_EQ(sql::SQLString("8.0.44"), meta->getDatabaseProductVersion());
 }
 
 TEST_F(DbcMetadataTest, TestDatabaseMetaDataGetDriverMajorVersion) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-  setupConnectionEnvironment(connectionProperties);
-
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper.get());
-
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-
-    meta->getDriverMajorVersion();
-  } catch (sql::SQLException &) {
-    printf("ERR: Caught sql::SQLException\n");
-    throw;
-  }
+  EXPECT_CALL(metadata, getDriverMajorVersion()).WillOnce(Return(8));
+  EXPECT_EQ(8U, meta->getDriverMajorVersion());
 }
 
 TEST_F(DbcMetadataTest, TestDatabaseMetaDataGetDriverMinorVersion) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-  setupConnectionEnvironment(connectionProperties);
-
-  try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper.get());
-
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-
-    meta->getDriverMinorVersion();
-  } catch (sql::SQLException &) {
-    printf("ERR: Caught sql::SQLException\n");
-    throw;
-  }
+  EXPECT_CALL(metadata, getDriverMinorVersion()).WillOnce(Return(0));
+  EXPECT_EQ(0U, meta->getDriverMinorVersion());
 }
 
 TEST_F(DbcMetadataTest, TestDatabaseMetaDataGetDriverName) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
+  const sql::SQLString name("MySQL Connector/C++");
+  EXPECT_CALL(metadata, getDriverName()).WillOnce(ReturnRef(name));
+  EXPECT_EQ(sql::SQLString("MySQL Connector/C++"), meta->getDriverName());
+}
 
-  setupConnectionEnvironment(connectionProperties);
-
+TEST_F(DbcMetadataTest, MetadataFailurePropagates) {
+  EXPECT_CALL(metadata, getDatabaseProductName())
+    .WillOnce(Throw(sql::SQLException("Mock metadata failed", "HY000", 2013)));
   try {
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    EXPECT_NE(nullptr, dm);
-
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    EXPECT_NE(nullptr, wrapper.get());
-
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    EXPECT_NE(nullptr, meta);
-
-    meta->getDriverName();
-  } catch (sql::SQLException &) {
-    printf("ERR: Caught sql::SQLException\n");
-    throw;
+    meta->getDatabaseProductName();
+    FAIL() << "Expected metadata failure";
+  } catch (const sql::SQLException &error) {
+    EXPECT_EQ(2013, error.getErrorCode());
+    EXPECT_EQ(sql::SQLString("HY000"), error.getSQLState());
+    EXPECT_STREQ("Mock metadata failed", error.what());
   }
 }
+
+class DbcMetadataIntegrationTest : public LiveConnectorFixture {
+protected:
+  sql::DatabaseMetaData *meta = nullptr;
+
+  void SetUp() override {
+    LiveConnectorFixture::SetUp();
+    if (IsSkipped() || HasFatalFailure())
+      return;
+    meta = connection->getMetaData();
+    ASSERT_NE(nullptr, meta);
+  }
+};
+
+TEST_F(DbcMetadataIntegrationTest, TestDatabaseMetaDataGetCatalogs) {
+  std::unique_ptr<sql::ResultSet> catalogs(meta->getCatalogs());
+  ASSERT_NE(nullptr, catalogs.get());
+  EXPECT_EQ(1U, catalogs->rowsCount());
+  ASSERT_TRUE(catalogs->next());
+  EXPECT_EQ(sql::SQLString("def"), catalogs->getString("TABLE_CAT"));
+  EXPECT_FALSE(catalogs->next());
 }
 
+TEST_F(DbcMetadataIntegrationTest, TestDatabaseMetaDataGetDatabaseProductName) {
+  EXPECT_EQ(sql::SQLString("MySQL"), meta->getDatabaseProductName());
+}
+
+TEST_F(DbcMetadataIntegrationTest, TestDatabaseMetaDataGetDatabaseProductVersion) {
+  std::unique_ptr<sql::Statement> statement(connection->createStatement());
+  ASSERT_NE(nullptr, statement.get());
+  std::unique_ptr<sql::ResultSet> version(statement->executeQuery("SELECT VERSION()"));
+  ASSERT_NE(nullptr, version.get());
+  ASSERT_TRUE(version->next());
+  EXPECT_EQ(version->getString(1), meta->getDatabaseProductVersion());
+}
+
+TEST_F(DbcMetadataIntegrationTest, TestDatabaseMetaDataGetDriverMajorVersion) {
+  auto driver = connection->getDriver();
+  ASSERT_NE(nullptr, driver);
+  EXPECT_EQ(static_cast<unsigned int>(driver->getMajorVersion()), meta->getDriverMajorVersion());
+}
+
+TEST_F(DbcMetadataIntegrationTest, TestDatabaseMetaDataGetDriverMinorVersion) {
+  auto driver = connection->getDriver();
+  ASSERT_NE(nullptr, driver);
+  EXPECT_EQ(static_cast<unsigned int>(driver->getMinorVersion()), meta->getDriverMinorVersion());
+}
+
+TEST_F(DbcMetadataIntegrationTest, TestDatabaseMetaDataGetDriverName) {
+  EXPECT_EQ(sql::SQLString("MySQL Connector/C++"), meta->getDriverName());
+}
+} // namespace

@@ -127,12 +127,18 @@ metadata, prepared-statement, and rollback calls through the connection manager
 with strict connector mocks. The canned results do not verify MySQL schema,
 metadata, or transaction behavior.
 
+`--gtest_filter=DbcMetadataTest.*` runs offline using the same initialized fixture.
+It checks catalog result ownership, product and driver metadata, and exception
+propagation with strict mocks. `getCatalogs()` is exercised rather than treated as
+unimplemented. Real getter values are checked by `DbcMetadataIntegrationTest.*`;
+the offline tests do not validate a live connector's metadata.
+
 To run those checks against a real, isolated MySQL test server on Windows:
 
 ```powershell
 # Configure DB_HOST, DB_PORT, DB_USER and DB_PASSWORD for the test server first.
 $env:SQLSTUDIO_DBC_LIVE_TESTS = '1'
-.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=DbcGeneralIntegrationTest.*'
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=DbcGeneralIntegrationTest.*:DbcMetadataIntegrationTest.*'
 Remove-Item Env:\SQLSTUDIO_DBC_LIVE_TESTS
 ```
 
@@ -140,10 +146,11 @@ The Windows runner and the top-level CMake test target use `DB_HOST`, `DB_PORT`,
 `DB_USER`, and `DB_PASSWORD` (defaulting to `localhost`, `3306`, `root`, and an
 empty password). The legacy `testing/test-suite` CMake target uses the equivalent
 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, and `TEST_DB_PASSWORD` variables.
-The integration tests are skipped unless explicitly enabled; connection and SQL
+Both integration suites are skipped unless explicitly enabled; connection and SQL
 errors fail the tests once enabled. The account needs permission to create and drop
-schemas and tables. Each test creates a uniquely named `sqlstudio_dbc_<uuid>` schema
-and drops only that schema during teardown; an interrupted process may leave it behind.
+schemas and tables for the general integration suite. Its tests create a uniquely
+named `sqlstudio_dbc_<uuid>` schema and drop only that schema during teardown;
+an interrupted process may leave it behind. The metadata integration suite is read-only.
 
 Additional offline regressions can be selected with these suite filters:
 

@@ -2,8 +2,10 @@
 
 #include "connector_mocks.h"
 #include "cdbc/src/driver_manager.h"
+#include "wb_connection_helpers.h"
 #include "wb_test_helpers.h"
 
+#include <cstdlib>
 #include <functional>
 #include <memory>
 
@@ -85,6 +87,37 @@ protected:
       .WillOnce(transferOwnership(userStatement))
       .WillOnce(transferOwnership(charsetStatement));
     return connection;
+  }
+};
+
+class LiveConnectorFixture : public ::testing::Test {
+protected:
+  std::unique_ptr<SqlStudioTester> tester;
+  std::unique_ptr<sql::DriverManager> manager;
+  db_mgmt_ConnectionRef connectionProperties;
+  sql::ConnectionWrapper connection;
+
+  void SetUp() override {
+    const char *enabled = std::getenv("SQLSTUDIO_DBC_LIVE_TESTS");
+    if (!enabled)
+      GTEST_SKIP() << "Set SQLSTUDIO_DBC_LIVE_TESTS=1 to run the MySQL integration tests";
+    ASSERT_STREQ("1", enabled) << "SQLSTUDIO_DBC_LIVE_TESTS must be 1 when set";
+
+    grt::GRT::get();
+    tester = std::make_unique<SqlStudioTester>();
+    manager = std::make_unique<sql::DriverManager>();
+    manager->set_testing();
+    connectionProperties = db_mgmt_ConnectionRef(grt::Initialized);
+    setupConnectionEnvironment(connectionProperties);
+    connection = manager->getConnection(connectionProperties);
+    ASSERT_NE(nullptr, connection.get());
+  }
+
+  void TearDown() override {
+    connection.reset();
+    connectionProperties = db_mgmt_ConnectionRef();
+    manager.reset();
+    tester.reset();
   }
 };
 
