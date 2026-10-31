@@ -174,6 +174,10 @@ add_executable(wbtests-bin
   tests/plugins/db.mysql.editors/backend/mysql_table_editor_specs.cpp
 )
 
+if(MSVC)
+  set_property(SOURCE tests/library/cdbc/dbc_general_specs.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " /bigobj")
+endif()
+
 target_include_directories(wbtests-bin
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

@@ -111,6 +111,7 @@
   <ItemGroup>
     <ClInclude Include="core\context.h" />
     <ClInclude Include="tests\library\cdbc\connector_mocks.h" />
+    <ClInclude Include="tests\library\cdbc\connector_test_fixture.h" />
     <ClInclude Include="core\grt_test_helpers.h" />
     <ClInclude Include="core\grt_values_test_data.h" />
     <ClInclude Include="core\helpers.h" />
@@ -211,7 +212,9 @@
     <ClCompile Include="tests\library\base\threading_specs.cpp" />
     <ClCompile Include="tests\library\base\utf8string_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_connection_specs.cpp" />
-    <ClCompile Include="tests\library\cdbc\dbc_general_specs.cpp" />
+    <ClCompile Include="tests\library\cdbc\dbc_general_specs.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="tests\library\cdbc\dbc_metadata_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_result_set_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_statement_specs.cpp" />

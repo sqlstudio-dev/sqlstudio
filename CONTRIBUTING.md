@@ -122,6 +122,29 @@ They do not verify server transactions, live connection IDs, or KILL behavior.
 Keep the test-only connector mock signatures aligned with the bundled interfaces;
 methods added by newer connector releases deliberately omit `override`.
 
+`--gtest_filter=DbcGeneralTest.*` also runs offline. It checks ordered statement,
+metadata, prepared-statement, and rollback calls through the connection manager
+with strict connector mocks. The canned results do not verify MySQL schema,
+metadata, or transaction behavior.
+
+To run those checks against a real, isolated MySQL test server on Windows:
+
+```powershell
+# Configure DB_HOST, DB_PORT, DB_USER and DB_PASSWORD for the test server first.
+$env:SQLSTUDIO_DBC_LIVE_TESTS = '1'
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=DbcGeneralIntegrationTest.*'
+Remove-Item Env:\SQLSTUDIO_DBC_LIVE_TESTS
+```
+
+The Windows runner and the top-level CMake test target use `DB_HOST`, `DB_PORT`,
+`DB_USER`, and `DB_PASSWORD` (defaulting to `localhost`, `3306`, `root`, and an
+empty password). The legacy `testing/test-suite` CMake target uses the equivalent
+`TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, and `TEST_DB_PASSWORD` variables.
+The integration tests are skipped unless explicitly enabled; connection and SQL
+errors fail the tests once enabled. The account needs permission to create and drop
+schemas and tables. Each test creates a uniquely named `sqlstudio_dbc_<uuid>` schema
+and drops only that schema during teardown; an interrupted process may leave it behind.
+
 Additional offline regressions can be selected with these suite filters:
 
 - `CompactSidebar.*:HomeWelcomeLayout.*`: resource-backed layout checks, including

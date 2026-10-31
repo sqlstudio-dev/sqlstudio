@@ -384,6 +384,9 @@
     <ClInclude Include="tests\library\cdbc\connector_mocks.h">
       <Filter>tests\library\cdbc</Filter>
     </ClInclude>
+    <ClInclude Include="tests\library\cdbc\connector_test_fixture.h">
+      <Filter>tests\library\cdbc</Filter>
+    </ClInclude>
     <ClInclude Include="core\grt_test_helpers.h">
       <Filter>core</Filter>
     </ClInclude>

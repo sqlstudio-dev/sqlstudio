@@ -2,6 +2,7 @@
 #pragma once
 #include <cppconn/driver.h>
 #include <cppconn/connection.h>
+#include <cppconn/prepared_statement.h>
 #include <cppconn/statement.h>
 #include <cppconn/resultset.h>
 #include <cppconn/metadata.h>
@@ -74,9 +75,10 @@ public:
   MOCK_METHOD(void, setTransactionIsolation, (enum_transaction_isolation level));
 };
 
-class MockStatement : public Statement {
+template <typename StatementType>
+class MockStatementBase : public StatementType {
 public:
-  ~MockStatement() override { destroyed(); }
+  ~MockStatementBase() override { destroyed(); }
   MOCK_METHOD(void, destroyed, ());
   MOCK_METHOD(Connection *, getConnection, ());
   MOCK_METHOD(void, cancel, ());
@@ -100,7 +102,7 @@ public:
   MOCK_METHOD(void, setMaxFieldSize, (unsigned int max));
   MOCK_METHOD(void, setMaxRows, (unsigned int max));
   MOCK_METHOD(void, setQueryTimeout, (unsigned int seconds));
-  MOCK_METHOD(Statement *, setResultSetType, (sql::ResultSet::enum_type type));
+  MOCK_METHOD(StatementType *, setResultSetType, (sql::ResultSet::enum_type type));
   MOCK_METHOD(int, setQueryAttrBigInt, (const sql::SQLString &name, const sql::SQLString& value));
   MOCK_METHOD(int, setQueryAttrBoolean, (const sql::SQLString &name, bool value));
   MOCK_METHOD(int, setQueryAttrDateTime, (const sql::SQLString &name, const sql::SQLString& value));
@@ -112,6 +114,34 @@ public:
   MOCK_METHOD(int, setQueryAttrNull, (const sql::SQLString &name));
   MOCK_METHOD(int, setQueryAttrString, (const sql::SQLString &name, const sql::SQLString& value));
   MOCK_METHOD(void, clearAttributes, ());
+};
+
+using MockStatement = MockStatementBase<Statement>;
+
+class MockPreparedStatement : public MockStatementBase<PreparedStatement> {
+public:
+  using MockStatementBase<PreparedStatement>::execute;
+  using MockStatementBase<PreparedStatement>::executeQuery;
+  using MockStatementBase<PreparedStatement>::executeUpdate;
+
+  MOCK_METHOD(void, clearParameters, ());
+  MOCK_METHOD(bool, execute, ());
+  MOCK_METHOD(ResultSet *, executeQuery, ());
+  MOCK_METHOD(int, executeUpdate, ());
+  MOCK_METHOD(ResultSetMetaData *, getMetaData, ());
+  MOCK_METHOD(ParameterMetaData *, getParameterMetaData, ());
+  MOCK_METHOD(void, setBigInt, (unsigned int parameterIndex, const sql::SQLString &value));
+  MOCK_METHOD(void, setBlob, (unsigned int parameterIndex, std::istream *blob));
+  MOCK_METHOD(void, setBoolean, (unsigned int parameterIndex, bool value));
+  MOCK_METHOD(void, setDateTime, (unsigned int parameterIndex, const sql::SQLString &value));
+  MOCK_METHOD(void, setDouble, (unsigned int parameterIndex, double value));
+  MOCK_METHOD(void, setInt, (unsigned int parameterIndex, int32_t value));
+  MOCK_METHOD(void, setUInt, (unsigned int parameterIndex, uint32_t value));
+  MOCK_METHOD(void, setInt64, (unsigned int parameterIndex, int64_t value));
+  MOCK_METHOD(void, setUInt64, (unsigned int parameterIndex, uint64_t value));
+  MOCK_METHOD(void, setNull, (unsigned int parameterIndex, int sqlType));
+  MOCK_METHOD(void, setString, (unsigned int parameterIndex, const sql::SQLString &value));
+  MOCK_METHOD(void, setVector, (unsigned int parameterIndex, const std::vector<float> &value));
 };
 
 class MockResultSet : public ResultSet {

@@ -109,6 +109,9 @@ set(TEST_LIBRARY_CDBC_SPECS
   test-suite/tests/library/cdbc/dbc_result_set_specs.cpp
   test-suite/tests/library/cdbc/dbc_statement_specs.cpp
 )
+if(MSVC)
+  set_property(SOURCE test-suite/tests/library/cdbc/dbc_general_specs.cpp APPEND_STRING PROPERTY COMPILE_FLAGS " /bigobj")
+endif()
 
 # library/forms
 set(TEST_LIBRARY_FORMS_SPECS
