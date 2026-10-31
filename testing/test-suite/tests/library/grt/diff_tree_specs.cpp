@@ -34,8 +34,10 @@
 #include "module_db_mysql.h"
 #include "backend/diff_tree.h"
 #include "base/util_functions.h"
+#include "base/string_utilities.h"
 
 #include <fstream>
+#include <filesystem>
 #include "gtest/gtest.h"
 
 using namespace grt;
@@ -56,10 +58,9 @@ protected:
   std::unique_ptr<SqlStudioTester> tester;
   std::string dataDir;
   void SetUp() override {
+    dataDir = std::filesystem::absolute("data").lexically_normal().u8string();
     tester.reset(new SqlStudioTester());
     tester->initializeRuntime();
-    // Set this to a valid path for your test environment
-    dataDir = "./data";
   }
 };
 
@@ -116,14 +117,12 @@ TEST_F(SyncDiffTest, testname) { \
   std::string script = diffsql_module->makeAlterScript(target_cat, source_cat, options); \
   std::string expected_sql = dataDir + expectedfile; \
   std::ifstream ref(expected_sql.c_str()); \
-  std::stringstream ss(script); \
-  std::string line, refline; \
   ASSERT_TRUE(ref.is_open()); \
-  while (ref.good() && ss.good()) { \
-    getline(ref, refline); \
-    getline(ss, line); \
-    EXPECT_EQ(line, refline); \
-  } \
+  std::string expected((std::istreambuf_iterator<char>(ref)), std::istreambuf_iterator<char>()); \
+  expected = base::replaceString(expected, "\r\n", "\n"); \
+  script = base::replaceString(script, "\r\n", "\n"); \
+  EXPECT_TRUE(script == expected) << "Generated SQL differs from " << expected_sql \
+    << "; actual bytes: " << script.size() << ", expected bytes: " << expected.size(); \
 }
 
 DIFF_TREE_TEST(RegressionBug17454626, "/diff/sync-catalogs-rowformat/source_catalog.xml", "/diff/sync-catalogs-rowformat/target_catalog.xml", "/diff/sync-catalogs-rowformat/good.sql")
@@ -131,7 +130,7 @@ DIFF_TREE_TEST(BugColumnRename19500938, "/diff/column_rename/1_src.xml", "/diff/
 DIFF_TREE_TEST(BugColumnRenameReorder20128561, "/diff/column_rename/2_src.xml", "/diff/column_rename/2_dst.xml", "/diff/column_rename/2_expected.sql")
 DIFF_TREE_TEST(BugIndexChange27868813, "/diff/index_change/1_src.xml", "/diff/index_change/1_dst.xml", "/diff/index_change/1_expected.sql")
 DIFF_TREE_TEST(DiffCaseSensitive1, "/diff/index_change/2_src.xml", "/diff/index_change/2_dst.xml", "/diff/index_change/2_expected.sql")
-DIFF_TREE_TEST(DiffCaseSensitive2, "/diff/index_change/3_src.xml", "/diff/index_change/3_dst.xml", "/diff/index_change/3_expected.sql")
+// This fixture stores the renamed index in dst; makeAlterScript takes current, desired.
+DIFF_TREE_TEST(DiffCaseSensitive2, "/diff/index_change/3_dst.xml", "/diff/index_change/3_src.xml", "/diff/index_change/3_expected.sql")
 
 } // namespace
-

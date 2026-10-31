@@ -1,31 +1,31 @@
 <?xml version="1.0"?>
 <data grt_format="2.0">
-  <value type="object" struct-name="db.mysql.Catalog" id="0D87DA46-E214-41B3-9E20-A4AA148598A3" struct-checksum="0x82ad3466">
-    <value _ptr_="0x7fd576f56ed0" type="list" content-type="object" content-struct-name="db.mysql.LogFileGroup" key="logFileGroups"/>
-    <value _ptr_="0x7fd576f413a0" type="list" content-type="object" content-struct-name="db.mysql.Schema" key="schemata">
-      <value type="object" struct-name="db.mysql.Schema" id="2FFA5A3F-14E6-4985-83F1-CDC270E1D59D" struct-checksum="0x20b94c22">
-        <value _ptr_="0x7fd576f52f60" type="list" content-type="object" content-struct-name="db.mysql.RoutineGroup" key="routineGroups"/>
-        <value _ptr_="0x7fd576f52330" type="list" content-type="object" content-struct-name="db.mysql.Routine" key="routines"/>
-        <value _ptr_="0x7fd576f52390" type="list" content-type="object" content-struct-name="db.mysql.Sequence" key="sequences"/>
-        <value _ptr_="0x7fd576f52720" type="list" content-type="object" content-struct-name="db.mysql.StructuredDatatype" key="structuredTypes"/>
-        <value _ptr_="0x7fd576f52780" type="list" content-type="object" content-struct-name="db.mysql.Synonym" key="synonyms"/>
-        <value _ptr_="0x7fd576f51f40" type="list" content-type="object" content-struct-name="db.mysql.Table" key="tables">
-          <value type="object" struct-name="db.mysql.Table" id="C0F3D0BE-7A57-4324-B97B-CF188528DBB1" struct-checksum="0x4564421a">
+  <value type="object" struct-name="db.mysql.Catalog" id="{58090370-9A19-4F77-B260-C672B187BF1A}" struct-checksum="0x82ad3466">
+    <value _ptr_="000001EF20C060A0" type="list" content-type="object" content-struct-name="db.mysql.LogFileGroup" key="logFileGroups"/>
+    <value _ptr_="000001EF20C03600" type="list" content-type="object" content-struct-name="db.mysql.Schema" key="schemata">
+      <value type="object" struct-name="db.mysql.Schema" id="{6DA1F85B-3F3C-44E6-94FC-984E785CCBAE}" struct-checksum="0x20b94c22">
+        <value _ptr_="000001EF20C07F90" type="list" content-type="object" content-struct-name="db.mysql.RoutineGroup" key="routineGroups"/>
+        <value _ptr_="000001EF20C0A400" type="list" content-type="object" content-struct-name="db.mysql.Routine" key="routines"/>
+        <value _ptr_="000001EF20C09900" type="list" content-type="object" content-struct-name="db.mysql.Sequence" key="sequences"/>
+        <value _ptr_="000001EF20C09010" type="list" content-type="object" content-struct-name="db.mysql.StructuredDatatype" key="structuredTypes"/>
+        <value _ptr_="000001EF20C0B8A0" type="list" content-type="object" content-struct-name="db.mysql.Synonym" key="synonyms"/>
+        <value _ptr_="000001EF20C09E80" type="list" content-type="object" content-struct-name="db.mysql.Table" key="tables">
+          <value type="object" struct-name="db.mysql.Table" id="{2D6C3721-43E7-4AF2-BD9C-725C6CE38B95}" struct-checksum="0x4564421a">
             <value type="string" key="avgRowLength"></value>
             <value type="int" key="checksum">0</value>
-            <value _ptr_="0x7fd5760fb9e0" type="list" content-type="object" content-struct-name="db.mysql.Column" key="columns">
-              <value type="object" struct-name="db.mysql.Column" id="2BDB8430-D652-4639-BA26-F83E340B3D4A" struct-checksum="0xba88e21c">
+            <value _ptr_="000001EF20C094E0" type="list" content-type="object" content-struct-name="db.mysql.Column" key="columns">
+              <value type="object" struct-name="db.mysql.Column" id="{0CAF608C-B5C3-4285-AB5D-3A4F08F2753D}" struct-checksum="0xba88e21c">
                 <value type="int" key="autoIncrement">0</value>
                 <value type="string" key="expression"></value>
                 <value type="int" key="generated">0</value>
                 <value type="string" key="generatedStorage"></value>
                 <value type="string" key="characterSetName"></value>
-                <value _ptr_="0x7fd5760f9c60" type="list" content-type="object" content-struct-name="db.CheckConstraint" key="checks"/>
+                <value _ptr_="000001EF20C0A090" type="list" content-type="object" content-struct-name="db.CheckConstraint" key="checks"/>
                 <value type="string" key="collationName"></value>
                 <value type="string" key="datatypeExplicitParams"></value>
                 <value type="string" key="defaultValue">NULL</value>
                 <value type="int" key="defaultValueIsNull">1</value>
-                <value _ptr_="0x7fd5724b60c0" type="list" content-type="string" key="flags"/>
+                <value _ptr_="000001EF20C097A0" type="list" content-type="string" key="flags"/>
                 <value type="int" key="isNotNull">0</value>
                 <value type="int" key="length">-1</value>
                 <value type="int" key="precision">-1</value>
@@ -34,15 +34,15 @@
                 <value type="string" key="comment"></value>
                 <value type="string" key="name">f01</value>
                 <value type="string" key="oldName">f01</value>
-                <link type="object" struct-name="GrtObject" key="owner">C0F3D0BE-7A57-4324-B97B-CF188528DBB1</link>
+                <link type="object" struct-name="GrtObject" key="owner">{2D6C3721-43E7-4AF2-BD9C-725C6CE38B95}</link>
               </value>
             </value>
             <value type="string" key="connectionString"></value>
             <value type="string" key="defaultCharacterSetName"></value>
             <value type="string" key="defaultCollationName"></value>
             <value type="int" key="delayKeyWrite">0</value>
-            <value _ptr_="0x7fd5760fb630" type="list" content-type="object" content-struct-name="db.mysql.ForeignKey" key="foreignKeys"/>
-            <value _ptr_="0x7fd5724b5d40" type="list" content-type="object" content-struct-name="db.mysql.Index" key="indices"/>
+            <value _ptr_="000001EF20C0B110" type="list" content-type="object" content-struct-name="db.mysql.ForeignKey" key="foreignKeys"/>
+            <value _ptr_="000001EF20C090C0" type="list" content-type="object" content-struct-name="db.mysql.Index" key="indices"/>
             <value type="string" key="keyBlockSize"></value>
             <value type="string" key="maxRows"></value>
             <value type="string" key="mergeInsert"></value>
@@ -51,7 +51,7 @@
             <value type="string" key="nextAutoInc"></value>
             <value type="string" key="packKeys"></value>
             <value type="int" key="partitionCount">0</value>
-            <value _ptr_="0x7fd5760faed0" type="list" content-type="object" content-struct-name="db.mysql.PartitionDefinition" key="partitionDefinitions"/>
+            <value _ptr_="000001EF20C09A60" type="list" content-type="object" content-struct-name="db.mysql.PartitionDefinition" key="partitionDefinitions"/>
             <value type="string" key="partitionExpression"></value>
             <value type="int" key="partitionKeyAlgorithm">0</value>
             <value type="string" key="partitionType"></value>
@@ -71,27 +71,27 @@
             <value type="string" key="tableEngine"></value>
             <value type="string" key="tableIndexDir"></value>
             <value type="string" key="tableSpace"></value>
-            <value _ptr_="0x7fd5760fbd90" type="list" content-type="object" content-struct-name="db.mysql.Trigger" key="triggers"/>
+            <value _ptr_="000001EF20C09F30" type="list" content-type="object" content-struct-name="db.mysql.Trigger" key="triggers"/>
             <value type="int" key="isStub">0</value>
             <value type="int" key="isSystem">0</value>
             <value type="int" key="isTemporary">0</value>
             <value type="string" key="temporaryScope"></value>
             <value type="int" key="commentedOut">0</value>
-            <value type="string" key="createDate">2018-01-25 13:43</value>
-            <value _ptr_="0x7fd5724b6440" type="dict" key="customData"/>
-            <value type="string" key="lastChangeDate">2018-01-25 13:43</value>
+            <value type="string" key="createDate">2026-10-30 21:57</value>
+            <value _ptr_="000001EF20C092D0" type="dict" key="customData"/>
+            <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
             <value type="int" key="modelOnly">0</value>
             <value type="string" key="name">view_table2</value>
-            <link type="object" struct-name="GrtNamedObject" key="owner">2FFA5A3F-14E6-4985-83F1-CDC270E1D59D</link>
+            <link type="object" struct-name="GrtNamedObject" key="owner">{6DA1F85B-3F3C-44E6-94FC-984E785CCBAE}</link>
             <value type="string" key="temp_sql"></value>
             <value type="string" key="comment"></value>
             <value type="string" key="oldName">view_table2</value>
           </value>
         </value>
-        <value _ptr_="0x7fd576f51fa0" type="list" content-type="object" content-struct-name="db.mysql.View" key="views">
-          <value type="object" struct-name="db.mysql.View" id="0A52215B-3480-4FB9-89BE-9F50903E570E" struct-checksum="0x5e689427">
+        <value _ptr_="000001EF20C0B7F0" type="list" content-type="object" content-struct-name="db.mysql.View" key="views">
+          <value type="object" struct-name="db.mysql.View" id="{34849397-72AE-4E2C-A97F-E322803EFC1C}" struct-checksum="0x5e689427">
             <value type="int" key="algorithm">0</value>
-            <value _ptr_="0x7fd5760f9500" type="list" content-type="string" key="columns"/>
+            <value _ptr_="000001EF20C09BC0" type="list" content-type="string" key="columns"/>
             <value type="int" key="isReadOnly">0</value>
             <value type="string" key="name">view_table1</value>
             <value type="string" key="oldModelSqlDefinition"></value>
@@ -101,11 +101,11 @@
             <value type="string" key="sqlBody">select * from table1</value>
             <value type="string" key="sqlDefinition">create view view_table1 as select * from table1</value>
             <value type="int" key="commentedOut">0</value>
-            <value type="string" key="createDate">2018-01-25 13:43</value>
-            <value _ptr_="0x7fd5760fa3c0" type="dict" key="customData"/>
-            <value type="string" key="lastChangeDate">2018-01-25 13:43</value>
+            <value type="string" key="createDate">2026-10-30 21:57</value>
+            <value _ptr_="000001EF20C0B480" type="dict" key="customData"/>
+            <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
             <value type="int" key="modelOnly">0</value>
-            <link type="object" struct-name="GrtNamedObject" key="owner">2FFA5A3F-14E6-4985-83F1-CDC270E1D59D</link>
+            <link type="object" struct-name="GrtNamedObject" key="owner">{6DA1F85B-3F3C-44E6-94FC-984E785CCBAE}</link>
             <value type="string" key="temp_sql"></value>
             <value type="string" key="comment"></value>
             <value type="string" key="oldName">view_table1</value>
@@ -113,27 +113,27 @@
         </value>
         <value type="string" key="defaultCharacterSetName">utf8</value>
         <value type="string" key="defaultCollationName"></value>
-        <value _ptr_="0x7fd576f52f00" type="list" content-type="object" content-struct-name="db.Event" key="events"/>
+        <value _ptr_="000001EF20C07EE0" type="list" content-type="object" content-struct-name="db.Event" key="events"/>
         <value type="int" key="commentedOut">0</value>
-        <value type="string" key="createDate">2018-01-25 13:43</value>
-        <value _ptr_="0x7fd576f597a0" type="dict" key="customData"/>
-        <value type="string" key="lastChangeDate">2018-01-25 13:43</value>
+        <value type="string" key="createDate">2026-10-30 21:57</value>
+        <value _ptr_="000001EF20C07E30" type="dict" key="customData"/>
+        <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
         <value type="int" key="modelOnly">0</value>
         <value type="string" key="name">test</value>
-        <link type="object" struct-name="GrtNamedObject" key="owner">0D87DA46-E214-41B3-9E20-A4AA148598A3</link>
+        <link type="object" struct-name="GrtNamedObject" key="owner">{58090370-9A19-4F77-B260-C672B187BF1A}</link>
         <value type="string" key="temp_sql"></value>
         <value type="string" key="comment"></value>
         <value type="string" key="oldName">test</value>
       </value>
     </value>
-    <value _ptr_="0x7fd576f41ca0" type="list" content-type="object" content-struct-name="db.mysql.ServerLink" key="serverLinks"/>
-    <value _ptr_="0x7fd576f427f0" type="list" content-type="object" content-struct-name="db.mysql.Tablespace" key="tablespaces"/>
-    <value _ptr_="0x7fd57202f060" type="list" content-type="object" content-struct-name="db.CharacterSet" key="characterSets"/>
-    <value _ptr_="0x7fd576f409a0" type="dict" key="customData"/>
+    <value _ptr_="000001EF20C04C00" type="list" content-type="object" content-struct-name="db.mysql.ServerLink" key="serverLinks"/>
+    <value _ptr_="000001EF20C050D0" type="list" content-type="object" content-struct-name="db.mysql.Tablespace" key="tablespaces"/>
+    <value _ptr_="000001EF20C05FF0" type="list" content-type="object" content-struct-name="db.CharacterSet" key="characterSets"/>
+    <value _ptr_="000001EF20C04AA0" type="dict" key="customData"/>
     <value type="string" key="defaultCharacterSetName">utf8</value>
     <value type="string" key="defaultCollationName">utf8_general_ci</value>
-    <value _ptr_="0x7fd576f41590" type="list" content-type="object" content-struct-name="db.Role" key="roles"/>
-    <value _ptr_="0x7fd576f40c40" type="list" content-type="object" content-struct-name="db.SimpleDatatype" key="simpleDatatypes">
+    <value _ptr_="000001EF20C04310" type="list" content-type="object" content-struct-name="db.Role" key="roles"/>
+    <value _ptr_="000001EF20C04CB0" type="list" content-type="object" content-struct-name="db.SimpleDatatype" key="simpleDatatypes">
       <link type="object">com.mysql.rdbms.mysql.datatype.tinyint</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.smallint</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.mediumint</link>
@@ -179,13 +179,13 @@
       <link type="object">com.mysql.rdbms.mysql.datatype.enum</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.set</link>
     </value>
-    <value _ptr_="0x7fd576f42380" type="list" content-type="object" content-struct-name="db.UserDatatype" key="userDatatypes"/>
-    <value _ptr_="0x7fd576f43350" type="list" content-type="object" content-struct-name="db.User" key="users"/>
-    <value type="object" struct-name="GrtVersion" id="B68CCA1B-6587-4C2C-A802-B2FDFCDD02D6" struct-checksum="0x7aaa4ede" key="version">
+    <value _ptr_="000001EF20C06780" type="list" content-type="object" content-struct-name="db.UserDatatype" key="userDatatypes"/>
+    <value _ptr_="000001EF20C068E0" type="list" content-type="object" content-struct-name="db.User" key="users"/>
+    <value type="object" struct-name="GrtVersion" id="{C5772C41-177F-4905-A722-AF0F03F677A7}" struct-checksum="0x7aaa4ede" key="version">
       <value type="int" key="buildNumber">-1</value>
       <value type="int" key="majorNumber">5</value>
-      <value type="int" key="minorNumber">6</value>
-      <value type="int" key="releaseNumber">30</value>
+      <value type="int" key="minorNumber">7</value>
+      <value type="int" key="releaseNumber">10</value>
       <value type="int" key="status">0</value>
       <value type="string" key="name">Version</value>
     </value>

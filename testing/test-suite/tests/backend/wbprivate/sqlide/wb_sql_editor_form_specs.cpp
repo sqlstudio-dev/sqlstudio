@@ -9,13 +9,13 @@
  * This program is designed to work with certain software (including
  * but not limited to OpenSSL) that is licensed under separate terms, as
  * designated in a particular file or component or in included license
- * documentation.  The authors of MySQL hereby grant you an additional
+ * documentation. The authors of MySQL hereby grant you an additional
  * permission to link the program and your derivative works with the
  * separately licensed software that they have either included with
  * the program or referenced in the documentation.
- * This program is distributed in the hope that it will be useful,  but
+ * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
  * the GNU General Public License, version 2.0, for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -23,673 +23,365 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "wb_test_helpers.h"
-
-#include "grts/structs.db.query.h"
-#include "sqlide/wb_context_sqlide.h"
-#include "sqlide/wb_live_schema_tree.h"
-#define private public
-#define protected public
-#include "sqlide/wb_sql_editor_tree_controller.h"
-#undef protected
-#undef private
 #include "stub/stub_mforms.h"
+#include "grt/grt_manager.h"
+#include "sqlide/wb_live_schema_tree.h"
+#include "sqlide/wb_sql_editor_tree_controller.h"
+#include "cppconn/exception.h"
+#include <gtest/gtest.h>
+#include <deque>
+#include <optional>
 
-#include "grt.h"
-
-#include "cppdbc.h"
-#include "wb_connection_helpers.h"
-
-#include "cppconn/driver.h"
-#include "cppconn/sqlstring.h"
-
-#include "sqlide/wb_sql_editor_form.h"
-
-#include "gtest/gtest.h"
-
-#include <thread>
-#include <chrono>
-
-using namespace grt;
-using namespace wb;
-using namespace sql;
-// This class is a friend of the SqlEditorForm in TESTING mode. This way everything is available for testing.
 class LocalEditorFormTester {
-private:
-  wb::LiveSchemaTree::NodeChildrenUpdaterSlot updaterSlot;
-  wb::LiveSchemaTree::NewSchemaContentArrivedSlot schemaContentArrivedSlot;
-
 public:
-  LocalEditorFormTester() :
-    _expectSchemaContentArrived(false),
-    _expectUpdateNodeChildren(false),
-    _mockValidateSchemaContent(false),
-    _mockPropagateSchemaContent(false),
-    _mockPropagateUpdateNodeChildren(false) {
-    updaterSlot = std::bind(&LocalEditorFormTester::mock_update_node_children, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-                            std::placeholders::_4, std::placeholders::_5);
-    schemaContentArrivedSlot = std::bind(&LocalEditorFormTester::mock_schema_content_arrived, this, std::placeholders::_1, std::placeholders::_2,
-                                         std::placeholders::_3, std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
+  static std::shared_ptr<SqlEditorTreeController> create(
+    SqlEditorTreeController::MetadataSessionFactory session_factory) {
+    return SqlEditorTreeController::create(base::MySQLVersion::MySQL80, std::move(session_factory), nullptr);
   }
 
-  void set_target(const SqlEditorForm::Ref &sql_editor) {
-    _form = sql_editor;
+  static void fetch_schema_contents(const std::shared_ptr<SqlEditorTreeController> &controller,
+                                   const wb::LiveSchemaTree::NewSchemaContentArrivedSlot &callback) {
+    controller->do_fetch_live_schema_contents(controller, "wb_sql_editor_form_test", callback);
   }
-
-  void fetch_column_data(const std::string &schema_name, const std::string &obj_name, wb::LiveSchemaTree::ObjectType object_type) {
-    _form->get_live_tree()->fetch_column_data(schema_name, obj_name, object_type, updaterSlot);
-  }
-
-  void fetch_index_data(const std::string &schema_name, const std::string &obj_name, wb::LiveSchemaTree::ObjectType object_type) {
-    _form->get_live_tree()->fetch_index_data(schema_name, obj_name, object_type, updaterSlot);
-  }
-
-  void fetch_trigger_data(const std::string &schema_name, const std::string &obj_name, wb::LiveSchemaTree::ObjectType object_type) {
-    _form->get_live_tree()->fetch_trigger_data(schema_name, obj_name, object_type, updaterSlot);
-  }
-
-  void fetch_foreign_key_data(const std::string &schema_name, const std::string &obj_name, wb::LiveSchemaTree::ObjectType object_type) {
-    _form->get_live_tree()->fetch_foreign_key_data(schema_name, obj_name, object_type, updaterSlot);
-  }
-
-  void fetch_schema_contents(const std::string &schema_name) {
-    _form->get_live_tree()->fetch_schema_contents(schema_name, schemaContentArrivedSlot);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    perform_idle_tasks();
-  }
-
-  void perform_idle_tasks() {
-    bec::GRTManager::get()->perform_idle_tasks();
-  }
-
-  std::vector<std::string> fetch_schema_list() {
-    return _form->get_live_tree()->fetch_schema_list();
-  }
-
-  void load_schema_list() {
-    return _form->get_live_tree()->tree_refresh();
-  }
-
-  void load_schema_data(const std::string &schema) {
-    mforms::TreeNodeRef schema_node = _form->get_live_tree()->_schema_tree->get_node_for_object(schema, wb::LiveSchemaTree::Schema, "");
-    _form->get_live_tree()->_schema_tree->expand_toggled(schema_node, true);
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    perform_idle_tasks();
-  }
-
-  void exec_sql(std::string &sql) {
-    _form->exec_sql_returning_results(sql, false);
-  }
-
-  /* mock function that will simulate the schema list loading using this thread */
-  void tree_refresh() {
-    std::vector<std::string> sl = _form->get_live_tree()->fetch_schema_list();
-    base::StringListPtr schema_list(new std::list<std::string>());
-    schema_list->assign(sl.begin(), sl.end());
-    _form->get_live_tree()->_schema_tree->update_schemata(schema_list);
-  }
-
-  void set_lst_model_view(mforms::TreeView *pmodel_view) {
-    _form->get_live_tree()->_schema_tree->set_model_view(pmodel_view);
-    _form->get_live_tree()->_schema_tree->enable_events(true);
-  }
-
-  bool mock_update_node_children(mforms::TreeNodeRef parent, base::StringListPtr children, wb::LiveSchemaTree::ObjectType type, bool sorted = false,
-                                 bool just_append = false) {
-    EXPECT_TRUE(_expectUpdateNodeChildren) << _checkId + " : Unexpected call to update_node_children";
-    _expectUpdateNodeChildren = false;
-
-    if (_mockPropagateUpdateNodeChildren) {
-      _form->get_live_tree()->_schema_tree->update_node_children(parent, children, type, sorted, just_append);
-    }
-
-    return false;
-  }
-
-  void mock_schema_content_arrived(const std::string &schema_name, base::StringListPtr tables, base::StringListPtr views,
-    base::StringListPtr procedures, base::StringListPtr functions, bool just_append) {
-    EXPECT_TRUE(_expectSchemaContentArrived) << _checkId + " : Unexpected call to schema_content_arrived";
-    _expectSchemaContentArrived = false;
-
-    if (_mockValidateSchemaContent) {
-      _mockValidateSchemaContent = false;
-      EXPECT_EQ(tables->size(), _expectedTables.size()) << _checkId + " : Unexpected number of tables received";
-
-      std::list<std::string>::const_iterator index, end = tables->end();
-      for (index = tables->begin(); index != end; index++) {
-        EXPECT_TRUE(std::find(_expectedTables.begin(), _expectedTables.end(), *index) != _expectedTables.end()) << _checkId + " : Unexpected table retrieved";
-      }
-
-      _expectedTables.clear();
-
-      EXPECT_EQ(views->size(), _expectedViews.size()) << _checkId + " : Unexpected number of views received";
-
-      end = views->end();
-      for (index = views->begin(); index != end; index++) {
-        EXPECT_TRUE(std::find(_expectedViews.begin(), _expectedViews.end(), *index) != _expectedViews.end()) << _checkId + " : Unexpected view retrieved";
-      }
-
-      _expectedViews.clear();
-
-      EXPECT_EQ(procedures->size(), _expectedProcedures.size()) << _checkId + " : Unexpected number of procedures received";
-
-      end = procedures->end();
-      for (index = procedures->begin(); index != end; index++) {
-        EXPECT_TRUE(std::find(_expectedProcedures.begin(), _expectedProcedures.end(), *index) != _expectedProcedures.end()) << _checkId + " : Unexpected procedure retrieved";
-      }
-
-      _expectedProcedures.clear();
-
-      EXPECT_EQ(functions->size(), _expectedFunctions.size()) << _checkId + " : Unexpected number of functions received";
-
-      end = functions->end();
-      for (index = functions->begin(); index != end; index++) {
-        EXPECT_TRUE(std::find(_expectedFunctions.begin(), _expectedFunctions.end(), *index) != _expectedFunctions.end()) << _checkId + " : Unexpected function retrieved";
-      }
-
-      _expectedFunctions.clear();
-    }
-
-    if (_mockPropagateSchemaContent) {
-      //_form->get_live_tree()->_schema_tree->schema_contents_arrived(schema_name, tables, views, procedures, functions,
-      //just_append);
-    }
-  }
-
-  void clean_and_reset() {
-    EXPECT_FALSE(_expectSchemaContentArrived) << _checkId + " : Missing call to schema_content_arrived";
-
-    _expectSchemaContentArrived = false;
-
-    EXPECT_FALSE(_expectUpdateNodeChildren) << _checkId + " : Missing call to update_node_children";
-    _expectUpdateNodeChildren = false;
-  }
-
- public:
-  bool _expectSchemaContentArrived;
-  bool _expectUpdateNodeChildren;
-  bool _mockValidateSchemaContent;
-  bool _mockPropagateSchemaContent;
-  bool _mockPropagateUpdateNodeChildren;
-  std::list<std::string> _expectedTables;
-  std::list<std::string> _expectedViews;
-  std::list<std::string> _expectedProcedures;
-  std::list<std::string> _expectedFunctions;
-  std::list<std::string> _expectedChildren;
-
-  std::string _expectedSchemaName;
-  std::string _expectedParentName;
-
-  std::string _checkId;
-
- private:
-  SqlEditorForm::Ref _form;
 };
 
 namespace {
+  using Tree = wb::LiveSchemaTree;
+  using Cell = std::optional<std::string>;
+  using Rows = std::vector<std::vector<Cell>>;
 
-struct WbSqlEditorFormData {
-  std::unique_ptr<SqlStudioTester> tester;
-  WBContextSQLIDE *wbContextSqlide;
-  sql::ConnectionWrapper connection;
-  SqlEditorForm::Ref form;
-  LocalEditorFormTester *formTester;
-  mforms::TreeView *pmodelView;
-};
+  class MetadataResult : public SqlEditorTreeController::MetadataResult {
+    Rows _rows;
+    const int &_active_sessions;
+    size_t _position = 0;
 
-class SQL_Editor_FormTest : public ::testing::Test {
-protected:
-  static std::unique_ptr<WbSqlEditorFormData> data;
+    const Cell &cell(unsigned int column) const {
+      if (_position == 0 || _position > _rows.size() || column == 0)
+        throw std::out_of_range("Metadata cursor is not positioned on a valid cell");
+      return _rows.at(_position - 1).at(column - 1);
+    }
 
-  static void SetUpTestSuite() {
-    data = std::make_unique<WbSqlEditorFormData>();
-    bec::GRTManager::get(); // Ensure the GRT instance exists.
+  public:
+    MetadataResult(Rows rows, const int &active_sessions)
+      : _rows(std::move(rows)), _active_sessions(active_sessions) {
+    }
 
-    data->tester.reset(new SqlStudioTester());
-    data->wbContextSqlide = new WBContextSQLIDE();
-    data->formTester = new LocalEditorFormTester();
+    ~MetadataResult() override {
+      EXPECT_GT(_active_sessions, 0) << "Metadata session was destroyed before its result";
+    }
 
-    data->tester->initializeRuntime();
+    bool next() override { return ++_position <= _rows.size(); }
+    std::string getString(unsigned int column) override { return cell(column).value_or(""); }
+    int getInt(unsigned int column) override { return std::stoi(cell(column).value()); }
+    bool isNull(unsigned int column) override { return !cell(column).has_value(); }
+  };
 
-    // init database connection
-    db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
+  struct ExpectedQuery {
+    std::string sql;
+    Rows rows;
+    int error_code = 0;
+  };
 
-    setupConnectionEnvironment(connectionProperties);
-    db_mgmt_DriverRef driverProperties = db_mgmt_DriverRef::cast_from(grt::GRT::get()->get("/rdbms/drivers/0/"));
-    connectionProperties->driver(driverProperties);
+  struct MetadataFixture {
+    std::deque<ExpectedQuery> queries;
+    bool supports_visibility = true;
+    int active_sessions = 0;
+    int opened_sessions = 0;
+  };
 
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
+  class MetadataSession : public SqlEditorTreeController::MetadataSession {
+    MetadataFixture &_fixture;
 
-    data->connection = dm->getConnection(connectionProperties);
+  public:
+    explicit MetadataSession(MetadataFixture &fixture) : _fixture(fixture) {
+      ++_fixture.active_sessions;
+      ++_fixture.opened_sessions;
+    }
 
-    db_mgmt_ConnectionRef myConnection(grt::Initialized);
-    setupConnectionEnvironment(myConnection);
-    myConnection->driver(driverProperties);
+    ~MetadataSession() override { --_fixture.active_sessions; }
 
-    data->form = SqlEditorForm::create(data->wbContextSqlide, myConnection);
-    data->form->connect(std::shared_ptr<wb::SSHTunnel>());
+    std::unique_ptr<SqlEditorTreeController::MetadataResult> schemata() override {
+      return query("<schemata>");
+    }
 
-    data->pmodelView =
-      new mforms::TreeView(mforms::TreeNoColumns | mforms::TreeNoBorder | mforms::TreeSidebar | mforms::TreeNoHeader);
+    std::unique_ptr<SqlEditorTreeController::MetadataResult> query(const std::string &sql) override {
+      if (_fixture.queries.empty()) {
+        ADD_FAILURE() << "Unexpected metadata query: " << sql;
+        throw std::logic_error("Unexpected metadata query");
+      }
+      auto expected = std::move(_fixture.queries.front());
+      _fixture.queries.pop_front();
+      EXPECT_EQ(sql, expected.sql);
+      if (sql != expected.sql)
+        throw std::logic_error("Metadata query did not match the expected SQL");
+      if (expected.error_code != 0)
+        throw sql::SQLException("Test metadata query failed", "HY000", expected.error_code);
+      return std::make_unique<MetadataResult>(std::move(expected.rows), _fixture.active_sessions);
+    }
 
-    data->formTester->set_target(data->form);
-    data->formTester->set_lst_model_view(data->pmodelView);
+    bool supports_index_visibility() const override { return _fixture.supports_visibility; }
+  };
 
-    //"USE `wb_sql_editor_form_test`;"
-    static const char *sql1 =
-      "DROP DATABASE IF EXISTS `wb_sql_editor_form_test`;"
-      "CREATE DATABASE IF NOT EXISTS `wb_sql_editor_form_test` DEFAULT CHARSET=latin1 DEFAULT COLLATE = "
-      "latin1_swedish_ci;"
+  class SQL_Editor_FormTest : public ::testing::Test {
+  protected:
+    MetadataFixture metadata;
+    std::unique_ptr<mforms::TreeView> view;
+    std::shared_ptr<SqlEditorTreeController> controller;
 
-      "USE `wb_sql_editor_form_test`;"
+    void SetUp() override {
+      // GRT installs the notification center used by the controller's observers.
+      grt::GRT::get();
+      mforms::stub::init(nullptr);
+      view = std::make_unique<mforms::TreeView>(
+        mforms::TreeNoColumns | mforms::TreeNoBorder | mforms::TreeSidebar | mforms::TreeNoHeader);
+      controller = LocalEditorFormTester::create([this]() {
+        return std::make_unique<MetadataSession>(metadata);
+      });
+      tree()->set_model_view(view.get());
+      tree()->update_schemata(std::make_shared<std::list<std::string>>(
+        std::initializer_list<std::string>{"wb_sql_editor_form_test"}));
+    }
 
-      "CREATE TABLE language ("
-      "language_id TINYINT UNSIGNED NOT NULL AUTO_INCREMENT,"
-      "name CHAR(20) NOT NULL,"
-      "last_update TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
-      "PRIMARY KEY (language_id)"
-      ")ENGINE=InnoDB DEFAULT CHARSET=utf8;"
+    void TearDown() override {
+      EXPECT_TRUE(metadata.queries.empty()) << "Expected metadata queries were not executed";
+      EXPECT_EQ(metadata.active_sessions, 0);
+      controller.reset();
+      view.reset();
+    }
 
-      "CREATE TABLE film ("
-      "film_id SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,"
-      "title VARCHAR(255) NOT NULL,"
-      "description TEXT DEFAULT NULL,"
-      "release_year YEAR DEFAULT NULL,"
-      "language_id TINYINT UNSIGNED NOT NULL,"
-      "original_language_id TINYINT UNSIGNED DEFAULT NULL,"
-      "rental_duration TINYINT UNSIGNED NOT NULL DEFAULT 3,"
-      "rental_rate DECIMAL(4,2) NOT NULL DEFAULT 4.99,"
-      "length SMALLINT UNSIGNED DEFAULT NULL,"
-      "replacement_cost DECIMAL(5,2) NOT NULL DEFAULT 19.99,"
-      "rating ENUM('G','PG','PG-13','R','NC-17') DEFAULT 'G',"
-      "special_features SET('Trailers','Commentaries','Deleted Scenes','Behind the Scenes') DEFAULT NULL,"
-      "last_update TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
-      "PRIMARY KEY  (film_id),"
-      "KEY idx_title (title),"
-      "KEY idx_fk_language_id (language_id),"
-      "KEY idx_fk_original_language_id (original_language_id),"
-      "CONSTRAINT fk_film_language FOREIGN KEY (language_id) REFERENCES language (language_id) ON DELETE RESTRICT ON "
-      "UPDATE CASCADE,"
-      "CONSTRAINT fk_film_language_original FOREIGN KEY (original_language_id) REFERENCES language (language_id) ON "
-      "DELETE RESTRICT ON UPDATE CASCADE"
-      ")ENGINE=InnoDB DEFAULT CHARSET=utf8;"
+    Tree *tree() { return controller->get_schema_tree(); }
 
-      "CREATE TABLE film_text ("
-      "film_id SMALLINT NOT NULL,"
-      "title VARCHAR(255) NOT NULL,"
-      "description TEXT,"
-      "PRIMARY KEY  (film_id),"
-      "FULLTEXT KEY idx_title_description (title,description)"
-      ")ENGINE=MyISAM DEFAULT CHARSET=utf8;"
+    Tree::NodeChildrenUpdaterSlot updater() {
+      return [this](mforms::TreeNodeRef parent, base::StringListPtr names, Tree::ObjectType type,
+                    bool sorted, bool append) {
+        return tree()->update_node_children(parent, names, type, sorted, append);
+      };
+    }
 
-      "CREATE TABLE dummy_table ("
-      "dummy_table_id SMALLINT NOT NULL,"
-      "name VARCHAR(255) NOT NULL,"
-      "description TEXT,"
-      "PRIMARY KEY  (dummy_table_id)"
-      ")ENGINE=MyISAM DEFAULT CHARSET=utf8;"
+    mforms::TreeNodeRef table(const std::string &name) {
+      return tree()->create_node_for_object("wb_sql_editor_form_test", Tree::Table, name);
+    }
 
-      "CREATE TABLE complex_pk_table ("
-      "dummy_first_id SMALLINT NOT NULL,"
-      "dummy_second_id SMALLINT NOT NULL,"
-      "title VARCHAR(255) NOT NULL,"
-      "description TEXT,"
-      "PRIMARY KEY  (dummy_first_id,dummy_second_id),"
-      "FULLTEXT KEY idx_title_description (title,description)"
-      ")ENGINE=MyISAM DEFAULT CHARSET=utf8;"
+    std::vector<std::string> captions(mforms::TreeNodeRef parent) {
+      std::vector<std::string> result;
+      for (int i = 0; i < parent->count(); ++i)
+        result.push_back(parent->get_child(i)->get_string(0));
+      return result;
+    }
 
-      "CREATE TABLE no_pk_table ("
-      "dummy_id SMALLINT NOT NULL,"
-      "title VARCHAR(255) NOT NULL,"
-      "description TEXT,"
-      "FULLTEXT KEY idx_title_description (title,description)"
-      ")ENGINE=MyISAM DEFAULT CHARSET=utf8;"
+    void expect_indexes() {
+      metadata.queries.push_back({"SHOW INDEXES FROM `wb_sql_editor_form_test`.`film`", {
+        {"film", "0", "PRIMARY", "1", "film_id", "", "", "", "", "", "BTREE", "", "", "YES"},
+        {"film", "1", "idx_title", "1", "title", "", "", "", "", "", "BTREE", "", "", "NO"},
+        {"film", "1", "idx_language", "1", "language_id", "", "", "", "", "", "BTREE", "", "", "YES"},
+        {"film", "1", "idx_language", "2", "original_language_id", "", "", "", "", "", "BTREE", "", "", "YES"}
+      }});
+    }
+  };
 
-      "CREATE TABLE pk_table_unique_not_null ("
-      "dummy_pk SMALLINT NOT NULL,"
-      "dummy_id SMALLINT NOT NULL,"
-      "title VARCHAR(255) NOT NULL,"
-      "description TEXT,"
-      "FULLTEXT KEY idx_title_description (title,description),"
-      "PRIMARY KEY  (dummy_pk),"
-      "UNIQUE KEY dummy_id (dummy_id)"
-      ")ENGINE=MyISAM DEFAULT CHARSET=utf8;"
-
-      "CREATE TABLE no_pk_table_unique_not_null ("
-      "dummy_id SMALLINT NOT NULL,"
-      "title VARCHAR(255) NOT NULL,"
-      "description TEXT,"
-      "FULLTEXT KEY idx_title_description (title,description),"
-      "UNIQUE KEY dummy_id (dummy_id)"
-      ")ENGINE=MyISAM DEFAULT CHARSET=utf8;"
-
-      "CREATE VIEW dummy_film_view"
-      " AS"
-      " SELECT film_id, title, description, release_year"
-      " FROM film;"
-
-      " DELIMITER ;;\n"
-      " CREATE TRIGGER `ins_film` AFTER INSERT ON `film` FOR EACH ROW BEGIN"
-      " INSERT INTO film_text (film_id, title, description)"
-      " VALUES (new.film_id, new.title, new.description);"
-      " END;;"
-
-      " CREATE TRIGGER `upd_film` AFTER UPDATE ON `film` FOR EACH ROW BEGIN"
-      " IF (old.title != new.title) or (old.description != new.description)"
-      " THEN"
-      " UPDATE film_text"
-      " SET title=new.title,"
-      " description=new.description,"
-      " film_id=new.film_id"
-      " WHERE film_id=old.film_id;"
-      " END IF;"
-      " END;;"
-
-      " CREATE TRIGGER `del_film` AFTER DELETE ON `film` FOR EACH ROW BEGIN"
-      " DELETE FROM film_text WHERE film_id = old.film_id;"
-      " END;;"
-
-      " CREATE FUNCTION `dummy_function`() RETURNS int(1) DETERMINISTIC"
-      " BEGIN"
-      " RETURN 1;"
-      " END;;"
-
-      " CREATE FUNCTION `other_function`() RETURNS int(1) DETERMINISTIC"
-      " BEGIN"
-      " RETURN 1;"
-      " END;;"
-
-      " CREATE PROCEDURE `get_films`() READS SQL DATA"
-      " BEGIN"
-      " select * from film;"
-      " END;;"
-
-      " DELIMITER ;\n";
-
-    std::string sql(sql1);
-    data->formTester->exec_sql(sql);
-
-    data->formTester->tree_refresh();
-    data->formTester->load_schema_data("wb_sql_editor_form_test");
-
-    // Stay for some time to finish the setup (it's done in a background thread).
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    data->formTester->perform_idle_tasks();
+  TEST_F(SQL_Editor_FormTest, Testing_fetch_schema_list) {
+    metadata.queries.push_back({"<schemata>", {
+      {"information_schema"}, {"performance_schema"}, {"mysql"}, {".hidden"}, {"wb_sql_editor_form_test"}
+    }});
+    const auto actual = static_cast<Tree::FetchDelegate &>(*controller).fetch_schema_list();
+    EXPECT_EQ(actual, (std::vector<std::string>{"wb_sql_editor_form_test"}));
+    EXPECT_EQ(metadata.opened_sessions, 1);
   }
 
-  static void TearDownTestSuite() {
-    // cleanup
-    std::string sql = "DROP DATABASE wb_sql_editor_form_test";
-    data->formTester->exec_sql(sql);
-    data->form->close();
-    data->form.reset();
-
-    delete data->formTester;
-    delete data->wbContextSqlide;
-    data.reset();
+  TEST_F(SQL_Editor_FormTest, Loads_the_schema_list) {
+    metadata.queries.push_back({"SHOW FULL TABLES FROM `wb_sql_editor_form_test`", {
+      {"language", "BASE TABLE"}, {"film", "BASE TABLE"}, {"film_text", "BASE TABLE"},
+      {"dummy_table", "BASE TABLE"}, {"complex_pk_table", "BASE TABLE"}, {"no_pk_table", "BASE TABLE"},
+      {"pk_table_unique_not_null", "BASE TABLE"}, {"no_pk_table_unique_not_null", "BASE TABLE"},
+      {"dummy_film_view", "VIEW"}
+    }});
+    metadata.queries.push_back({"SHOW PROCEDURE STATUS WHERE Db='wb_sql_editor_form_test'", {
+      {"wb_sql_editor_form_test", "get_films"}
+    }});
+    metadata.queries.push_back({"SHOW FUNCTION STATUS WHERE Db='wb_sql_editor_form_test'", {
+      {"wb_sql_editor_form_test", "dummy_function"}, {"wb_sql_editor_form_test", "other_function"}
+    }});
+    int callbacks = 0;
+    // Run the real worker synchronously, then drain its idle callback instead of sleeping.
+    LocalEditorFormTester::fetch_schema_contents(controller,
+      [&](const std::string &schema, base::StringListPtr tables, base::StringListPtr views,
+          base::StringListPtr procedures, base::StringListPtr functions, bool append) {
+        ++callbacks;
+        EXPECT_EQ(schema, "wb_sql_editor_form_test");
+        EXPECT_FALSE(append);
+        EXPECT_EQ(*tables, (std::list<std::string>{"language", "film", "film_text", "dummy_table",
+          "complex_pk_table", "no_pk_table", "pk_table_unique_not_null", "no_pk_table_unique_not_null"}));
+        EXPECT_EQ(*views, (std::list<std::string>{"dummy_film_view"}));
+        EXPECT_EQ(*procedures, (std::list<std::string>{"get_films"}));
+        EXPECT_EQ(*functions, (std::list<std::string>{"dummy_function", "other_function"}));
+      });
+    EXPECT_EQ(callbacks, 0);
+    bec::GRTManager::get()->perform_idle_tasks();
+    EXPECT_EQ(callbacks, 1);
+    EXPECT_EQ(metadata.opened_sessions, 1);
   }
 
-};
-
-std::unique_ptr<WbSqlEditorFormData> SQL_Editor_FormTest::data;
-
-TEST_F(SQL_Editor_FormTest, Testing_fetch_schema_list) {
-  std::vector<std::string> schemaList = data->formTester->fetch_schema_list();
-
-  EXPECT_TRUE(schemaList.size() > 0) << "TF001CHK001: Unexpected number of schemas retrieved";
-
-  bool found = false;
-
-  std::vector<std::string>::iterator index, end = schemaList.end();
-  for (index = schemaList.begin(); !found && index != end; index++)
-    found = (*index) == "wb_sql_editor_form_test";
-
-  EXPECT_TRUE(found) << "TF001CHK002: wb_sql_editor_form_test not found on retrieved list";
-}
-
-TEST_F(SQL_Editor_FormTest, Loads_the_schema_list) {
-  data->formTester->tree_refresh();
-
-  // Sets the expectations..
-  data->formTester->_expectSchemaContentArrived = true;
-  data->formTester->_mockValidateSchemaContent = true;
-
-  data->formTester->_expectedTables.push_back("language");
-  data->formTester->_expectedTables.push_back("film");
-  data->formTester->_expectedTables.push_back("film_text");
-  data->formTester->_expectedTables.push_back("dummy_table");
-  data->formTester->_expectedTables.push_back("complex_pk_table");
-  data->formTester->_expectedTables.push_back("no_pk_table");
-  data->formTester->_expectedTables.push_back("pk_table_unique_not_null");
-  data->formTester->_expectedTables.push_back("no_pk_table_unique_not_null");
-
-  data->formTester->_expectedViews.push_back("dummy_film_view");
-
-  data->formTester->_expectedProcedures.push_back("get_films");
-
-  data->formTester->_expectedFunctions.push_back("dummy_function");
-  data->formTester->_expectedFunctions.push_back("other_function");
-
-  data->formTester->_checkId = "TF002CHK001";
-
-  // Loads the specific schema...
-  data->formTester->fetch_schema_contents("wb_sql_editor_form_test");
-
-  data->formTester->clean_and_reset();
-}
-
-TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_column_data) {
-  mforms::TreeNodeRef tableNode;
-  mforms::TreeNodeRef collectionNode;
-  mforms::TreeNodeRef childNode;
-  wb::LiveSchemaTree::TableData *pdata;
-  wb::LiveSchemaTree::ColumnData *pchildData;
-
-  // Loads the schema list into the tree...
-  data->formTester->tree_refresh();
-
-  // Loads a specific schema contents...
-  data->formTester->load_schema_data("wb_sql_editor_form_test");
-
-  // Loads the column data from the language table.
-  data->formTester->_expectUpdateNodeChildren = true;
-  data->formTester->_mockPropagateUpdateNodeChildren = true;
-  data->formTester->_checkId = "TF003CHK001";
-  data->formTester->fetch_column_data("wb_sql_editor_form_test", "language", wb::LiveSchemaTree::Table);
-
-  tableNode = data->form->get_live_tree()->get_schema_tree()->get_node_for_object("wb_sql_editor_form_test",
-                                                                                  wb::LiveSchemaTree::Table, "language");
-  pdata = dynamic_cast<wb::LiveSchemaTree::TableData *>(tableNode->get_data());
-
-  EXPECT_TRUE(pdata->is_data_loaded(wb::LiveSchemaTree::COLUMN_DATA)) << "TF003CHK002 : Columns were not loaded";
-
-  // Gets the columns node...
-  collectionNode = tableNode->get_child(0);
-
-  // Now validates each column...
-  childNode = collectionNode->get_child(0);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::ColumnData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "language_id") << "TF003CHK002 : Unexpected column name";
-  EXPECT_TRUE(pchildData->is_pk) << "TF003CHK002 : Unexpected primary key flag";
-  EXPECT_FALSE(pchildData->is_fk) << "TF003CHK002 : Unexpected foreign key flag";
-
-  childNode = collectionNode->get_child(1);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::ColumnData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "name") << "TF003CHK003 : Unexpected column name";
-  EXPECT_FALSE(pchildData->is_pk) << "TF003CHK003 : Unexpected primary key flag";
-  EXPECT_FALSE(pchildData->is_fk) << "TF003CHK003 : Unexpected foreign key flag";
-
-  childNode = collectionNode->get_child(2);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::ColumnData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "last_update") << "TF003CHK004 : Unexpected column name";
-  EXPECT_FALSE(pchildData->is_pk) << "TF003CHK004 : Unexpected primary key flag";
-  EXPECT_FALSE(pchildData->is_fk) << "TF003CHK004 : Unexpected foreign key flag";
-}
-
-TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_index_data) {
-  mforms::TreeNodeRef tableNode;
-  mforms::TreeNodeRef collectionNode;
-  mforms::TreeNodeRef childNode;
-  wb::LiveSchemaTree::TableData *pdata;
-  wb::LiveSchemaTree::IndexData *pchildData;
-
-  // Loads the schema list into the tree...
-  data->formTester->tree_refresh();
-
-  // Loads a specific schema contents...
-  data->formTester->_checkId = "TF004CHK001";
-  data->formTester->load_schema_data("wb_sql_editor_form_test");
-
-  // Loads the index data from the film table.
-  data->formTester->_expectUpdateNodeChildren = true;
-  data->formTester->_mockPropagateUpdateNodeChildren = true;
-  data->formTester->_checkId = "TF004CHK002";
-  data->formTester->fetch_index_data("wb_sql_editor_form_test", "film", wb::LiveSchemaTree::Table);
-
-  tableNode = data->form->get_live_tree()->get_schema_tree()->get_node_for_object("wb_sql_editor_form_test",
-                                                                                  wb::LiveSchemaTree::Table, "film");
-  pdata = dynamic_cast<wb::LiveSchemaTree::TableData *>(tableNode->get_data());
-
-  EXPECT_TRUE(pdata->is_data_loaded(wb::LiveSchemaTree::INDEX_DATA)) << "TF004CHK003 : Indexes were not loaded";
-
-  // Gets the indexes node...
-  collectionNode = tableNode->get_child(1);
-  EXPECT_EQ(collectionNode->count(), 4) << "TF004CHK004 : Unexpected nuber of indexes";
-
-  // Now validates each index...
-  childNode = collectionNode->get_child(0);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::IndexData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "PRIMARY") << "TF004CHK005 : Unexpected index name";
-  EXPECT_TRUE(pchildData->unique) << "TF004CHK005 : Unexpected non unique index found";
-  EXPECT_EQ(pchildData->type, 6U) << "TF004CHK005 : Unexpected index type";
-
-  childNode = collectionNode->get_child(1);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::IndexData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "idx_title") << "TF004CHK006 : Unexpected index name";
-  EXPECT_FALSE(pchildData->unique) << "TF004CHK006 : Unexpected unique index found";
-  EXPECT_EQ(pchildData->type, 6U) << "TF004CHK006 : Unexpected index type";
-
-  childNode = collectionNode->get_child(2);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::IndexData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "idx_fk_language_id") << "TF004CHK007 : Unexpected index name";
-  EXPECT_FALSE(pchildData->unique) << "TF004CHK007 : Unexpected non index found";
-  EXPECT_EQ(pchildData->type, 6U) << "TF004CHK007 : Unexpected index type";
-
-  childNode = collectionNode->get_child(3);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::IndexData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "idx_fk_original_language_id") << "TF004CHK008 : Unexpected index name";
-  EXPECT_FALSE(pchildData->unique) << "TF004CHK008 : Unexpected non unique index found";
-  EXPECT_EQ(pchildData->type, 6U) << "TF004CHK008 : Unexpected index type";
-}
-
-TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_trigger_data) {
-  mforms::TreeNodeRef tableNode;
-  mforms::TreeNodeRef collectionNode;
-  mforms::TreeNodeRef childNode;
-  wb::LiveSchemaTree::TableData *pdata;
-  wb::LiveSchemaTree::TriggerData *pchildData;
-
-  // Loads the schema list into the tree...
-  data->formTester->tree_refresh();
-
-  // Loads a specific schema contents...
-  data->formTester->_checkId = "TF005CHK001";
-  data->formTester->load_schema_data("wb_sql_editor_form_test");
-
-  // Loads the trigger data from the film table.
-  data->formTester->_expectUpdateNodeChildren = true;
-  data->formTester->_mockPropagateUpdateNodeChildren = true;
-  data->formTester->_checkId = "TF005CHK002";
-  data->formTester->fetch_trigger_data("wb_sql_editor_form_test", "film", wb::LiveSchemaTree::Table);
-
-  tableNode = data->form->get_live_tree()->get_schema_tree()->get_node_for_object("wb_sql_editor_form_test",
-                                                                                  wb::LiveSchemaTree::Table, "film");
-  pdata = dynamic_cast<wb::LiveSchemaTree::TableData *>(tableNode->get_data());
-
-  EXPECT_TRUE(pdata->is_data_loaded(wb::LiveSchemaTree::TRIGGER_DATA)) << "TF005CHK003 : Triggers were not loaded";
-
-  // Gets the triggers node...
-  collectionNode = tableNode->get_child(3);
-  EXPECT_EQ(collectionNode->count(), 3) << "TF005CHK004 : Unexpected nuber of triggers";
-
-  // Now validates each index...
-  childNode = collectionNode->get_child(0);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::TriggerData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "ins_film") << "TF005CHK004 : Unexpected trigger name";
-  EXPECT_EQ(pchildData->event_manipulation, 11) << "TF005CHK004 : Unexpected trigger event";// 11 is INSERT
-  EXPECT_EQ(pchildData->timing, 15) << "TF005CHK004 : Unexpected trigger timing";// 15 is AFTER
-
-  childNode = collectionNode->get_child(1);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::TriggerData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "upd_film") << "TF005CHK005 : Unexpected trigger name";
-  EXPECT_EQ(pchildData->event_manipulation, 12) << "TF005CHK005 : Unexpected trigger event";// 12 is UPDATE
-  EXPECT_EQ(pchildData->timing, 15) << "TF005CHK005 : Unexpected trigger timing";// 15 is AFTER
-
-  childNode = collectionNode->get_child(2);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::TriggerData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "del_film") << "TF005CHK006 : Unexpected trigger name";
-  EXPECT_EQ(pchildData->event_manipulation, 13) << "TF005CHK006 : Unexpected trigger event";// 13 is DELETE
-  EXPECT_EQ(pchildData->timing, 15) << "TF005CHK006 : Unexpected trigger timing";// 15 is AFTER
-}
-
-TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_foreign_key_data) {
-  mforms::TreeNodeRef tableNode;
-  mforms::TreeNodeRef collectionNode;
-  mforms::TreeNodeRef childNode;
-  wb::LiveSchemaTree::TableData *pdata;
-  wb::LiveSchemaTree::FKData *pchildData;
-
-  // Loads the schema list into the tree...
-  data->formTester->tree_refresh();
-
-  // Loads a specific schema contents...
-  data->formTester->_checkId = "TF006CHK001";
-  data->formTester->load_schema_data("wb_sql_editor_form_test");
-
-  // Loads the foreign key data from the film table.
-  data->formTester->_expectUpdateNodeChildren = true;
-  data->formTester->_mockPropagateUpdateNodeChildren = true;
-  data->formTester->_checkId = "TF006CHK002";
-  data->formTester->fetch_foreign_key_data("wb_sql_editor_form_test", "film", wb::LiveSchemaTree::Table);
-
-  tableNode = data->form->get_live_tree()->get_schema_tree()->get_node_for_object("wb_sql_editor_form_test",
-                                                                                  wb::LiveSchemaTree::Table, "film");
-  pdata = dynamic_cast<wb::LiveSchemaTree::TableData *>(tableNode->get_data());
-
-  EXPECT_TRUE(pdata->is_data_loaded(wb::LiveSchemaTree::FK_DATA)) << "TF006CHK003 : Foreign keys were not loaded";
-
-  // Gets the foreign keys node...
-  collectionNode = tableNode->get_child(2);
-  EXPECT_EQ(collectionNode->count(), 2) << "TF006CHK004 : Unexpected nuber of foreign keys";
-
-  // Now validates each index...
-  childNode = collectionNode->get_child(0);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::FKData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "fk_film_language") << "TF006CHK004 : Unexpected foreign key name";
-  EXPECT_EQ(pchildData->update_rule, 1U) << "TF006CHK004 : Unexpected foreign key update rule";
-  EXPECT_EQ(pchildData->delete_rule, 4U) << "TF006CHK004 : Unexpected foreign key delete rule";
-  EXPECT_EQ(pchildData->referenced_table, "language") << "TF006CHK004 : Unexpected foreign key delete rule";
-
-  childNode = collectionNode->get_child(1);
-  pchildData = dynamic_cast<wb::LiveSchemaTree::FKData *>(childNode->get_data());
-
-  EXPECT_EQ(childNode->get_string(0), "fk_film_language_original") << "TF006CHK005 : Unexpected foreign key name";
-  EXPECT_EQ(pchildData->update_rule, 1U) << "TF006CHK005 : Unexpected foreign key update rule";
-  EXPECT_EQ(pchildData->delete_rule, 4U) << "TF006CHK005 : Unexpected foreign key delete rule";
-  EXPECT_EQ(pchildData->referenced_table, "language") << "TF006CHK005 : Unexpected foreign key delete rule";
-}
-
-
+  TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_column_data) {
+    auto node = table("language");
+    metadata.queries.push_back({"SHOW FULL COLUMNS FROM `wb_sql_editor_form_test`.`language`", {
+      {"language_id", "smallint unsigned", std::nullopt, "NO", "PRI", "", "auto_increment"},
+      {"name", "char(20)", "utf8_general_ci", "NO", "UNI", "", ""},
+      {"last_update", "timestamp", std::nullopt, "YES", "", "CURRENT_TIMESTAMP", ""}
+    }});
+    controller->fetch_column_data("wb_sql_editor_form_test", "language", Tree::Table, updater());
+    auto columns = node->get_child(Tree::TABLE_COLUMNS_NODE_INDEX);
+    EXPECT_EQ(captions(columns), (std::vector<std::string>{"language_id", "name", "last_update"}));
+    auto data = dynamic_cast<Tree::TableData *>(node->get_data());
+    ASSERT_NE(data, nullptr);
+    EXPECT_TRUE(data->is_data_loaded(Tree::COLUMN_DATA));
+    ASSERT_EQ(columns->count(), 3);
+    auto id = dynamic_cast<Tree::ColumnData *>(columns->get_child(0)->get_data());
+    ASSERT_NE(id, nullptr);
+    EXPECT_TRUE(id->is_pk);
+    EXPECT_TRUE(id->is_id);
+    EXPECT_TRUE(id->is_idx);
+    EXPECT_FALSE(id->is_fk);
+    EXPECT_EQ(id->type, "smallint UN AI");
+    EXPECT_TRUE(id->charset_collation.empty());
+    auto name = dynamic_cast<Tree::ColumnData *>(columns->get_child(1)->get_data());
+    ASSERT_NE(name, nullptr);
+    EXPECT_FALSE(name->is_pk);
+    EXPECT_TRUE(name->is_id);
+    EXPECT_EQ(name->charset_collation, "utf8_general_ci");
+    auto timestamp = dynamic_cast<Tree::ColumnData *>(columns->get_child(2)->get_data());
+    ASSERT_NE(timestamp, nullptr);
+    EXPECT_FALSE(timestamp->is_id);
+    EXPECT_FALSE(timestamp->is_idx);
+    EXPECT_EQ(timestamp->default_value, "CURRENT_TIMESTAMP");
+  }
+
+  TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_index_data) {
+    auto node = table("film");
+    for (bool visibility_supported : {true, false}) {
+      metadata.supports_visibility = visibility_supported;
+      expect_indexes();
+      controller->fetch_index_data("wb_sql_editor_form_test", "film", Tree::Table, updater());
+      auto indexes = node->get_child(Tree::TABLE_INDEXES_NODE_INDEX);
+      EXPECT_EQ(captions(indexes), (std::vector<std::string>{"PRIMARY", "idx_title", "idx_language"}));
+      ASSERT_EQ(indexes->count(), 3);
+      auto primary = dynamic_cast<Tree::IndexData *>(indexes->get_child(0)->get_data());
+      ASSERT_NE(primary, nullptr);
+      EXPECT_TRUE(primary->unique);
+      EXPECT_EQ(primary->type, Tree::internalize_token("BTREE"));
+      auto title = dynamic_cast<Tree::IndexData *>(indexes->get_child(1)->get_data());
+      ASSERT_NE(title, nullptr);
+      EXPECT_FALSE(title->unique);
+      EXPECT_EQ(title->visible, !visibility_supported);
+      auto language = dynamic_cast<Tree::IndexData *>(indexes->get_child(2)->get_data());
+      ASSERT_NE(language, nullptr);
+      EXPECT_EQ(language->columns, (std::vector<std::string>{"language_id", "original_language_id"}));
+      auto data = dynamic_cast<Tree::TableData *>(node->get_data());
+      ASSERT_NE(data, nullptr);
+      EXPECT_TRUE(data->is_data_loaded(Tree::INDEX_DATA));
+    }
+  }
+
+  TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_trigger_data) {
+    auto node = table("film");
+    metadata.queries.push_back({"SHOW TRIGGERS FROM `wb_sql_editor_form_test` LIKE 'film'", {
+      {"ins_film", "INSERT", "film", "", "AFTER"},
+      {"upd_film", "UPDATE", "film", "", "AFTER"},
+      {"del_film", "DELETE", "film", "", "BEFORE"}
+    }});
+    controller->fetch_trigger_data("wb_sql_editor_form_test", "film", Tree::Table, updater());
+    auto triggers = node->get_child(Tree::TABLE_TRIGGERS_NODE_INDEX);
+    EXPECT_EQ(captions(triggers), (std::vector<std::string>{"ins_film", "upd_film", "del_film"}));
+    ASSERT_EQ(triggers->count(), 3);
+    const std::vector<std::string> events{"INSERT", "UPDATE", "DELETE"};
+    for (int i = 0; i < triggers->count(); ++i) {
+      auto data = dynamic_cast<Tree::TriggerData *>(triggers->get_child(i)->get_data());
+      ASSERT_NE(data, nullptr);
+      EXPECT_EQ(data->event_manipulation, Tree::internalize_token(events[i]));
+      EXPECT_EQ(data->timing, Tree::internalize_token(i == 2 ? "BEFORE" : "AFTER"));
+    }
+    auto data = dynamic_cast<Tree::TableData *>(node->get_data());
+    ASSERT_NE(data, nullptr);
+    EXPECT_TRUE(data->is_data_loaded(Tree::TRIGGER_DATA));
+  }
+
+  TEST_F(SQL_Editor_FormTest, Testing_for_SqlEditorForm_fetch_foreign_key_data) {
+    auto node = table("film");
+    metadata.queries.push_back({"SHOW CREATE TABLE `wb_sql_editor_form_test`.`film`", {
+      {"film",
+       "CREATE TABLE `film` (\n"
+       "  `film_id` int NOT NULL,\n"
+       "  CONSTRAINT `fk_film_language` FOREIGN KEY (`language_id`) REFERENCES `language` (`language_id`) "
+       "ON DELETE RESTRICT ON UPDATE CASCADE,\n"
+       "  CONSTRAINT `fk_film_language_original` FOREIGN KEY (`original_language_id`) "
+       "REFERENCES `language` (`language_id`) ON DELETE SET NULL ON UPDATE NO ACTION\n"
+       ") ENGINE=InnoDB"}
+    }});
+    controller->fetch_foreign_key_data("wb_sql_editor_form_test", "film", Tree::Table, updater());
+    auto keys = node->get_child(Tree::TABLE_FOREIGN_KEYS_NODE_INDEX);
+    EXPECT_EQ(captions(keys), (std::vector<std::string>{"fk_film_language", "fk_film_language_original"}));
+    ASSERT_EQ(keys->count(), 2);
+    auto first = dynamic_cast<Tree::FKData *>(keys->get_child(0)->get_data());
+    ASSERT_NE(first, nullptr);
+    EXPECT_EQ(first->update_rule, Tree::internalize_token("CASCADE"));
+    EXPECT_EQ(first->delete_rule, Tree::internalize_token("RESTRICT"));
+    EXPECT_EQ(first->referenced_table, "language");
+    EXPECT_EQ(first->from_cols, "language_id");
+    EXPECT_EQ(first->to_cols, "language_id");
+    auto second = dynamic_cast<Tree::FKData *>(keys->get_child(1)->get_data());
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(second->update_rule, Tree::internalize_token("NO ACTION"));
+    EXPECT_EQ(second->delete_rule, Tree::internalize_token("SET NULL"));
+    EXPECT_EQ(second->from_cols, "original_language_id");
+    auto data = dynamic_cast<Tree::TableData *>(node->get_data());
+    ASSERT_NE(data, nullptr);
+    EXPECT_TRUE(data->is_data_loaded(Tree::FK_DATA));
+  }
+
+  TEST_F(SQL_Editor_FormTest, Broken_view_records_column_load_error) {
+    auto node = tree()->create_node_for_object("wb_sql_editor_form_test", Tree::View, "broken_view");
+    metadata.queries.push_back({"SHOW FULL COLUMNS FROM `wb_sql_editor_form_test`.`broken_view`", {}, 1356});
+    controller->fetch_column_data("wb_sql_editor_form_test", "broken_view", Tree::View, updater());
+    auto data = dynamic_cast<Tree::ViewData *>(node->get_data());
+    ASSERT_NE(data, nullptr);
+    EXPECT_TRUE(data->columns_load_error);
+    EXPECT_FALSE(data->is_data_loaded(Tree::COLUMN_DATA));
+    EXPECT_EQ(data->details, "Test metadata query failed");
+    EXPECT_EQ(metadata.active_sessions, 0);
+  }
+
+  TEST_F(SQL_Editor_FormTest, View_columns_use_the_view_as_parent) {
+    auto node = tree()->create_node_for_object("wb_sql_editor_form_test", Tree::View, "film_view");
+    metadata.queries.push_back({"SHOW FULL COLUMNS FROM `wb_sql_editor_form_test`.`film_view`", {
+      {"title", "varchar(255)", "utf8_general_ci", "YES", "", "", ""}
+    }});
+    controller->fetch_column_data("wb_sql_editor_form_test", "film_view", Tree::View, updater());
+    ASSERT_EQ(node->count(), 1);
+    EXPECT_EQ(node->get_child(0)->get_string(0), "title");
+    auto column = dynamic_cast<Tree::ColumnData *>(node->get_child(0)->get_data());
+    ASSERT_NE(column, nullptr);
+    EXPECT_EQ(column->get_type(), Tree::ViewColumn);
+    auto data = dynamic_cast<Tree::ViewData *>(node->get_data());
+    ASSERT_NE(data, nullptr);
+    EXPECT_TRUE(data->is_data_loaded(Tree::COLUMN_DATA));
+    EXPECT_FALSE(data->columns_load_error);
+  }
+
+  TEST_F(SQL_Editor_FormTest, Empty_metadata_marks_collections_loaded) {
+    auto node = table("film");
+    metadata.queries.push_back({"SHOW INDEXES FROM `wb_sql_editor_form_test`.`film`", {}});
+    metadata.queries.push_back({"SHOW TRIGGERS FROM `wb_sql_editor_form_test` LIKE 'film'", {}});
+    metadata.queries.push_back({"SHOW CREATE TABLE `wb_sql_editor_form_test`.`film`", {
+      {"film", "CREATE TABLE `film` (\n  `film_id` int NOT NULL\n) ENGINE=InnoDB"}
+    }});
+    controller->fetch_index_data("wb_sql_editor_form_test", "film", Tree::Table, updater());
+    controller->fetch_trigger_data("wb_sql_editor_form_test", "film", Tree::Table, updater());
+    controller->fetch_foreign_key_data("wb_sql_editor_form_test", "film", Tree::Table, updater());
+    EXPECT_EQ(node->get_child(Tree::TABLE_INDEXES_NODE_INDEX)->count(), 0);
+    EXPECT_EQ(node->get_child(Tree::TABLE_TRIGGERS_NODE_INDEX)->count(), 0);
+    EXPECT_EQ(node->get_child(Tree::TABLE_FOREIGN_KEYS_NODE_INDEX)->count(), 0);
+    auto data = dynamic_cast<Tree::TableData *>(node->get_data());
+    ASSERT_NE(data, nullptr);
+    EXPECT_TRUE(data->is_data_loaded(Tree::INDEX_DATA | Tree::TRIGGER_DATA | Tree::FK_DATA));
+    EXPECT_EQ(metadata.opened_sessions, 3);
+  }
 }

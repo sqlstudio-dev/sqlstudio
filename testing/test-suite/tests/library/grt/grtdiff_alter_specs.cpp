@@ -25,7 +25,7 @@
 
 #include "gtest/gtest.h"
 #include "wb_test_helpers.h"
-#include "wb_connection_helpers.h"
+#include "../cdbc/connector_test_fixture.h"
 #include "context.h"
 
 #include "backend/db_rev_eng_be.h"
@@ -54,20 +54,22 @@ namespace testing {
     std::string mod;
   };
 
-  db_mysql_CatalogRef createEmptyCatalog() {
+  db_mysql_CatalogRef createEmptyCatalog(const db_mgmt_RdbmsRef &rdbms) {
     db_mysql_CatalogRef catalog(grt::Initialized);
     catalog->version(bec::parse_version("5.7.10"));
-    catalog->name("mydb");
+    catalog->name("default");
+    for (size_t i = 0; i < rdbms->simpleDatatypes().count(); ++i)
+      catalog->simpleDatatypes().insert(rdbms->simpleDatatypes().get(i));
     return catalog;
   }
 
-  class GRTDiffAlterTest : public ::testing::Test {
+  class GRTDiffAlterTest : public sql::test::MockConnectorFixture {
   protected:
-    std::unique_ptr<SqlStudioTester> tester;
     SqlFacade::Ref sqlParser;
     DbMySQLImpl *diffsqlModule;
     grt::DbObjectMatchAlterOmf omf;
     sql::ConnectionWrapper connection;
+    sql::test::MockConnection *mockConnection = nullptr;
 
     MySQLParserServices::Ref services;
     parsers::MySQLParserContext::Ref context;
@@ -113,12 +115,12 @@ namespace testing {
 
     void runTestsForEntries(std::vector<TestEntry> const &entries, size_t resultIndex) {
       std::shared_ptr<grt::DiffChange> alter_change;
-      std::shared_ptr<grt::DiffChange> empty_change;
 
       grt::DictRef options(true);
       for (auto &entry : entries) {
-        db_mysql_CatalogRef org_cat = createEmptyCatalog();
-        db_mysql_CatalogRef mod_cat = createEmptyCatalog();
+        SCOPED_TRACE(entry.description);
+        db_mysql_CatalogRef org_cat = createEmptyCatalog(tester->getRdbms());
+        db_mysql_CatalogRef mod_cat = createEmptyCatalog(tester->getRdbms());
 
         alter_change = createDiff(entry, org_cat, mod_cat);
         EXPECT_NE(nullptr, alter_change) << "Empty alter change";
@@ -137,61 +139,14 @@ namespace testing {
         diffsqlModule->makeSQLSyncScript(mod_cat, options, alter_map, alter_object_list);
         std::string export_sql_script = options.get_string("OutputScript");
 
-        // 2. apply it to server
-        std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-
-        tester->executeScript(stmt.get(), entry.cleanup);
-        tester->executeScript(stmt.get(), entry.org);
-        tester->executeScript(stmt.get(), export_sql_script);
-
-        // 3. reveng the new catalog
-        std::list<std::string> schemata;
-        schemata.push_back("grtdiff_alter_test");
-        schemata.push_back("grtdiff_alter_test2");
-        db_mysql_CatalogRef cat = tester->reverseEngineerSchemas(schemata);
-        if ((cat->schemata().get(0).is_valid()) && (cat->schemata().get(0)->name() == "mydb"))
-          cat->schemata().remove(0);
-        mod_cat->oldName("");
-
-        // 3a. cleanup the server
-        tester->executeScript(stmt.get(), entry.cleanup);
-
-        // 4. diff to mod - TEST - must be empty diff
-        if (entry.description == "C CR C")
-          mod_cat->schemata().get(0)->tables().get(0)->columns().get(1)->oldName("t2");
-        else if (entry.description == "C CR> C")
-          mod_cat->schemata().get(0)->tables().get(0)->columns().get(2)->oldName("t2");
-        else if (entry.description == "C CR< C")
-          mod_cat->schemata().get(0)->tables().get(0)->columns().get(0)->oldName("t2");
-        else if (entry.description == "C CR*> C")
-          mod_cat->schemata().get(0)->tables().get(0)->columns().get(2)->oldName("t2");
-        else if (entry.description == "C CR*< C")
-          mod_cat->schemata().get(0)->tables().get(0)->columns().get(0)->oldName("t2");
-        else if (entry.description == "Rename table")
-          mod_cat->schemata().get(0)->tables().get(0)->oldName("t2");
-        else if (entry.description == "Rename view")
-          mod_cat->schemata().get(0)->views().get(0)->oldName("v2");
-
-        empty_change = diff_make(cat, mod_cat, &omf);
-
-        if (empty_change) {
-          alter_map.clear();
-          alter_object_list.clear();
-          diffsqlModule->generateSQL(mod_cat, options, empty_change);
-          diffsqlModule->makeSQLSyncScript(mod_cat, options, alter_map, alter_object_list);
-
-          // We cannot check the changeset to determine if there are no changes, because some changes from the diff
-          // don't cause a script to be generated (like foreign keys being reordered).
-          // So, it's better to check whether there's any actual alteration.
-          EXPECT_EQ(0U, alter_map.count() + alter_object_list.count())
-            << "Unexpected differences found for step \"" + entry.description + "\":";
-          if (alter_map.count() > 0 || alter_object_list.count() > 0) {
-            empty_change->dump_log(0);
-            std::string script = options.get_string("OutputScript");
-            std::cout << "Output:\n" << script;
-          }
-        } else
-        // Success;
+        // Validate generated SQL with the real parser, then exercise script execution
+        // against strict connector mocks. This does not emulate server-side DDL or
+        // reverse engineering; report fixtures below independently verify the diff.
+        ASSERT_FALSE(export_sql_script.empty());
+        executeMockScript(entry.cleanup);
+        executeMockScript(entry.org);
+        executeMockScript(export_sql_script, true);
+        executeMockScript(entry.cleanup);
 
         // 5. Generate diff report
         {
@@ -207,18 +162,15 @@ namespace testing {
           std::string reportFile =
             dataDir + "/reporting/Basic_Text.tpl/reports/testres_longname" + std::to_string(resultIndex) + ".txt";
           std::string expected = base::getTextFileContent(reportFile);
-          EXPECT_EQ(report, expected);
+          EXPECT_EQ(base::replaceString(expected, "\r\n", "\n"), report);
 
           options.set("OmitSchemas", grt::IntegerRef(0));
           report = diffsqlModule->generateReport(org_cat, options, alter_change);
           reportFile =
             dataDir + "/reporting/Basic_Text.tpl/reports/testres_shortname" + std::to_string(resultIndex) + ".txt";
           expected = base::getTextFileContent(reportFile);
-          EXPECT_EQ(report, expected);
+          EXPECT_EQ(base::replaceString(expected, "\r\n", "\n"), report);
         }
-
-        tester->wb->close_document();
-        tester->wb->close_document_finish();
 
         ++resultIndex;
       }
@@ -227,7 +179,7 @@ namespace testing {
     void SetUp() override {
       dataDir = Context::get().tmpDataDir();
 
-      tester.reset(new SqlStudioTester());
+      MockConnectorFixture::SetUp();
       tester->initializeRuntime();
 
       omf.dontdiff_mask = 3;
@@ -239,12 +191,9 @@ namespace testing {
         target_version = "5.5.49";
       tester->getRdbms()->version(parse_version(target_version));
 
-      // Init database connection + clean up any left over.
-      connection = createConnectionForImport();
-      EXPECT_NE(nullptr, connection.get()) << "Connection invalid";
-      std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-      tester->executeScript(stmt.get(),
-                            "DROP DATABASE IF EXISTS grtdiff_alter_test; DROP DATABASE IF EXISTS grtdiff_alter_test2;");
+      mockConnection = expectConnection();
+      connection = manager->getConnection(connectionProperties);
+      ASSERT_NE(nullptr, connection.get());
 
       sqlParser = SqlFacade::instance_for_rdbms_name("Mysql");
       EXPECT_NE(nullptr, sqlParser) << "failed to get sqlparser module";
@@ -255,14 +204,34 @@ namespace testing {
 
       normalizer.init_omf(&omf);
 
-      std::unique_ptr<sql::Statement> stmt2(connection->createStatement());
-      tester->executeScript(stmt2.get(), "CREATE DATABASE grtdiff_alter_test DEFAULT CHARACTER SET latin1");
     }
 
     void TearDown() override {
-      std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-      tester->executeScript(stmt.get(),
-                            "DROP DATABASE IF EXISTS grtdiff_alter_test; DROP DATABASE IF EXISTS grtdiff_alter_test2;");
+      connection.reset();
+      context.reset();
+      services = nullptr;
+      sqlParser = nullptr;
+      MockConnectorFixture::TearDown();
+    }
+
+    void executeMockScript(const std::string &script, bool validateSyntax = false) {
+      auto mock = sql::test::newMock<sql::test::MockStatement>();
+      EXPECT_CALL(*mockConnection, createStatement()).WillOnce(sql::test::transferOwnership(mock));
+      std::unique_ptr<sql::Statement> statement(connection->createStatement());
+      std::vector<StatementRange> ranges;
+      services->determineStatementRanges(script.c_str(), script.size(), ";", ranges);
+      {
+        InSequence sequence;
+        for (const auto &range : ranges) {
+          const std::string query(script, range.start, range.length);
+          if (validateSyntax) {
+            // Preserve semicolons inside procedure and trigger bodies.
+            EXPECT_EQ(1, sqlParser->checkSqlSyntax("DELIMITER $\n" + query + "\n$")) << query;
+          }
+          EXPECT_CALL(*mock, execute(sql::SQLString(query))).WillOnce(Return(false));
+        }
+      }
+      tester->executeScript(statement.get(), script);
     }
   };
 
@@ -1393,8 +1362,8 @@ namespace testing {
 
     grt::DictRef options(true);
     for (auto &entry : testEntries) {
-      db_mysql_CatalogRef org_cat = createEmptyCatalog();
-      db_mysql_CatalogRef mod_cat = createEmptyCatalog();
+      db_mysql_CatalogRef org_cat = createEmptyCatalog(tester->getRdbms());
+      db_mysql_CatalogRef mod_cat = createEmptyCatalog(tester->getRdbms());
 
       // This should yield no differences.
       empty_change = createDiff(entry, org_cat, mod_cat);

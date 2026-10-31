@@ -23,162 +23,274 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <cppconn/prepared_statement.h>
-#include <cppconn/connection.h>
-#include <cppconn/statement.h>
-#include <cppconn/resultset.h>
-#include <cppconn/metadata.h>
+#include "connector_test_fixture.h"
+#include "grtpp_util.h"
 
-#include "cdbc/src/driver_manager.h"
-#include "wb_connection_helpers.h"
-#include "wb_test_helpers.h"
+#include <cppconn/exception.h>
 
-#include "helpers.h"
-#include "gtest/gtest.h"
-
-extern void register_all_metaclasses();
+#include <stdexcept>
+#include <string>
 
 namespace {
+using namespace testing;
+using namespace sql::test;
 
-  class DbcGeneralTest : public ::testing::Test {
-  protected:
-    std::unique_ptr<SqlStudioTester> tester;
+class DbcGeneralTest : public MockConnectorFixture {};
 
-    void SetUp() override {
-      register_all_metaclasses();
-      grt::GRT::get()->scan_metaclasses_in("../../res/grt/");
-      grt::GRT::get()->end_loading_metaclasses();
-      tester.reset(new SqlStudioTester);
-      EXPECT_EQ((size_t)INT_METACLASS_COUNT, grt::GRT::get()->get_metaclasses().size());
-    }
+TEST_F(DbcGeneralTest, ChecksInitialFunctionality) {
+  EXPECT_EQ(static_cast<size_t>(INT_METACLASS_COUNT), grt::GRT::get()->get_metaclasses().size());
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  auto statement = newMock<MockStatement>();
+  EXPECT_CALL(*connection, createStatement()).WillOnce(transferOwnership(statement));
 
-    void TearDown() override {
-      db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-      setupConnectionEnvironment(connectionProperties);
-
-      sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-      dm->set_testing();
-      sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-      sql::Connection *connection = wrapper.get();
-
-      std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-      stmt->execute("DROP SCHEMA IF EXISTS test");
-
-      //SqlStudioTester::reinitGRT();
-    }
-  };
-
-  TEST_F(DbcGeneralTest, ChecksInitialFunctionality) {
-    EXPECT_EQ(INT_METACLASS_COUNT, grt::GRT::get()->get_metaclasses().size());
-    db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-    setupConnectionEnvironment(connectionProperties);
-
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    sql::Connection *connection = wrapper.get();
-
-    std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-    stmt->execute("DROP SCHEMA IF EXISTS test");
-
-    std::unique_ptr<sql::ResultSet> rset1(stmt->executeQuery("SHOW DATABASES like 'test'"));
-    EXPECT_EQ(0U, rset1->rowsCount());
-
-    stmt->execute("CREATE SCHEMA test");
-
-    std::unique_ptr<sql::ResultSet> rset2(stmt->executeQuery("SHOW DATABASES like 'test'"));
-    EXPECT_EQ(1U, rset2->rowsCount());
+  auto before = newMock<MockResultSet>();
+  auto after = newMock<MockResultSet>();
+  const sql::SQLString lookup("SHOW DATABASES LIKE 'sqlstudio_dbc_general'");
+  {
+    InSequence sequence;
+    EXPECT_CALL(*statement, executeQuery(lookup)).WillOnce(transferOwnership(before));
+    EXPECT_CALL(*before, rowsCount()).WillOnce(Return(0));
+    EXPECT_CALL(*statement, execute(sql::SQLString("CREATE SCHEMA sqlstudio_dbc_general")))
+      .WillOnce(Return(false));
+    EXPECT_CALL(*statement, executeQuery(lookup)).WillOnce(transferOwnership(after));
+    EXPECT_CALL(*after, rowsCount()).WillOnce(Return(1));
   }
 
-  TEST_F(DbcGeneralTest, MetadataFetchTest) {
-    db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
+  std::unique_ptr<sql::Statement> owned(wrapper->createStatement());
+  {
+    std::unique_ptr<sql::ResultSet> result(owned->executeQuery(lookup));
+    EXPECT_EQ(0U, result->rowsCount());
+  }
+  owned->execute("CREATE SCHEMA sqlstudio_dbc_general");
+  {
+    std::unique_ptr<sql::ResultSet> result(owned->executeQuery(lookup));
+    EXPECT_EQ(1U, result->rowsCount());
+  }
+}
 
-    setupConnectionEnvironment(connectionProperties);
+TEST_F(DbcGeneralTest, MetadataFetchTest) {
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  StrictMock<MockDatabaseMetaData> metadata;
+  EXPECT_CALL(metadata, destroyed());
+  auto schemata = newMock<MockResultSet>();
+  auto objects = newMock<MockResultSet>();
+  {
+    InSequence sequence;
+    EXPECT_CALL(*connection, getMetaData()).WillOnce(Return(&metadata));
+    EXPECT_CALL(metadata, getSchemata(sql::SQLString(""))).WillOnce(transferOwnership(schemata));
+    EXPECT_CALL(*schemata, next()).WillOnce(Return(true));
+    EXPECT_CALL(*schemata, getString(sql::SQLString("Database")))
+      .WillOnce(Return(sql::SQLString("sqlstudio_dbc_general")));
+    EXPECT_CALL(metadata, getSchemaObjects(sql::SQLString(""), sql::SQLString("sqlstudio_dbc_general"),
+                                           sql::SQLString(""), true, sql::SQLString(""), sql::SQLString("")))
+      .WillOnce(transferOwnership(objects));
+    EXPECT_CALL(*objects, next()).WillOnce(Return(true));
+    EXPECT_CALL(*objects, getString(sql::SQLString("OBJECT_TYPE"))).WillOnce(Return(sql::SQLString("table")));
+    EXPECT_CALL(*objects, getString(sql::SQLString("NAME"))).WillOnce(Return(sql::SQLString("product")));
+    EXPECT_CALL(*objects, getString(sql::SQLString("DDL")))
+      .WillOnce(Return(sql::SQLString("CREATE TABLE product (id INT)")));
+    EXPECT_CALL(*objects, next()).WillOnce(Return(false));
+    EXPECT_CALL(*schemata, next()).WillOnce(Return(false));
+  }
 
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    sql::Connection *connection = wrapper.get();
-    sql::DatabaseMetaData *meta(connection->getMetaData());
-    std::unique_ptr<sql::ResultSet> rset(meta->getSchemata());
+  auto meta = wrapper->getMetaData();
+  std::unique_ptr<sql::ResultSet> schemaRows(meta->getSchemata());
+  ASSERT_TRUE(schemaRows->next());
+  const auto schema = schemaRows->getString("Database");
+  EXPECT_EQ(sql::SQLString("sqlstudio_dbc_general"), schema);
+  std::unique_ptr<sql::ResultSet> objectRows(meta->getSchemaObjects("", schema));
+  ASSERT_TRUE(objectRows->next());
+  EXPECT_EQ(sql::SQLString("table"), objectRows->getString("OBJECT_TYPE"));
+  EXPECT_EQ(sql::SQLString("product"), objectRows->getString("NAME"));
+  EXPECT_EQ(sql::SQLString("CREATE TABLE product (id INT)"), objectRows->getString("DDL"));
+  EXPECT_FALSE(objectRows->next());
+  EXPECT_FALSE(schemaRows->next());
+}
 
-    while (rset->next()) {
-      if (getenv("VERBOSE")) {
-        std::cout << rset->getString("Database") << std::endl;
-        std::cout << "  Schema Objects:" << std::endl;
+TEST_F(DbcGeneralTest, TransactionTests) {
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  auto statement = newMock<MockStatement>();
+  EXPECT_CALL(*connection, createStatement()).WillOnce(transferOwnership(statement));
+  auto prepared = newMock<MockPreparedStatement>();
+  auto before = newMock<MockResultSet>();
+  auto after = newMock<MockResultSet>();
+  const sql::SQLString insert("INSERT INTO product(idproduct, name) VALUES(?, ?)");
+  const sql::SQLString query("SELECT idproduct, name FROM product");
+  {
+    InSequence sequence;
+    EXPECT_CALL(*connection, setAutoCommit(false));
+    EXPECT_CALL(*connection, prepareStatement(insert)).WillOnce(transferOwnership(prepared));
+    EXPECT_CALL(*prepared, setInt(1, 1));
+    EXPECT_CALL(*prepared, setString(2, sql::SQLString("Harry Potter")));
+    EXPECT_CALL(*prepared, executeUpdate()).WillOnce(Return(1));
+    EXPECT_CALL(*statement, executeQuery(query)).WillOnce(transferOwnership(before));
+    EXPECT_CALL(*before, next()).WillOnce(Return(true));
+    EXPECT_CALL(*before, getString(uint32_t(2))).WillOnce(Return(sql::SQLString("Harry Potter")));
+    EXPECT_CALL(*before, next()).WillOnce(Return(false));
+    EXPECT_CALL(*connection, rollback());
+    EXPECT_CALL(*statement, executeQuery(query)).WillOnce(transferOwnership(after));
+    EXPECT_CALL(*after, next()).WillOnce(Return(false));
+  }
+
+  std::unique_ptr<sql::Statement> owned(wrapper->createStatement());
+  wrapper->setAutoCommit(false);
+  std::unique_ptr<sql::PreparedStatement> insertStatement(wrapper->prepareStatement(insert));
+  insertStatement->setInt(1, 1);
+  insertStatement->setString(2, "Harry Potter");
+  EXPECT_EQ(1, insertStatement->executeUpdate());
+  {
+    std::unique_ptr<sql::ResultSet> result(owned->executeQuery(query));
+    ASSERT_TRUE(result->next());
+    EXPECT_EQ(sql::SQLString("Harry Potter"), result->getString(2));
+    EXPECT_FALSE(result->next());
+  }
+  wrapper->rollback();
+  {
+    std::unique_ptr<sql::ResultSet> result(owned->executeQuery(query));
+    EXPECT_FALSE(result->next());
+  }
+}
+
+TEST_F(DbcGeneralTest, RollbackFailurePropagates) {
+  auto connection = expectConnection();
+  auto wrapper = manager->getConnection(connectionProperties);
+  EXPECT_CALL(*connection, rollback())
+    .WillOnce(Throw(sql::SQLException("Mock rollback failed", "HY000", 2013)));
+  try {
+    wrapper->rollback();
+    FAIL() << "Expected rollback failure";
+  } catch (const sql::SQLException &error) {
+    EXPECT_EQ(2013, error.getErrorCode());
+    EXPECT_EQ(sql::SQLString("HY000"), error.getSQLState());
+    EXPECT_STREQ("Mock rollback failed", error.what());
+  }
+}
+
+class DbcGeneralIntegrationTest : public LiveConnectorFixture {
+protected:
+  std::unique_ptr<sql::Statement> statement;
+  std::string schema;
+  bool schemaCreated = false;
+
+  void SetUp() override {
+    LiveConnectorFixture::SetUp();
+    if (IsSkipped() || HasFatalFailure())
+      return;
+    statement.reset(connection->createStatement());
+    ASSERT_NE(nullptr, statement.get());
+
+    std::string guid;
+    for (char c : grt::get_guid()) {
+      if (c >= 'A' && c <= 'F')
+        guid += static_cast<char>(c - 'A' + 'a');
+      else if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))
+        guid += c;
+    }
+    ASSERT_EQ(32U, guid.size());
+    schema = "sqlstudio_dbc_" + guid;
+  }
+
+  void TearDown() override {
+    if (schemaCreated) {
+      try {
+        statement->execute("DROP SCHEMA `" + schema + "`");
+      } catch (const sql::SQLException &error) {
+        ADD_FAILURE() << "Could not drop test schema " << schema << ": " << error.what();
       }
-
-      std::unique_ptr<sql::ResultSet> rset2(meta->getSchemaObjects("", rset->getString("Database")));
-      while (rset2->next()) {
-        if (getenv("VERBOSE"))
-          std::cout << rset2->getString("OBJECT_TYPE") << ": " << rset2->getString("NAME") << ","
-                    << rset2->getString("DDL") << std::endl;
-      }
     }
+    statement.reset();
+    LiveConnectorFixture::TearDown();
   }
 
-  TEST_F(DbcGeneralTest, TransactionTests) {
-    db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-
-    setupConnectionEnvironment(connectionProperties);
-
-    sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-    dm->set_testing();
-    sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-    sql::Connection *connection = wrapper.get();
-
-    std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-
-    stmt->execute("DROP SCHEMA IF EXISTS test");
-    stmt->execute("CREATE SCHEMA test");
-
-    stmt->execute("DROP TABLE IF EXISTS test.product");
-    stmt->execute("CREATE TABLE test.product(idproduct INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(80))");
-
-    connection->setAutoCommit(0);
-
-    if (getenv("VERBOSE"))
-      std::cout << "Insert Data." << std::endl;
-
-    std::unique_ptr<sql::PreparedStatement> prepStmt(
-      connection->prepareStatement("INSERT INTO test.product(idproduct, name)  VALUES(?, ?)"));
-    prepStmt->setInt(1, 1);
-    prepStmt->setString(2, "Harry Potter");
-    prepStmt->executeUpdate();
-
-    if (getenv("VERBOSE"))
-      std::cout << "Display Data." << std::endl;
-
-    std::unique_ptr<sql::ResultSet> rset1(stmt->executeQuery("SELECT * FROM test.product"));
-
-    int i = 0;
-    while (rset1->next()) {
-      if (getenv("VERBOSE"))
-        std::cout << rset1->getString(2) << ", " << rset1->getString("name") << std::endl;
-      i++;
-    }
-    if (getenv("VERBOSE")) {
-      printf("%d row(s)", i);
-
-      printf("Rollback");
-    }
-
-    connection->rollback();
-
-    if (getenv("VERBOSE"))
-      printf("Display Data Again.\n");
-
-    std::unique_ptr<sql::ResultSet> rset2(stmt->executeQuery("SELECT * FROM test.product"));
-
-    i = 0;
-    while (rset2->next()) {
-      if (getenv("VERBOSE"))
-        std::cout << rset2->getString(2) << ", " << rset2->getString("name") << std::endl;
-      i++;
-    }
-    if (getenv("VERBOSE"))
-      std::cout << i << " row(s)" << std::endl;
+  void createSchema() {
+    statement->execute("CREATE SCHEMA `" + schema + "`");
+    schemaCreated = true;
   }
+
+  bool schemaExists() {
+    std::unique_ptr<sql::ResultSet> result(statement->executeQuery(
+      "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" + schema + "'"));
+    if (!result)
+      throw std::runtime_error("Schema lookup returned no result");
+    return result->next();
+  }
+};
+
+TEST_F(DbcGeneralIntegrationTest, ChecksInitialFunctionality) {
+  ASSERT_FALSE(schemaExists());
+  createSchema();
+  EXPECT_TRUE(schemaExists());
+}
+
+TEST_F(DbcGeneralIntegrationTest, MetadataFetchTest) {
+  createSchema();
+  statement->execute("CREATE TABLE `" + schema + "`.product (id INT PRIMARY KEY) ENGINE=InnoDB");
+  auto metadata = connection->getMetaData();
+  ASSERT_NE(nullptr, metadata);
+  std::unique_ptr<sql::ResultSet> schemata(metadata->getSchemata());
+  ASSERT_NE(nullptr, schemata.get());
+  bool foundSchema = false;
+  while (schemata->next()) {
+    if (schemata->getString("Database").asStdString() == schema) {
+      foundSchema = true;
+      break;
+    }
+  }
+  ASSERT_TRUE(foundSchema);
+
+  std::unique_ptr<sql::ResultSet> objects(metadata->getSchemaObjects("", schema));
+  ASSERT_NE(nullptr, objects.get());
+  bool foundTable = false;
+  while (objects->next()) {
+    if (objects->getString("NAME") == "product") {
+      EXPECT_EQ(sql::SQLString("table"), objects->getString("OBJECT_TYPE"));
+      EXPECT_NE(std::string::npos, objects->getString("DDL").asStdString().find("product"));
+      foundTable = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(foundTable);
+}
+
+TEST_F(DbcGeneralIntegrationTest, TransactionTests) {
+  createSchema();
+  const std::string table = "`" + schema + "`.product";
+  statement->execute("CREATE TABLE " + table +
+                     " (idproduct INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name VARCHAR(80)) ENGINE=InnoDB");
+  connection->setAutoCommit(false);
+  std::unique_ptr<sql::PreparedStatement> insert(connection->prepareStatement(
+    "INSERT INTO " + table + " (idproduct, name) VALUES (?, ?)"));
+  ASSERT_NE(nullptr, insert.get());
+  insert->setInt(1, 1);
+  insert->setString(2, "Harry Potter");
+  ASSERT_EQ(1, insert->executeUpdate());
+  {
+    std::unique_ptr<sql::ResultSet> rows(statement->executeQuery("SELECT name FROM " + table));
+    ASSERT_NE(nullptr, rows.get());
+    ASSERT_TRUE(rows->next());
+    EXPECT_EQ(sql::SQLString("Harry Potter"), rows->getString(1));
+    EXPECT_FALSE(rows->next());
+  }
+
+  connection->rollback();
+  {
+    std::unique_ptr<sql::ResultSet> rows(statement->executeQuery("SELECT name FROM " + table));
+    ASSERT_NE(nullptr, rows.get());
+    EXPECT_FALSE(rows->next());
+  }
+  insert->setInt(1, 2);
+  insert->setString(2, "Committed");
+  ASSERT_EQ(1, insert->executeUpdate());
+  connection->commit();
+  {
+    std::unique_ptr<sql::ResultSet> rows(statement->executeQuery("SELECT name FROM " + table));
+    ASSERT_NE(nullptr, rows.get());
+    ASSERT_TRUE(rows->next());
+    EXPECT_EQ(sql::SQLString("Committed"), rows->getString(1));
+    EXPECT_FALSE(rows->next());
+  }
+}
 } // namespace

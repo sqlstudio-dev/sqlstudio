@@ -145,7 +145,11 @@ namespace sql {
     return dm;
   }
 
-  DriverManager::DriverManager() : _driver_path("."), _cacheTime(0), _testing(false) {
+  DriverManager::DriverManager() : DriverManager(DriverFactory()) {
+  }
+
+  DriverManager::DriverManager(DriverFactory driver_factory)
+    : _driver_path("."), _cacheTime(0), _testing(false), _driverFactory(std::move(driver_factory)) {
   }
 
   void DriverManager::setTunnelFactoryFunction(TunnelFactoryFunction function) {
@@ -251,7 +255,7 @@ namespace sql {
 
     Driver *driver;
     if (library == "mysqlcppconn")
-      driver = get_driver_instance();
+      driver = _driverFactory ? _driverFactory() : get_driver_instance();
     else {
 #ifdef _MSC_VER
       library.append(".dll");

@@ -20,6 +20,161 @@ and feature ideas are handled through the GitHub repository.
 4. Verify the relevant build and tests pass before submitting.
 5. Open a pull request on GitHub against the `develop` branch.
 
+## Native SQL Editor Tests
+
+The Windows runner saves Google Test XML results under
+`testing\test-suite\TestResults\<Platform>\<Configuration>\last-test-results.xml`,
+including failed runs. To rerun only suites that failed in the previous run:
+
+```powershell
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -RerunFailed
+```
+
+This reruns whole suites, including suite setup/teardown failures, not just failed
+test cases. A passing previous run does not launch tests. Missing or invalid
+reports produce an explicit error. Each execution replaces the previous results;
+listing tests leaves them unchanged. Failed-suite names are also saved immediately
+to `failed-suites.txt` in the same directory. If a later test crashes or the run
+is interrupted before XML is written, `-RerunFailed` uses those recorded failures.
+Tests interrupted before reporting a failure cannot be inferred. History is kept
+outside the build output so rebuilding does not remove it.
+While recording output, the runner preserves colored Google Test status markers:
+green for success/progress, red for failures, and yellow for skips.
+Use `--gtest_color=no` (or `GTEST_COLOR=no`) to disable these colors.
+Do not combine `-RerunFailed` with `--gtest_filter` or `--gtest_list_tests`.
+Custom reports save history when using `--gtest_output=xml:<file.xml>`; other
+output formats still run using console failure history with a warning. Relative XML
+paths are based on `testing\test-suite`. Google Test reports only the last
+iteration when repeating tests, so failure history has that same limitation.
+Runner regression checks (no build required):
+`powershell -NoProfile -File .\testing\test-suite\compile.tests.ps1`.
+
+On Windows, run the schema-tree and metadata-fetching unit tests with:
+
+```powershell
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=SQL_Editor_FormTest.*:Live_Schema_TreeTest.*'
+```
+
+Build the native test executable first when sources have changed. `SQL_Editor_FormTest`
+uses an injected metadata session with canned query results: it exercises the real
+schema, column, index, trigger and foreign-key processing without connecting to MySQL,
+creating databases, loading application runtime XML, or waiting for background work.
+It does not cover live connector behavior or the complete SQL editor UI.
+The fixture initializes GRT's notification center itself, so the suite can run
+alone without another suite initializing the application first. `-SkipBuild`
+does not load the Visual Studio build environment when running tests.
+
+For model-document integration tests, use:
+
+```powershell
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=SqlStudio_model_document_integration_testsTest.*'
+```
+
+These tests require the built application runtime resources. Their fixture and
+runtime paths are resolved before model operations can change the working directory,
+and the test context creates the output directory for saved models. The model
+fixtures used by this suite use the SqlStudio format marker and `studio.*` class
+names; this does not add support for opening legacy MySQL Workbench documents.
+
+For diagram undo/redo integration tests, use the same runner with
+`--gtest_filter=UndoRedoForDiagramActionsInSqlStudioTest.*`. Each test opens
+`testing\test-suite\data\studio\undo_test_model1.mwb` and releases its application
+test context afterward. These tests also require the built runtime resources,
+but do not require a MySQL connection.
+
+For SQL-to-model diff/apply tests, use
+`--gtest_filter=db_mysql_pluginTest.*`. The suite parses SQL and applies changes
+to the `all_objects.mwb` model fixture in memory. It requires the built application
+runtime resources, but does not connect to MySQL or execute SQL against a server.
+
+For forward-engineering SQL export tests, use
+`--gtest_filter=ForwardEngineerTest.*`. These tests initialize the application
+runtime, load SqlStudio model fixtures, and compare generated SQL with the checked-in
+expected scripts without connecting to MySQL.
+The export target is pinned to MySQL 8.0, matching the expected index-visibility
+syntax. Comparisons normalize CRLF to LF but otherwise require exact SQL output.
+
+For offline SQL synchronization regressions, use
+`--gtest_filter=db_mysql_plugin_testTest.*`. These tests check generated DDL
+operations, routine delimiters, view placeholders, and in-memory model changes.
+They require built application runtime resources but no MySQL connection.
+The fixture explicitly targets MySQL 8.0.16 so saved application preferences
+cannot change version-dependent index-generation expectations.
+They no longer execute SQL or reverse-engineer a server, so they do not prove
+server acceptance or schema round-trip equivalence.
+
+For SQL parser catalog regressions, use `--gtest_filter=MySqlParserTest.*`.
+Fixture SQL is normalized from CRLF to LF before parsing so Git checkout settings
+do not affect stored definitions. Catalog comparisons remain exact; SQL-definition
+failures report the member path, lengths, and first differing byte instead of SQL.
+These tests do not write generated catalog XML into the fixture directories.
+
+For SQL editor context-help tests, use `--gtest_filter=SqlEditorHelpTest.*`.
+Topic entries use inclusive lower and exclusive upper version bounds. The main
+cases target MySQL 8.0.0, with additional checks on both sides of that boundary.
+
+For offline connector-contract tests, use `--gtest_filter=DbcConnectionTest.*`.
+An instance-local native driver factory supplies strict Connector/C++ mocks to the
+real connection manager. These tests cover option conversion, session startup,
+initialization callbacks, connection ownership, wrapper forwarding, and error
+propagation without using database environment variables or connecting to MySQL.
+They do not verify server transactions, live connection IDs, or KILL behavior.
+Keep the test-only connector mock signatures aligned with the bundled interfaces;
+methods added by newer connector releases deliberately omit `override`.
+
+`--gtest_filter=DbcGeneralTest.*` also runs offline. It checks ordered statement,
+metadata, prepared-statement, and rollback calls through the connection manager
+with strict connector mocks. The canned results do not verify MySQL schema,
+metadata, or transaction behavior.
+
+`--gtest_filter=DbcMetadataTest.*` runs offline using the same initialized fixture.
+It checks catalog result ownership, product and driver metadata, and exception
+propagation with strict mocks. `getCatalogs()` is exercised rather than treated as
+unimplemented. Real getter values are checked by `DbcMetadataIntegrationTest.*`;
+the offline tests do not validate a live connector's metadata.
+
+`--gtest_filter=DbcResultSetTest.*` runs all eight result-set contract tests offline.
+Strict mocks check statement/result ownership, prepared-query row access, repeated
+queries, ordered transaction calls, and invalid-column exceptions. Canned row
+counts do not verify MySQL commit/rollback behavior or native column validation;
+those checks remain in `DbcResultSetIntegrationTest.*`. The multistatement check
+uses native prepared statements, which reject multiple SQL statements regardless
+of the connection manager enabling them for regular statements.
+
+To run those checks against a real, isolated MySQL test server on Windows:
+
+```powershell
+# Configure DB_HOST, DB_PORT, DB_USER and DB_PASSWORD for the test server first.
+$env:SQLSTUDIO_DBC_LIVE_TESTS = '1'
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=DbcGeneralIntegrationTest.*:DbcMetadataIntegrationTest.*:DbcResultSetIntegrationTest.*'
+Remove-Item Env:\SQLSTUDIO_DBC_LIVE_TESTS
+```
+
+The Windows runner and the top-level CMake test target use `DB_HOST`, `DB_PORT`,
+`DB_USER`, and `DB_PASSWORD` (defaulting to `localhost`, `3306`, `root`, and an
+empty password). The legacy `testing/test-suite` CMake target uses the equivalent
+`TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, and `TEST_DB_PASSWORD` variables.
+All three integration suites are skipped unless explicitly enabled; connection and SQL
+errors fail the tests once enabled. The account needs permission to create and drop
+schemas and tables for the general integration suite. Its tests create a uniquely
+named `sqlstudio_dbc_<uuid>` schema and drop only that schema during teardown;
+an interrupted process may leave it behind. The result-set integration suite
+similarly creates and drops only its own `sqlstudio_dbc_result_<uuid>` schema,
+never the shared `test` schema. The metadata integration suite is read-only.
+
+Additional offline regressions can be selected with these suite filters:
+
+- `CompactSidebar.*:HomeWelcomeLayout.*`: resource-backed layout checks, including
+  Windows DPI/zoom and first-paint geometry. Run from the test-suite directory
+  (the runner does this automatically); images resolve to the repository assets.
+- `GRTCppModulesTest.*:GRTWrapperStandaloneTest.*`: module registration and wrapper
+  contracts. Each module test registers its own prerequisites and runs independently.
+- `SqlStringTest.*:SyncDiffTest.*:TableEditorInsertsBackendTest.*`: SQL formatting,
+  catalog synchronization, and model INSERT storage. Sync comparisons normalize
+  CRLF but compare the entire script; failures report sizes instead of SQL text.
+- `WbModuleTestsForSqlStudioTest.*`: OS-name matching against the current
+  application support list, not historical platform support.
+
 ## C/C++ Formatting
 
 Use **clang-format 20.1.8**, matching the version pinned for CI:

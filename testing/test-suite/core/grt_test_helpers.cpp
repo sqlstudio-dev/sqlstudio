@@ -166,7 +166,17 @@ void compareValues(std::string const& major_msg, grt::ValueRef actualValue, grt:
     }
 
     case grt::StringType: {
-      EXPECT_EQ(*grt::StringRef::cast_from(actualValue), *grt::StringRef::cast_from(expectedValue)) << msg + ", different values";
+      const std::string actual = *grt::StringRef::cast_from(actualValue);
+      const std::string expected = *grt::StringRef::cast_from(expectedValue);
+      if (!followed_path.empty() &&
+          (followed_path.back() == "sqlDefinition" || followed_path.back() == ".sqlDefinition")) {
+        const auto mismatch = std::mismatch(actual.begin(), actual.end(), expected.begin(), expected.end());
+        EXPECT_TRUE(actual == expected)
+          << msg << ", SQL differs at byte " << std::distance(actual.begin(), mismatch.first)
+          << " (actual length " << actual.size() << ", expected length " << expected.size() << ")";
+      } else {
+        EXPECT_EQ(actual, expected) << msg + ", different values";
+      }
       break;
     }
 
@@ -244,9 +254,6 @@ void compareValues(std::string const& major_msg, grt::ValueRef actualValue, grt:
     case grt::ListType: {
       grt::BaseListRef actualList = grt::BaseListRef::cast_from(actualValue);
       grt::BaseListRef expectedList = grt::BaseListRef::cast_from(expectedValue);
-
-      for (size_t i = expectedList.count(); i < actualList.count(); i++)
-        std::cout << actualList[i].toString().c_str() << "\n\n";
 
       EXPECT_EQ(actualList.count(), expectedList.count()) << msg + ", list sizes differ";
 

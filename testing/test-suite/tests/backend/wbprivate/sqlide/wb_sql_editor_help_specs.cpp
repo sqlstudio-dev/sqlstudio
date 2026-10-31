@@ -48,7 +48,7 @@ namespace {
 
 struct HelpTestEntry {
   size_t lowVersion;  //  First supported version for this entry
-  size_t highVersion; //  Last supported version for this entry
+  size_t highVersion; //  First unsupported version for this entry
   std::string query;
   size_t offset;      // Byte offset of the caret in the query.
   std::string topic;
@@ -58,7 +58,7 @@ struct HelpTestEntry {
 void checkTopics(size_t start, const std::vector<HelpTestEntry> entries, TestData *dt) {
   for (size_t i = start; i < entries.size(); i++) {
     // Ignore disabled test cases or those defined for a different server version.
-    if (entries[i].lowVersion > dt->version || entries[i].highVersion < dt->version)
+    if (entries[i].lowVersion > dt->version || entries[i].highVersion <= dt->version)
       continue;
 
     // If there's no query given then scan backwards and use the first query we can.
@@ -379,8 +379,7 @@ static std::vector<HelpTestEntry> singleTokenTests = {
   { MYSQL_VERSION_LOWER, MYSQL_VERSION_HIGHER, "do a = mbrdisjoint(a, b)", 8, "MBRDISJOINT", __LINE__ },
   { MYSQL_VERSION_LOWER, MYSQL_VERSION_8_0_0, "do a = mbrequal(a, b)", 8, "MBREQUAL", __LINE__ },
   { MYSQL_VERSION_8_0_0, MYSQL_VERSION_HIGHER, "do a = mbrequal(a, b)", 8, "DO", __LINE__ },
-  { MYSQL_VERSION_LOWER, MYSQL_VERSION_8_0_0, "do a = mbrequals(a, b)", 8, "DO", __LINE__ },
-  { MYSQL_VERSION_8_0_0, MYSQL_VERSION_HIGHER, "do a = mbrequals(a, b)", 8, "MBREQUALS", __LINE__ },
+  { MYSQL_VERSION_LOWER, MYSQL_VERSION_HIGHER, "do a = mbrequals(a, b)", 8, "MBREQUALS", __LINE__ },
   { MYSQL_VERSION_LOWER, MYSQL_VERSION_HIGHER, "do a = mbrintersects(b, c)", 8, "MBRINTERSECTS", __LINE__ },
   { MYSQL_VERSION_LOWER, MYSQL_VERSION_HIGHER, "do a = mbroverlaps(b, c)", 8, "MBROVERLAPS", __LINE__ },
   { MYSQL_VERSION_LOWER, MYSQL_VERSION_HIGHER, "do a = mbrtouches(a, b)", 8, "MBRTOUCHES", __LINE__ },
@@ -909,6 +908,7 @@ protected:
     data->tester->initializeRuntime();
 
     data->catalog = createEmptyCatalog();
+    data->catalog->version(bec::parse_version("8.0.0"));
     GrtVersionRef version = data->catalog->version();
     data->version = (unsigned long)(version->majorNumber() * 10000 + version->minorNumber() * 100 + version->releaseNumber());
 
@@ -934,5 +934,27 @@ TEST_F(SqlEditorHelpTest, MultiTokenTopics) {
 
 TEST_F(SqlEditorHelpTest, ComplexTests) {
   checkTopics(0, complexTests, data);
+}
+
+TEST_F(SqlEditorHelpTest, VersionBoundaryTopics) {
+  const std::vector<HelpTestEntry> entries = {
+    { MYSQL_VERSION_LOWER, MYSQL_VERSION_8_0_0, "do area(poly)", 9, "AREA", __LINE__ },
+    { MYSQL_VERSION_8_0_0, MYSQL_VERSION_HIGHER, "do st_area(poly)", 9, "ST_AREA", __LINE__ },
+    { MYSQL_VERSION_LOWER, MYSQL_VERSION_8_0_0, "do a = mbrequal(a, b)", 8, "MBREQUAL", __LINE__ },
+    { MYSQL_VERSION_8_0_0, MYSQL_VERSION_HIGHER, "do a = mbrequal(a, b)", 8, "DO", __LINE__ },
+    { MYSQL_VERSION_LOWER, MYSQL_VERSION_HIGHER, "do a = mbrequals(a, b)", 8, "MBREQUALS", __LINE__ },
+    { MYSQL_VERSION_LOWER, MYSQL_VERSION_8_0_0, "flush local query cache", 0, "FLUSH QUERY CACHE", __LINE__ },
+    { MYSQL_VERSION_8_0_0, MYSQL_VERSION_HIGHER, "flush local query cache", 0, "FLUSH", __LINE__ },
+    { MYSQL_VERSION_LOWER, MYSQL_VERSION_8_0_0, "select 1 from dual procedure analyse()", 20, "PROCEDURE ANALYSE", __LINE__ },
+    { MYSQL_VERSION_8_0_0, MYSQL_VERSION_HIGHER, "select 1 from dual procedure analyse()", 20, "SELECT", __LINE__ },
+  };
+  for (unsigned long version : {50710UL, 80000UL, 80016UL}) {
+    SCOPED_TRACE(version);
+    help::HelpContext context(data->tester->getRdbms()->characterSets(), "", version);
+    TestData probe;
+    probe.version = version;
+    probe.helpContext = &context;
+    checkTopics(0, entries, &probe);
+  }
 }
 }

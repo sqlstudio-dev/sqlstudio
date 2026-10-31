@@ -99,6 +99,12 @@ protected:
     register_structs_test_xml();
     grt::GRT::get()->load_metaclasses(Context::get().tmpDataDir() + "/structs.test.xml");
     grt::GRT::get()->end_loading_metaclasses();
+    grt::InterfaceImplBase::Register<SampleInterface1Impl>();
+    grt::InterfaceImplBase::Register<SampleInterface2Impl>();
+    grt::GRT::get()->get_native_module<SampleModule1Impl>();
+    grt::GRT::get()->get_native_module<SampleModule2Impl>();
+    grt::GRT::get()->get_native_module<SampleModule3Impl>();
+    grt::GRT::get()->get_native_module<TestModuleImpl>();
   }
 
   void TearDown() override {
@@ -113,17 +119,6 @@ TEST_F(GRTCppModulesTest, LoadStructures) {
 }
 
 TEST_F(GRTCppModulesTest, LoadInvalidModule) {
-  // this is exactly what should be done
-  // by module dll during initialization
-  grt::InterfaceImplBase::Register<SampleInterface1Impl>();
-  grt::InterfaceImplBase::Register<SampleInterface2Impl>();
-
-  grt::GRT::get()->get_native_module<SampleModule1Impl>();
-  grt::GRT::get()->get_native_module<SampleModule2Impl>();
-  grt::GRT::get()->get_native_module<SampleModule3Impl>();
-
-  grt::GRT::get()->get_native_module<TestModuleImpl>();
-
   EXPECT_THROW(grt::GRT::get()->get_native_module<BadModuleImpl>(), std::exception);
 }
 
@@ -181,7 +176,6 @@ TEST_F(GRTCppModulesTest, ModuleInterfaceRegistration) {
 //-----------------------------------------------------------------------------------------------------
 
 TEST_F(GRTCppModulesTest, ModuleLoadingAndInteraction) {
-  // TODO: this test cannot run alone, as it requires at least one module to be registered.
   const grt::Module::Function *f;
 
   EXPECT_FALSE(grt::GRT::get()->get_modules().empty());
@@ -291,7 +285,7 @@ TEST_F(GRTCppModulesTest, ModuleLoadingAndInteraction) {
 TEST_F(GRTCppModulesTest, TestModuleCalling) {
   grt::Module *module = grt::GRT::get()->get_module("SampleModule1");
 
-  EXPECT_NE(module, nullptr);
+  ASSERT_NE(module, nullptr);
 
   grt::BaseListRef args(grt::AnyType);
   grt::ValueRef result;
@@ -305,7 +299,7 @@ TEST_F(GRTCppModulesTest, TestModuleCalling) {
 TEST_F(GRTCppModulesTest, FunctionsReturningNULLValueWereCausingException) {
   grt::Module *module = grt::GRT::get()->get_module("TestModule");
 
-  EXPECT_NE(module, nullptr);
+  ASSERT_NE(module, nullptr);
 
   grt::BaseListRef args(grt::AnyType);
   grt::ValueRef result;
@@ -317,5 +311,3 @@ TEST_F(GRTCppModulesTest, FunctionsReturningNULLValueWereCausingException) {
 //-----------------------------------------------------------------------------------------------------
 
 }
-
-

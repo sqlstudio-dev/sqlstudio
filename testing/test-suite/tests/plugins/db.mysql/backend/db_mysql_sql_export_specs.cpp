@@ -47,9 +47,10 @@ namespace {
 
     void doForwardEngineering(std::string &modelfile, std::string &expectedFileName,
                               std::map<std::string, bool> &fwd_opts) {
-      EXPECT_TRUE(base::file_exists(modelfile)) << "Model file not found";
+      ASSERT_TRUE(base::file_exists(modelfile)) << "Model file not found: " << modelfile;
+      ASSERT_TRUE(base::file_exists(expectedFileName)) << "Expected SQL file not found: " << expectedFileName;
 
-      tester->wb->open_document(modelfile);
+      ASSERT_TRUE(tester->wb->open_document(modelfile)) << "Could not open model: " << modelfile;
       tester->openAllDiagrams();
       tester->activateOverview();
 
@@ -58,7 +59,7 @@ namespace {
       ValueRef valRef = grt::GRT::get()->get("/wb/doc/physicalModels/0/catalog/schemata/0");
 
       db_mysql_SchemaRef schemaRef = db_mysql_SchemaRef::cast_from(valRef);
-      EXPECT_TRUE(schemaRef.is_valid());
+      ASSERT_TRUE(schemaRef.is_valid());
 
       bec::GrtStringListModel *users_model;
       bec::GrtStringListModel *users_imodel;
@@ -82,24 +83,23 @@ namespace {
       exp.start_export(true);
 
       std::string output = exp.export_sql_script();
-      EXPECT_EQ(base::getTextFileContent(expectedFileName), output);
+      EXPECT_EQ(base::replaceString(base::getTextFileContent(expectedFileName), "\r\n", "\n"),
+                base::replaceString(output, "\r\n", "\n"));
 
-      tester->wb->close_document();
+      EXPECT_TRUE(tester->closeDocument());
       tester->wb->close_document_finish();
     }
   };
 
   class ForwardEngineerTest : public ::testing::Test {
   protected:
-    TestData *data = new TestData();
+    std::unique_ptr<TestData> data = std::make_unique<TestData>();
 
     void SetUp() override {
       data->dataDir = testing::Context::get().tmpDataDir();
       data->tester.reset(new SqlStudioTester());
-    }
-
-    void TearDown() override {
-      delete data;
+      data->tester->initializeRuntime();
+      bec::GRTManager::get()->set_app_option("DefaultTargetMySQLVersion", grt::StringRef("8.0.0"));
     }
   };
 

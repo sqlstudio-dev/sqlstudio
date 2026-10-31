@@ -59,11 +59,11 @@ TEST_F(GRTWrapperTest, GetFullTypeNameAndGetTypeName) {
 TEST(GRTWrapperStandaloneTest, OsErrorException) {
     os_error* error = new os_error("dummy");
 
-    EXPECT_EQ(error->what(), "dummy");
+    EXPECT_STREQ(error->what(), "dummy");
     delete error;
 
     error = new os_error(5);
-    EXPECT_EQ(error->what(), g_strerror(5));
+    EXPECT_STREQ(error->what(), g_strerror(5));
     delete error;
 }
 
@@ -73,49 +73,49 @@ TEST(GRTWrapperStandaloneTest, TypeErrorException) {
     Type container = ListType;
 
     type_error* error = new type_error("dummy");
-    EXPECT_EQ(error->what(), "dummy");
+    EXPECT_STREQ(error->what(), "dummy");
     delete error;
 
     error = new type_error("foo", "bar");
-    EXPECT_EQ(error->what(), "Type mismatch: expected object of type foo, but got bar");
+    EXPECT_STREQ(error->what(), "Type mismatch: expected object of type foo, but got bar");
     delete error;
 
     error = new type_error("foo", "bar", container);
-    EXPECT_EQ(error->what(), "Type mismatch: expected content object of type foo, but got bar");
+    EXPECT_STREQ(error->what(), "Type mismatch: expected content object of type foo, but got bar");
     delete error;
 
     error = new type_error(expected, actual);
-    EXPECT_EQ(error->what(), "Type mismatch: expected type string, but got real");
+    EXPECT_STREQ(error->what(), "Type mismatch: expected type string, but got real");
     delete error;
 
     error = new type_error(expected, actual, container);
-    EXPECT_EQ(error->what(), "Type mismatch: expected content-type string, but got real");
+    EXPECT_STREQ(error->what(), "Type mismatch: expected content-type string, but got real");
     delete error;
 }
 
 TEST(GRTWrapperStandaloneTest, NullValueException) {
-    EXPECT_EQ(null_value("dummy").what(), "dummy");
-    EXPECT_EQ(null_value().what(), "Attempt to operate on a NULL GRT value.");
+    EXPECT_STREQ(null_value("dummy").what(), "dummy");
+    EXPECT_STREQ(null_value().what(), "Attempt to operate on a NULL GRT value.");
 }
 
 TEST(GRTWrapperStandaloneTest, BadItemException) {
-    EXPECT_EQ(bad_item("dummy").what(), "Invalid item name 'dummy'");
-    EXPECT_EQ(bad_item(10, 100).what(), "Index out of range");
+    EXPECT_STREQ(bad_item("dummy").what(), "Invalid item name 'dummy'");
+    EXPECT_STREQ(bad_item(10, 100).what(), "Index out of range");
 }
 
 TEST(GRTWrapperStandaloneTest, GrtRuntimeErrorException) {
     grt_runtime_error error("dummy", "details");
-    EXPECT_EQ(error.what(), "dummy");
+    EXPECT_STREQ(error.what(), "dummy");
     EXPECT_EQ(error.detail, "details");
     EXPECT_FALSE(error.fatal);
 
     error = grt_runtime_error("foo", "bar", false);
-    EXPECT_EQ(error.what(), "foo");
+    EXPECT_STREQ(error.what(), "foo");
     EXPECT_EQ(error.detail, "bar");
     EXPECT_FALSE(error.fatal);
 
     error = grt_runtime_error("foo", "bar", true);
-    EXPECT_EQ(error.what(), "foo");
+    EXPECT_STREQ(error.what(), "foo");
     EXPECT_EQ(error.detail, "bar");
     EXPECT_TRUE(error.fatal);
 }
@@ -125,4 +125,3 @@ TEST(GRTWrapperStandaloneTest, GrtRuntimeErrorException) {
 // - Tests for GRT values are in value_specs.cpp.
 
 }
-

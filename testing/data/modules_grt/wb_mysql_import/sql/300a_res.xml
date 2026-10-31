@@ -1,57 +1,62 @@
 <?xml version="1.0"?>
 <data grt_format="2.0">
-  <value type="object" struct-name="db.mysql.Catalog" id="5C0F4ED0-C6D9-419E-8FCD-3E8993DA49AE" struct-checksum="0x82ad3466">
-    <value _ptr_="0x7fab486ec940" type="list" content-type="object" content-struct-name="db.mysql.LogFileGroup" key="logFileGroups">
-      <value type="object" struct-name="db.mysql.LogFileGroup" id="B1307070-E115-4938-BC66-5F715A393D2E" struct-checksum="0x7e71e885">
+  <value type="object" struct-name="db.mysql.Catalog" id="{14DA7A02-3FC5-4D16-8CF3-18943D656D6B}" struct-checksum="0x82ad3466">
+    <value _ptr_="000001EF21E92260" type="list" content-type="object" content-struct-name="db.mysql.LogFileGroup" key="logFileGroups">
+      <value type="object" struct-name="db.mysql.LogFileGroup" id="{2AFBBAF2-E75A-433B-89C3-23E3C4B97F03}" struct-checksum="0x7e71e885">
         <value type="string" key="engine">NDB</value>
         <value type="int" key="nodeGroupId">0</value>
         <value type="int" key="wait">0</value>
         <value type="int" key="initialSize">128</value>
+        <value type="int" key="nodeGroup">0</value>
+        <value type="int" key="redoBufferSize">0</value>
         <value type="int" key="undoBufferSize">8</value>
         <value type="string" key="undoFile">undo_file1.dat</value>
         <value type="int" key="commentedOut">0</value>
-        <value type="string" key="createDate">2018-02-08 13:35</value>
-        <value _ptr_="0x7fab486f4d30" type="dict" key="customData"/>
-        <value type="string" key="lastChangeDate">2018-02-08 13:35</value>
+        <value type="string" key="createDate">2026-10-30 21:57</value>
+        <value _ptr_="000001EF21E930D0" type="dict" key="customData"/>
+        <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
         <value type="int" key="modelOnly">0</value>
         <value type="string" key="name">logfile_group1</value>
-        <link type="object" struct-name="GrtNamedObject" key="owner">5C0F4ED0-C6D9-419E-8FCD-3E8993DA49AE</link>
+        <link type="object" struct-name="GrtNamedObject" key="owner">{14DA7A02-3FC5-4D16-8CF3-18943D656D6B}</link>
         <value type="string" key="temp_sql"></value>
         <value type="string" key="comment"></value>
-        <value type="string" key="oldName"></value>
+        <value type="string" key="oldName">logfile_group1</value>
       </value>
     </value>
-    <value _ptr_="0x7fab464a8270" type="list" content-type="object" content-struct-name="db.mysql.Schema" key="schemata"/>
-    <value _ptr_="0x7fab486a4ff0" type="list" content-type="object" content-struct-name="db.mysql.ServerLink" key="serverLinks"/>
-    <value _ptr_="0x7fab464deb00" type="list" content-type="object" content-struct-name="db.mysql.Tablespace" key="tablespaces">
-      <value type="object" struct-name="db.mysql.Tablespace" id="A45211FC-3C17-4C00-AAEC-F803E7B60A8F" struct-checksum="0xf070bb16">
+    <value _ptr_="000001EF21E93BD0" type="list" content-type="object" content-struct-name="db.mysql.Schema" key="schemata"/>
+    <value _ptr_="000001EF21E93230" type="list" content-type="object" content-struct-name="db.mysql.ServerLink" key="serverLinks"/>
+    <value _ptr_="000001EF21E91CE0" type="list" content-type="object" content-struct-name="db.mysql.Tablespace" key="tablespaces">
+      <value type="object" struct-name="db.mysql.Tablespace" id="{CA08B24D-1F9A-4CB1-A828-BE82AFBED0E6}" struct-checksum="0xf070bb16">
         <value type="string" key="engine">NDB</value>
         <value type="int" key="nodeGroupId">0</value>
         <value type="int" key="wait">0</value>
         <value type="int" key="autoExtendSize">0</value>
         <value type="string" key="dataFile">file1</value>
+        <value type="string" key="encryption"></value>
         <value type="int" key="extentSize">4</value>
+        <value type="int" key="fileBlockSize">0</value>
         <value type="int" key="initialSize">128</value>
-        <link type="object" struct-name="db.LogFileGroup" key="logFileGroup">B1307070-E115-4938-BC66-5F715A393D2E</link>
+        <link type="object" struct-name="db.LogFileGroup" key="logFileGroup">{2AFBBAF2-E75A-433B-89C3-23E3C4B97F03}</link>
         <value type="int" key="maxSize">0</value>
+        <value type="int" key="nodeGroup">0</value>
         <value type="int" key="commentedOut">0</value>
-        <value type="string" key="createDate">2018-02-08 13:35</value>
-        <value _ptr_="0x7fab464d4bd0" type="dict" key="customData"/>
-        <value type="string" key="lastChangeDate">2018-02-08 13:35</value>
+        <value type="string" key="createDate">2026-10-30 21:57</value>
+        <value _ptr_="000001EF21E93700" type="dict" key="customData"/>
+        <value type="string" key="lastChangeDate">2026-10-30 21:57</value>
         <value type="int" key="modelOnly">0</value>
         <value type="string" key="name">tablespace1</value>
-        <link type="object" struct-name="GrtNamedObject" key="owner">5C0F4ED0-C6D9-419E-8FCD-3E8993DA49AE</link>
+        <link type="object" struct-name="GrtNamedObject" key="owner">{14DA7A02-3FC5-4D16-8CF3-18943D656D6B}</link>
         <value type="string" key="temp_sql"></value>
         <value type="string" key="comment"></value>
-        <value type="string" key="oldName"></value>
+        <value type="string" key="oldName">tablespace1</value>
       </value>
     </value>
-    <value _ptr_="0x7fab464a09f0" type="list" content-type="object" content-struct-name="db.CharacterSet" key="characterSets"/>
-    <value _ptr_="0x7fab48667dd0" type="dict" key="customData"/>
+    <value _ptr_="000001EF21E91970" type="list" content-type="object" content-struct-name="db.CharacterSet" key="characterSets"/>
+    <value _ptr_="000001EF21E93440" type="dict" key="customData"/>
     <value type="string" key="defaultCharacterSetName">utf8</value>
     <value type="string" key="defaultCollationName">utf8_general_ci</value>
-    <value _ptr_="0x7fab464a3870" type="list" content-type="object" content-struct-name="db.Role" key="roles"/>
-    <value _ptr_="0x7fab464e0570" type="list" content-type="object" content-struct-name="db.SimpleDatatype" key="simpleDatatypes">
+    <value _ptr_="000001EF21E93020" type="list" content-type="object" content-struct-name="db.Role" key="roles"/>
+    <value _ptr_="000001EF21E91600" type="list" content-type="object" content-struct-name="db.SimpleDatatype" key="simpleDatatypes">
       <link type="object">com.mysql.rdbms.mysql.datatype.tinyint</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.smallint</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.mediumint</link>
@@ -97,13 +102,13 @@
       <link type="object">com.mysql.rdbms.mysql.datatype.enum</link>
       <link type="object">com.mysql.rdbms.mysql.datatype.set</link>
     </value>
-    <value _ptr_="0x7fab4869ce00" type="list" content-type="object" content-struct-name="db.UserDatatype" key="userDatatypes"/>
-    <value _ptr_="0x7fab464b6220" type="list" content-type="object" content-struct-name="db.User" key="users"/>
-    <value type="object" struct-name="GrtVersion" id="06B29C5D-194E-4ABB-A961-16896306B126" struct-checksum="0x7aaa4ede" key="version">
+    <value _ptr_="000001EF21E929F0" type="list" content-type="object" content-struct-name="db.UserDatatype" key="userDatatypes"/>
+    <value _ptr_="000001EF21E91C30" type="list" content-type="object" content-struct-name="db.User" key="users"/>
+    <value type="object" struct-name="GrtVersion" id="{CC138501-1561-4DE2-9FEC-2C773B8E34A0}" struct-checksum="0x7aaa4ede" key="version">
       <value type="int" key="buildNumber">-1</value>
       <value type="int" key="majorNumber">5</value>
-      <value type="int" key="minorNumber">6</value>
-      <value type="int" key="releaseNumber">30</value>
+      <value type="int" key="minorNumber">7</value>
+      <value type="int" key="releaseNumber">10</value>
       <value type="int" key="status">0</value>
       <value type="string" key="name">Version</value>
     </value>

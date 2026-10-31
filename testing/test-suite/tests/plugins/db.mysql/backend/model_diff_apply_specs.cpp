@@ -28,9 +28,8 @@
 #include "module_db_mysql.h"
 
 #include "wb_test_helpers.h"
-#include "wb_connection_helpers.h"
 #include "gtest/gtest.h"
-#include "context.h"
+#include <filesystem>
 
 namespace {
 
@@ -266,7 +265,6 @@ struct ModelDiffApplyData {
   std::unique_ptr<DbMySQLScriptSync> syncPlugin;
   std::unique_ptr<DbMySQLSQLExport> fwePlugin;
   SqlFacade::Ref sqlParser;
-  sql::ConnectionWrapper connection;
   grt::DbObjectMatchAlterOmf omf;
 
   std::string dataDir;
@@ -298,11 +296,11 @@ struct ModelDiffApplyData {
 
     db_mysql_CatalogRef mod_cat = db_mysql_CatalogRef::cast_from(tester->getCatalog());
 
-    DbMySQLSQLExportTest* plugin = new DbMySQLSQLExportTest(mod_cat);
+    DbMySQLSQLExportTest plugin(mod_cat);
 
     grt::DictRef options(true);
     options.set("UseFilteredLists", grt::IntegerRef(0));
-    plugin->set_options_as_dict(options);
+    plugin.set_options_as_dict(options);
 
     std::string value;
 
@@ -352,16 +350,15 @@ protected:
 
   static void SetUpTestSuite() {
     data = std::make_unique<ModelDiffApplyData>();
-    data->dataDir = testing::Context::get().tmpDataDir();
+    data->dataDir = std::filesystem::absolute("data").lexically_normal().u8string();
 
     data->tester.reset(new SqlStudioTester());
     data->tester->initializeRuntime();
 
     data->omf.dontdiff_mask = 3;
-    data->connection = createConnectionForImport();
 
     data->sqlParser = SqlFacade::instance_for_rdbms_name("Mysql");
-    EXPECT_NE(data->sqlParser, nullptr);
+    ASSERT_NE(data->sqlParser, nullptr);
   }
 
   static void TearDownTestSuite() {
@@ -369,7 +366,7 @@ protected:
   }
 
   void SetUp() override {
-    data->tester->wb->open_document(data->dataDir + "/studio/all_objects.mwb");
+    ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/all_objects.mwb"));
   }
 
   void TearDown() override {

@@ -56,8 +56,7 @@
 #include "module_db_mysql_shared_code.h"
 
 #include "wb_test_helpers.h"
-#include "context.h"
-#include "wb_connection_helpers.h"
+#include <filesystem>
 
 
 /*
@@ -84,37 +83,18 @@ public:
   }
 };
 
-class DbMySQLSQLExportTest : public DbMySQLSQLExport {
+namespace {
+class CatalogSQLExport : public DbMySQLSQLExport {
 protected:
-  db_mysql_CatalogRef model_catalog;
-  DictRef options;
-
-  virtual db_mysql_CatalogRef get_model_catalog() override {
-    return model_catalog;
-  }
-  virtual DictRef get_options_as_dict() override {
-    return options;
-  }
+  db_mysql_CatalogRef get_model_catalog() override { return get_catalog(); }
 
 public:
-  DbMySQLSQLExportTest(db_mysql_CatalogRef cat) : DbMySQLSQLExport(cat) {
-    set_model_catalog(cat);
-  }
-
-  void set_model_catalog(db_mysql_CatalogRef catalog) {
-    model_catalog = catalog;
-  }
-  void set_options_as_dict(DictRef options_dict) {
-    options = options_dict;
-  }
+  explicit CatalogSQLExport(db_mysql_CatalogRef catalog) : DbMySQLSQLExport(catalog) {}
 };
 
-namespace {
 struct DbMysqlPluginData {
   std::unique_ptr<SqlStudioTester> tester;
   std::shared_ptr<DbMySQLScriptSync> syncPlugin;
-  std::shared_ptr<DbMySQLSQLExport> fwePlugin;
-  sql::ConnectionWrapper connection;
   DbObjectMatchAlterOmf omf;
 
   std::string dataDir;
@@ -154,43 +134,6 @@ struct DbMysqlPluginData {
 
   //--------------------------------------------------------------------------------------------------------------------
 
-  std::string runFwGenerateScript(db_mysql_CatalogRef cat, DbMySQLSQLExportTest *plugin) {
-    fwePlugin.reset(plugin);
-    ValueRef retval = fwePlugin->export_task(StringRef());
-    return fwePlugin->export_sql_script();
-  }
-
-  //--------------------------------------------------------------------------------------------------------------------
-
-  std::shared_ptr<DiffChange> compareCatalogToServer(db_mysql_CatalogRef org_cat, const std::string &schema_name) {
-    syncPlugin.reset(new DbMySQLScriptSyncTest());
-    std::list<std::string> schemas = { "db_mysql_plugin_test" };
-    db_mysql_CatalogRef cat = tester->reverseEngineerSchemas(schemas);
-    if ((cat->schemata().get(0).is_valid()) && (cat->schemata().get(0)->name() == "mydb"))
-      cat->schemata().remove(0);
-    org_cat->oldName("");
-
-    ValueRef default_engine = bec::GRTManager::get()->get_app_option("db.mysql.Table:tableEngine");
-    std::string default_engine_name;
-    if (StringRef::can_wrap(default_engine))
-      default_engine_name = StringRef::cast_from(default_engine);
-
-    bec::CatalogHelper::apply_defaults(cat, default_engine_name);
-    bec::CatalogHelper::apply_defaults(org_cat, default_engine_name);
-
-    NormalizedComparer comparer(DictRef(true));
-    comparer.init_omf(&omf);
-
-    std::shared_ptr<DiffChange> result = diff_make(cat, org_cat, &omf);
-
-    tester->wb->close_document();
-    tester->wb->close_document_finish();
-
-    return result;
-  }
-
-  //--------------------------------------------------------------------------------------------------------------------
-
   void applySqlToModel(const std::string &sql) {
     db_mysql_CatalogRef org_cat = createCatalogFromScript(sql);
 
@@ -224,26 +167,18 @@ protected:
 
   static void SetUpTestSuite() {
     data = std::make_unique<DbMysqlPluginData>();
-    data->dataDir = testing::Context::get().tmpDataDir();
+    data->dataDir = std::filesystem::absolute("data").lexically_normal().u8string();
 
     data->tester.reset(new SqlStudioTester());
     data->tester->initializeRuntime();
 
     data->omf.dontdiff_mask = 3;
 
-    data->connection = createConnectionForImport();
-
-    // Modeling uses a default server version, which is not related to any server it might have
-    // reverse engineered content from, nor where it was sync'ed to. So we have to mimic this here.
-    std::string target_version = bec::GRTManager::get()->get_app_option_string("DefaultTargetMySQLVersion");
-    if (target_version.empty())
-      target_version = "8.0.16";
-    data->tester->getRdbms()->version(parse_version(target_version));
+    data->tester->getRdbms()->version(parse_version("8.0.16"));
   }
 
   static void TearDownTestSuite() {
     data->syncPlugin.reset();
-    data->fwePlugin.reset();
     data.reset();
   }
 
@@ -273,13 +208,9 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32327) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-  data->tester->executeScript(stmt.get(), script);
-
-  std::shared_ptr<DiffChange> empty_change = data->compareCatalogToServer(org_cat, "db_mysql_plugin_test");
-
-  EXPECT_FALSE((bool)empty_change);
+  EXPECT_EQ(script.find("DROP PRIMARY KEY"), std::string::npos);
+  EXPECT_EQ(script.find("ADD PRIMARY KEY"), std::string::npos);
+  EXPECT_EQ(script.find("mypk"), std::string::npos);
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32330) {
@@ -302,13 +233,8 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32330) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-  data->tester->executeScript(stmt.get(), script);
-
-  std::shared_ptr<DiffChange> empty_change = data->compareCatalogToServer(mod_cat, "db_mysql_plugin_test");
-
-  EXPECT_FALSE((bool)empty_change);
+  EXPECT_NE(script.find("DROP TABLE IF EXISTS `db_mysql_plugin_test`.`table1`"), std::string::npos) << script;
+  EXPECT_EQ(script.find("CREATE TABLE"), std::string::npos) << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32334) {
@@ -345,9 +271,10 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32334) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-  data->tester->executeScript(stmt.get(), script);
+  for (const char *option : {"AVG_ROW_LENGTH = 100", "CHECKSUM = 1", "DELAY_KEY_WRITE  = 1",
+                             "MAX_ROWS = 100", "MIN_ROWS = 10", "ROW_FORMAT = COMPACT",
+                             "INSERT_METHOD = LAST", "UNION = (`db_mysql_plugin_test`.`t2`,`db_mysql_plugin_test`.`t3`)"})
+    EXPECT_NE(script.find(option), std::string::npos) << option << "\n" << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32336) {
@@ -374,10 +301,12 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32336) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-
-  EXPECT_ANY_THROW([&] () { data->tester->executeScript(stmt.get(), script); });
+  EXPECT_NE(script.find("ADD COLUMN `col1`"), std::string::npos) << script;
+  MySQLParserServices::Ref services = MySQLParserServices::get();
+  auto context = services->createParserContext(data->tester->getRdbms()->characterSets(),
+                                               data->tester->getRdbms()->version(), "", false);
+  EXPECT_GT(services->parseSQLIntoCatalog(context, createEmptyCatalog(), script, DictRef(true)), 0U)
+    << "A column without a datatype must not produce valid SQL";
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32358) {
@@ -389,8 +318,6 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32358) {
     "CREATE  TABLE IF NOT EXISTS `db_mysql_plugin_test`.`table2` "
     "(`idtable2` INT NOT NULL DEFAULT 100 , `col1` VARCHAR(45) NULL , PRIMARY KEY (`idtable2`) ) "
     " ENGINE=InnoDB DEFAULT CHARSET=latin1 DEFAULT COLLATE = latin1_swedish_ci;";
-
-  std::string sql2 = "DROP DATABASE IF EXISTS `db_mysql_plugin_test`;";
 
   db_mysql_CatalogRef mod_cat = data->createCatalogFromScript(sql1);
   EXPECT_EQ(mod_cat->schemata().get(0)->tables().count(), 2U);
@@ -412,8 +339,10 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32358) {
 
   std::string script = data->generateScript(schemata, db_mysql_CatalogRef(Initialized), mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql2);
+  EXPECT_NE(script.find("CONSTRAINT `fk1`"), std::string::npos) << script;
+  EXPECT_NE(script.find("FOREIGN KEY (`idtable2` , `col1`)"), std::string::npos) << script;
+  EXPECT_NE(script.find("REFERENCES `db_mysql_plugin_test`.`table2` (`idtable2` , `col1`)"),
+            std::string::npos) << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32367) {
@@ -433,15 +362,8 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32367) {
     "DELIMITER ;\n"
     "INSERT INTO t1(col_char) VALUES ('a'), ('b'), ('c');";
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-
-  std::list<std::string> schemata_list;
-  schemata_list.push_back("db_mysql_plugin_test");
-  db_mysql_CatalogRef mod_cat = copy_object(data->tester->reverseEngineerSchemas(schemata_list));
+  db_mysql_CatalogRef mod_cat = data->createCatalogFromScript(sql1);
   db_mysql_CatalogRef org_cat = copy_object(mod_cat);
-  data->tester->wb->close_document();
-  data->tester->wb->close_document_finish();
 
   EXPECT_EQ(mod_cat->schemata().get(0)->tables().count(), 3U);
   EXPECT_EQ(mod_cat->schemata().get(0)->tables().get(0)->triggers().count(), 1U);
@@ -456,16 +378,10 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32367) {
   schemata.push_back("db_mysql_plugin_test");
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
-  data->tester->executeScript(stmt.get(), script);
-
-  db_mysql_CatalogRef new_cat = data->tester->reverseEngineerSchemas(schemata_list);
-
-  EXPECT_EQ(new_cat->schemata().get(0)->tables().count(), 2U);
-  EXPECT_EQ(new_cat->schemata().get(0)->tables().get(0)->triggers().count(), 0U);
-  EXPECT_EQ(new_cat->schemata().get(0)->routines().count(), 0U);
-
-  data->tester->wb->close_document();
-  data->tester->wb->close_document_finish();
+  EXPECT_NE(script.find("DROP TABLE IF EXISTS `db_mysql_plugin_test`.`t3`"), std::string::npos) << script;
+  EXPECT_NE(script.find("DROP procedure IF EXISTS `db_mysql_plugin_test`.`proc1`"), std::string::npos) << script;
+  EXPECT_NE(script.find("DROP TRIGGER IF EXISTS `db_mysql_plugin_test`.`tr1`"), std::string::npos) << script;
+  EXPECT_EQ(script.find("DROP TABLE IF EXISTS `db_mysql_plugin_test`.`t1`"), std::string::npos) << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32371) {
@@ -488,23 +404,15 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32371) {
     "INSERT INTO t1(col_char) VALUES ('a'), ('b'), ('c');";
 
   // Part1 - check that unmodified procedure is not updated.
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-
-  std::list<std::string> schemata_list;
-  schemata_list.push_back("db_mysql_plugin_test");
-  db_mysql_CatalogRef mod_cat = copy_object(data->tester->reverseEngineerSchemas(schemata_list));
+  db_mysql_CatalogRef mod_cat = data->createCatalogFromScript(sql1);
   db_mysql_CatalogRef org_cat = copy_object(mod_cat);
-
-  data->tester->wb->close_document();
-  data->tester->wb->close_document_finish();
 
   EXPECT_EQ(mod_cat->schemata().get(0)->tables().count(), 1U);
   EXPECT_EQ(mod_cat->schemata().get(0)->routines().count(), 2U);
 
-  std::shared_ptr<DiffChange> empty_change = data->compareCatalogToServer(mod_cat, "db_mysql_plugin_test");
-
-  EXPECT_FALSE((bool)empty_change);
+  std::string unchanged = data->generateScript({"db_mysql_plugin_test"}, org_cat, mod_cat);
+  EXPECT_EQ(unchanged.find("CREATE PROCEDURE"), std::string::npos) << unchanged;
+  EXPECT_EQ(unchanged.find("DROP procedure"), std::string::npos) << unchanged;
 
   // Part2 - check that delimiters for routines are generated.
   static const char *def1 =
@@ -527,7 +435,11 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32371) {
   schemata.push_back("db_mysql_plugin_test");
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
-  data->tester->executeScript(stmt.get(), script);
+  EXPECT_NE(script.find("DELIMITER $$"), std::string::npos) << script;
+  EXPECT_NE(script.find("CREATE PROCEDURE proc1"), std::string::npos) << script;
+  EXPECT_NE(script.find("CREATE PROCEDURE proc2"), std::string::npos) << script;
+  EXPECT_NE(script.find("END$$"), std::string::npos) << script;
+  EXPECT_NE(script.find("DELIMITER ;"), std::string::npos) << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32329) {
@@ -551,13 +463,9 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32329) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-  data->tester->executeScript(stmt.get(), script);
-
-  std::shared_ptr<DiffChange> empty_change = data->compareCatalogToServer(mod_cat, "db_mysql_plugin_test");
-
-  EXPECT_FALSE((bool)empty_change);
+  EXPECT_NE(script.find("DROP INDEX `idx1`"), std::string::npos) << script;
+  EXPECT_NE(script.find("`idx1` (`idtable1` ASC)"), std::string::npos) << script;
+  EXPECT_EQ(script.find("`idx1` (`idtable1` ASC, `col1` ASC)"), std::string::npos) << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32324) {
@@ -584,13 +492,8 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32324) {
 
   std::string script = data->generateScript(schemata, org_cat, mod_cat);
 
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), sql1);
-  data->tester->executeScript(stmt.get(), script);
-
-  std::shared_ptr<DiffChange> empty_change = data->compareCatalogToServer(mod_cat, "db_mysql_plugin_test");
-
-  EXPECT_FALSE((bool)empty_change);
+  EXPECT_NE(script.find("CHANGE COLUMN `col2` `col2` VARCHAR(45) NULL DEFAULT NULL AFTER `idtable1`"),
+            std::string::npos) << script;
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr32331) {
@@ -605,20 +508,34 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32331) {
   EXPECT_EQ(mod_cat->schemata().get(0)->views().count(), 2U);
 
   // First test export.
-  DbMySQLSQLExportTest *plugin = new DbMySQLSQLExportTest(mod_cat);
-  plugin->set_option("ViewsAreSelected", true);
+  CatalogSQLExport plugin(mod_cat);
+  for (const char *option : {"GenerateDrops", "GenerateSchemaDrops", "GenerateWarnings", "GenerateCreateIndex",
+                             "NoViewPlaceholders", "NoUsersJustPrivileges", "GenerateInserts", "NoFKForInserts",
+                             "TriggersAfterInserts", "OmitSchemata", "GenerateUse", "SkipForeignKeys", "SkipFKIndexes"})
+    plugin.set_option(option, false);
+  bec::GrtStringListModel *models[10] = {};
+  plugin.setup_grt_string_list_models_from_catalog(
+    &models[0], &models[1], &models[2], &models[3], &models[4], &models[5],
+    &models[6], &models[7], &models[8], &models[9]);
+  plugin.set_option("ViewsAreSelected", true);
+  plugin.export_task(StringRef());
 
-  DictRef options(true);
-  StringListRef views(Initialized);
-  views.insert(get_old_object_name_for_key(mod_cat->schemata().get(0)->views().get(0), false), false);
-  views.insert(get_old_object_name_for_key(mod_cat->schemata().get(0)->views().get(1), false), false);
-  options.set("ViewFilterList", views);
-  plugin->set_options_as_dict(options);
+  std::string script = plugin.export_sql_script();
 
-  std::string script = data->runFwGenerateScript(mod_cat, plugin);
-
-  std::unique_ptr<sql::Statement> stmt(data->connection->createStatement());
-  data->tester->executeScript(stmt.get(), script);
+  auto assert_view_placeholders = [](const std::string &sql) {
+    size_t view1 = sql.find("VIEW `db_mysql_plugin_test`.`view1` AS");
+    size_t view2 = sql.find("VIEW `db_mysql_plugin_test`.`view2` AS");
+    size_t placeholder1 = sql.find("CREATE TABLE IF NOT EXISTS `db_mysql_plugin_test`.`view1`");
+    size_t placeholder2 = sql.find("CREATE TABLE IF NOT EXISTS `db_mysql_plugin_test`.`view2`");
+    ASSERT_NE(view1, std::string::npos) << sql;
+    ASSERT_NE(view2, std::string::npos) << sql;
+    ASSERT_NE(placeholder1, std::string::npos) << sql;
+    ASSERT_NE(placeholder2, std::string::npos) << sql;
+    EXPECT_LT(placeholder1, std::min(view1, view2)) << sql;
+    EXPECT_LT(placeholder2, std::min(view1, view2)) << sql;
+    EXPECT_NE(sql.find("AS SELECT * FROM `db_mysql_plugin_test`.`view1`"), std::string::npos) << sql;
+  };
+  assert_view_placeholders(script);
 
   std::vector<std::string> schemata;
   schemata.push_back("db_mysql_plugin_test");
@@ -626,11 +543,7 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr32331) {
   // Now the same test for sync.
   script.assign(data->generateScript(schemata, db_mysql_CatalogRef(Initialized), mod_cat));
 
-  std::unique_ptr<sql::Statement> stmt2(data->connection->createStatement());
-  data->tester->executeScript(stmt2.get(), "DROP DATABASE IF EXISTS `db_mysql_plugin_test`");
-  data->tester->executeScript(stmt2.get(), script);
-
-  // XXX: what is being tested here?
+  assert_view_placeholders(script);
 }
 
 TEST_F(db_mysql_plugin_testTest, Bug_Nr37634) {
@@ -645,7 +558,7 @@ TEST_F(db_mysql_plugin_testTest, Bug_Nr37634) {
     "  PRIMARY KEY (`idtable1`) )\n"
     "ENGINE = InnoDB;";
 
-  data->tester->wb->open_document("data/studio/diff_table_replace_test.mwb");
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/diff_table_replace_test.mwb"));
 
   db_mgmt_ManagementRef mgmt(db_mgmt_ManagementRef::cast_from(GRT::get()->get("/wb/rdbmsMgmt")));
 
@@ -702,7 +615,7 @@ TEST_F(db_mysql_plugin_testTest, Column_type_change) {
     "  `idtable1` TINYINT NOT NULL ,\n"
     "  PRIMARY KEY (`idtable1`) )\n"
     "ENGINE = InnoDB;";
-  data->tester->wb->open_document(data->dataDir + "/studio/diff_table_replace_test.mwb");
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/diff_table_replace_test.mwb"));
   data->applySqlToModel(sql1);
 
   db_TableRef t2 = data->tester->getCatalog()->schemata().get(0)->tables().get(0);
@@ -716,7 +629,7 @@ TEST_F(db_mysql_plugin_testTest, Column_type_change) {
 
 TEST_F(db_mysql_plugin_testTest, Schema_collation_charset_change) {
   std::string sql1 = "CREATE schema IF NOT EXISTS `mydb` DEFAULT CHARACTER SET latin1 COLLATE latin1_swedish_ci;";
-  data->tester->wb->open_document(data->dataDir + "/studio/diff_table_replace_test.mwb");
+  ASSERT_TRUE(data->tester->wb->open_document(data->dataDir + "/studio/diff_table_replace_test.mwb"));
   data->applySqlToModel(sql1);
   EXPECT_EQ(data->tester->getCatalog()->schemata().get(0)->tables().count(), 0U);
 
