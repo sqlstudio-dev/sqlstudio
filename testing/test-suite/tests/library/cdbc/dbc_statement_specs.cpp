@@ -23,249 +23,216 @@
  * 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <cppconn/prepared_statement.h>
-#include <cppconn/connection.h>
-#include <cppconn/statement.h>
-#include <cppconn/resultset.h>
-#include <cppconn/metadata.h>
-
-#include "grt.h"
-#include "cdbc/src/driver_manager.h"
+#include "connector_test_fixture.h"
 #include "cdbc/src/sql_batch_exec.h"
 #include "grtsqlparser/sql_facade.h"
 
-#include "wb_connection_helpers.h"
-#include "wb_test_helpers.h"
-#include "helpers.h"
+namespace {
+using namespace testing;
+using namespace sql::test;
 
-#include "gtest/gtest.h"
-
-// Compatibility macro for older versions of Google Test that don't have GTEST_SKIP
-#ifndef GTEST_SKIP
-#define GTEST_SKIP() return
-#endif
-
-#define DATABASE_TO_USE "USE test"
-
-static bool populate_test_table(std::unique_ptr<sql::Statement> &stmt) {
-  stmt->execute(DATABASE_TO_USE);
-  stmt->execute("DROP TABLE IF EXISTS test_function");
-  if (stmt->execute(
-      "CREATE TABLE test_function (a integer, b integer, c integer default null)"))
-    return false;
-
-  if (stmt->execute("INSERT INTO test_function (a,b,c) VALUES(1, 111, NULL)")) {
-    stmt->execute("DROP TABLE test_function");
-    return false;
-  }
-  return true;
-}
-
-class DbcStatementTest : public ::testing::Test {
+// Exercise connector contracts through an injected driver; no database is contacted.
+class DbcStatementTest : public MockConnectorFixture {
 protected:
-  std::unique_ptr<SqlStudioTester> tester;
-  SqlFacade::Ref sqlSplitter;
-  sql::DriverManager *dm;
-  db_mgmt_ConnectionRef connectionProperties;
+  sql::ConnectionWrapper connection;
+  MockStatement *mockStatement = nullptr;
+  std::unique_ptr<sql::Statement> statement;
 
   void SetUp() override {
-    tester.reset(new SqlStudioTester());
-    sqlSplitter = SqlFacade::instance_for_rdbms_name("Mysql");
-    ASSERT_TRUE(sqlSplitter != nullptr) << "failed to get sqlparser module";
-    dm = sql::DriverManager::getDriverManager();
-    connectionProperties = db_mgmt_ConnectionRef(grt::Initialized);
-    setupConnectionEnvironment(connectionProperties);
-    ASSERT_TRUE(dm != nullptr) << "Couldn't get a driver manager";
-    sql::ConnectionWrapper connection = dm->getConnection(connectionProperties);
-    ASSERT_TRUE(connection.get() != nullptr) << "Couldn't get a connection from driver";
-    std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-    stmt->execute("CREATE SCHEMA IF NOT EXISTS test;");
+    MockConnectorFixture::SetUp();
+    auto mockConnection = expectConnection();
+    connection = manager->getConnection(connectionProperties);
+    mockStatement = newMock<MockStatement>();
+    EXPECT_CALL(*mockConnection, createStatement()).WillOnce(transferOwnership(mockStatement));
+    statement.reset(connection->createStatement());
+    ASSERT_NE(nullptr, statement.get());
   }
 
   void TearDown() override {
-    auto connection = dm->getConnection(connectionProperties);
-    std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-    stmt->execute("DROP SCHEMA IF EXISTS test;");
-  }
-
-  sql::ConnectionWrapper connection() {
-    dm->set_testing();
-    return dm->getConnection(connectionProperties);
-  }
-
-  void removeTestTable() {
-    dm->set_testing();
-    auto connection = dm->getConnection(connectionProperties);
-    std::unique_ptr<sql::Statement> stmt2(connection->createStatement());
-    stmt2->execute(DATABASE_TO_USE);
-    stmt2->execute("DROP TABLE test_function");
+    statement.reset();
+    connection.reset();
+    MockConnectorFixture::TearDown();
   }
 };
 
 TEST_F(DbcStatementTest, SimpleUpdateStatement) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_FALSE(stmt->execute("UPDATE test_function SET a = 2, b = 222 where b = 111"));
-  removeTestTable();
+  const sql::SQLString query("UPDATE test_function SET a = 2, b = 222 WHERE b = 111");
+  EXPECT_CALL(*mockStatement, execute(query)).WillOnce(Return(false));
+  EXPECT_FALSE(statement->execute(query));
 }
 
 TEST_F(DbcStatementTest, SimpleQueryStatement) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_TRUE(stmt->execute("SELECT * FROM test_function"));
-  removeTestTable();
+  const sql::SQLString query("SELECT * FROM test_function");
+  EXPECT_CALL(*mockStatement, execute(query)).WillOnce(Return(true));
+  EXPECT_TRUE(statement->execute(query));
 }
 
 TEST_F(DbcStatementTest, ExecuteQueryReturnsResultSet) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  std::unique_ptr<sql::ResultSet> rset(stmt->executeQuery("SELECT * FROM test_function"));
-  ASSERT_TRUE(rset != nullptr);
-  removeTestTable();
+  auto result = newMock<MockResultSet>();
+  EXPECT_CALL(*mockStatement, executeQuery(sql::SQLString("SELECT a, b FROM test_function")))
+    .WillOnce(transferOwnership(result));
+  {
+    InSequence sequence;
+    EXPECT_CALL(*result, next()).WillOnce(Return(true));
+    EXPECT_CALL(*result, getInt(uint32_t(1))).WillOnce(Return(1));
+    EXPECT_CALL(*result, getInt(uint32_t(2))).WillOnce(Return(111));
+    EXPECT_CALL(*result, next()).WillOnce(Return(false));
+  }
+  std::unique_ptr<sql::ResultSet> rows(statement->executeQuery("SELECT a, b FROM test_function"));
+  ASSERT_NE(nullptr, rows.get());
+  ASSERT_TRUE(rows->next());
+  EXPECT_EQ(1, rows->getInt(1));
+  EXPECT_EQ(111, rows->getInt(2));
+  EXPECT_FALSE(rows->next());
 }
 
 TEST_F(DbcStatementTest, ExecuteQueryReturnsEmptyResultSet) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  std::unique_ptr<sql::ResultSet> rset(stmt->executeQuery("SELECT * FROM test_function WHERE 1=2"));
-  ASSERT_TRUE(rset != nullptr);
-  ASSERT_FALSE(rset->next());
-  removeTestTable();
+  auto result = newMock<MockResultSet>();
+  EXPECT_CALL(*mockStatement, executeQuery(sql::SQLString("SELECT * FROM test_function WHERE 1=2")))
+    .WillOnce(transferOwnership(result));
+  EXPECT_CALL(*result, next()).WillOnce(Return(false));
+  std::unique_ptr<sql::ResultSet> rows(statement->executeQuery("SELECT * FROM test_function WHERE 1=2"));
+  ASSERT_NE(nullptr, rows.get());
+  EXPECT_FALSE(rows->next());
 }
 
 TEST_F(DbcStatementTest, ExecuteQueryInsertShouldThrow) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_THROW(stmt->executeQuery("INSERT INTO test_function VALUES(2,200)"), sql::SQLException);
-  removeTestTable();
+  const sql::SQLString query("INSERT INTO test_function (a,b) VALUES(2,200)");
+  EXPECT_CALL(*mockStatement, executeQuery(query))
+    .WillOnce(Throw(sql::SQLException("Statement did not produce a result set")));
+  EXPECT_THROW(statement->executeQuery(query), sql::SQLException);
 }
 
 TEST_F(DbcStatementTest, ExecuteUpdateReturnsRowCount) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_EQ(stmt->executeUpdate("UPDATE test_function SET a = 123"), 1);
-  removeTestTable();
+  const sql::SQLString query("UPDATE test_function SET a = 123");
+  EXPECT_CALL(*mockStatement, executeUpdate(query)).WillOnce(Return(1));
+  EXPECT_EQ(1, statement->executeUpdate(query));
 }
 
 TEST_F(DbcStatementTest, ExecuteUpdateSelectShouldThrow) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_THROW(stmt->executeUpdate("SELECT * FROM test_function"), sql::SQLException);
-  removeTestTable();
+  const sql::SQLString query("SELECT * FROM test_function");
+  EXPECT_CALL(*mockStatement, executeUpdate(query))
+    .WillOnce(Throw(sql::SQLException("Statement produced a result set")));
+  EXPECT_THROW(statement->executeUpdate(query), sql::SQLException);
 }
 
-TEST_F(DbcStatementTest, GetFetchSizePending) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  GTEST_SKIP() << "needs implementation of getFetchSize and getFetchDirection";
+TEST_F(DbcStatementTest, GetFetchSize) {
+  EXPECT_CALL(*mockStatement, getFetchSize()).WillOnce(Return(size_t(64)));
+  EXPECT_EQ(size_t(64), statement->getFetchSize());
 }
 
 TEST_F(DbcStatementTest, GetResultSetAfterExecuteQuery) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_TRUE(stmt->execute("SELECT * FROM test_function"));
-  std::unique_ptr<sql::ResultSet> rset(stmt->getResultSet());
-  ASSERT_TRUE(rset != nullptr);
-  removeTestTable();
+  auto result = newMock<MockResultSet>();
+  {
+    InSequence sequence;
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("SELECT * FROM test_function"))).WillOnce(Return(true));
+    EXPECT_CALL(*mockStatement, getResultSet()).WillOnce(transferOwnership(result));
+  }
+  ASSERT_TRUE(statement->execute("SELECT * FROM test_function"));
+  std::unique_ptr<sql::ResultSet> rows(statement->getResultSet());
+  EXPECT_EQ(result, rows.get());
 }
 
 TEST_F(DbcStatementTest, GetResultSetAfterExecuteUpdate) {
-  auto conn = connection();
-  std::unique_ptr<sql::Statement> stmt(conn->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  ASSERT_TRUE(populate_test_table(stmt));
-  ASSERT_FALSE(stmt->execute("UPDATE test_function SET a = 222"));
-  std::unique_ptr<sql::ResultSet> rset(stmt->getResultSet());
-  ASSERT_EQ(rset.get(), nullptr);
-  removeTestTable();
+  {
+    InSequence sequence;
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("UPDATE test_function SET a = 222")))
+      .WillOnce(Return(false));
+    EXPECT_CALL(*mockStatement, getResultSet()).WillOnce(Return(nullptr));
+  }
+  ASSERT_FALSE(statement->execute("UPDATE test_function SET a = 222"));
+  std::unique_ptr<sql::ResultSet> rows(statement->getResultSet());
+  EXPECT_EQ(nullptr, rows.get());
 }
 
-TEST_F(DbcStatementTest, SetFetchSizePending) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-  setupConnectionEnvironment(connectionProperties);
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  ASSERT_TRUE(dm != nullptr);
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  ASSERT_TRUE(wrapper.get() != nullptr);
-  sql::Connection *connection = wrapper.get();
-  std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  GTEST_SKIP() << "setFetchSize not implemented";
+TEST_F(DbcStatementTest, SetFetchSize) {
+  InSequence sequence;
+  EXPECT_CALL(*mockStatement, setFetchSize(size_t(64)));
+  EXPECT_CALL(*mockStatement, getFetchSize()).WillOnce(Return(size_t(64)));
+  statement->setFetchSize(64);
+  EXPECT_EQ(size_t(64), statement->getFetchSize());
 }
 
-TEST_F(DbcStatementTest, SetFetchSizeNegativePending) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-  setupConnectionEnvironment(connectionProperties);
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  ASSERT_TRUE(dm != nullptr);
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  ASSERT_TRUE(wrapper.get() != nullptr);
-  sql::Connection *connection = wrapper.get();
-  std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  GTEST_SKIP() << "setFetchSize not implemented";
+// The connector takes unsigned sizes/timeouts; test error propagation without
+// implying that the interface accepts negative values.
+TEST_F(DbcStatementTest, SetFetchSizeFailurePropagates) {
+  EXPECT_CALL(*mockStatement, setFetchSize(size_t(64)))
+    .WillOnce(Throw(sql::SQLException("Fetch size is unsupported")));
+  EXPECT_THROW(statement->setFetchSize(64), sql::SQLException);
 }
 
-TEST_F(DbcStatementTest, SetQueryTimeoutNegativePending) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-  setupConnectionEnvironment(connectionProperties);
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  ASSERT_TRUE(dm != nullptr);
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  ASSERT_TRUE(wrapper.get() != nullptr);
-  sql::Connection *connection = wrapper.get();
-  std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  GTEST_SKIP() << "setQueryTimeout not implemented";
+TEST_F(DbcStatementTest, SetQueryTimeoutFailurePropagates) {
+  EXPECT_CALL(*mockStatement, setQueryTimeout(10u))
+    .WillOnce(Throw(sql::SQLException("Query timeout is unsupported")));
+  EXPECT_THROW(statement->setQueryTimeout(10), sql::SQLException);
 }
 
 TEST_F(DbcStatementTest, AddBatchExecuteBatch) {
-  db_mgmt_ConnectionRef connectionProperties(grt::Initialized);
-  setupConnectionEnvironment(connectionProperties);
-  sql::DriverManager *dm = sql::DriverManager::getDriverManager();
-  dm->set_testing();
-  ASSERT_TRUE(dm != nullptr);
-  sql::ConnectionWrapper wrapper = dm->getConnection(connectionProperties);
-  ASSERT_TRUE(wrapper.get() != nullptr);
-  sql::Connection *connection = wrapper.get();
-  std::unique_ptr<sql::Statement> stmt(connection->createStatement());
-  ASSERT_TRUE(stmt != nullptr);
-  std::string sql_script =
-      "DROP DATABASE IF EXISTS dbc_statement_test_15;"
-      "CREATE DATABASE dbc_statement_test_15;"
-      "CREATE TABLE dbc_statement_test_15.table1 (id int);"
-      "SELECT 1;"
-      "CREATE TABLE dbc_statement_test_15.table2 (id int);"
-      "SELECT 1;"
-      "CREATE TABLE dbc_statement_test_15.table3 (id int);"
-      "SELECT 1;";
+  auto splitter = SqlFacade::instance_for_rdbms_name("Mysql");
+  ASSERT_NE(nullptr, splitter);
   std::list<std::string> statements;
-  ASSERT_TRUE(sqlSplitter != nullptr) << "failed to get sqlparser module";
-  sqlSplitter->splitSqlScript(sql_script, statements);
-  sql::SqlBatchExec()(stmt.get(), statements);
-  // Cleanup
-  sql_script = "DROP DATABASE IF EXISTS dbc_statement_test_15;";
-  sqlSplitter->splitSqlScript(sql_script, statements);
-  sql::SqlBatchExec()(stmt.get(), statements);
+  splitter->splitSqlScript("CREATE TABLE table1 (id int);SELECT 1;INSERT INTO table1 VALUES (1);SELECT 2;", statements);
+  const std::list<std::string> expected = {
+    "CREATE TABLE table1 (id int)", "SELECT 1", "INSERT INTO table1 VALUES (1)", "SELECT 2"};
+  ASSERT_EQ(expected, statements);
+  auto first = new StrictMock<MockResultSet>();
+  auto second = new StrictMock<MockResultSet>();
+  // Destruction must happen before executing the next SQL statement.
+  {
+    InSequence sequence;
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("CREATE TABLE table1 (id int)"))).WillOnce(Return(false));
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("SELECT 1"))).WillOnce(Return(true));
+    EXPECT_CALL(*mockStatement, getResultSet()).WillOnce(transferOwnership(first));
+    EXPECT_CALL(*first, destroyed());
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("INSERT INTO table1 VALUES (1)"))).WillOnce(Return(false));
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("SELECT 2"))).WillOnce(Return(true));
+    EXPECT_CALL(*mockStatement, getResultSet()).WillOnce(transferOwnership(second));
+    EXPECT_CALL(*second, destroyed());
+  }
+  sql::SqlBatchExec batch;
+  long successes = -1, errors = -1;
+  batch.batch_exec_stat_cb([&](long ok, long failed) { successes = ok; errors = failed; return 0; });
+  EXPECT_EQ(0, batch(statement.get(), statements));
+  EXPECT_EQ(4, successes);
+  EXPECT_EQ(0, errors);
+  EXPECT_EQ(expected, batch.sql_log());
 }
 
+TEST_F(DbcStatementTest, BatchFailurePropagatesAndStopsExecution) {
+  std::list<std::string> statements = {"UPDATE table1 SET id = 2", "SELECT 1"};
+  EXPECT_CALL(*mockStatement, execute(sql::SQLString(statements.front())))
+    .WillOnce(Throw(sql::SQLException("Mock connection lost", "HY000", 2013)));
+  sql::SqlBatchExec batch;
+  EXPECT_THROW(batch(statement.get(), statements), sql::SQLException);
+  EXPECT_EQ(std::list<std::string>({statements.front()}), batch.sql_log());
+}
+
+TEST_F(DbcStatementTest, BatchCanContinueAfterReportedError) {
+  std::list<std::string> statements = {"UPDATE table1 SET id = 2", "SELECT 1"};
+  auto result = newMock<MockResultSet>();
+  {
+    InSequence sequence;
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString(statements.front())))
+      .WillOnce(Throw(sql::SQLException("Mock query failure", "HY000", 1234)));
+    EXPECT_CALL(*mockStatement, execute(sql::SQLString("SELECT 1"))).WillOnce(Return(true));
+    EXPECT_CALL(*mockStatement, getResultSet()).WillOnce(transferOwnership(result));
+  }
+  sql::SqlBatchExec batch;
+  batch.stop_on_error(false);
+  int reports = 0;
+  batch.error_cb([&](long long code, const std::string &message, const std::string &query) {
+    ++reports;
+    EXPECT_EQ(1234, code);
+    EXPECT_EQ("Mock query failure", message);
+    EXPECT_EQ(statements.front(), query);
+    return 0;
+  });
+  long successes = -1, errors = -1;
+  batch.batch_exec_stat_cb([&](long ok, long failed) { successes = ok; errors = failed; return 0; });
+  EXPECT_EQ(1, batch(statement.get(), statements));
+  EXPECT_EQ(1, reports);
+  EXPECT_EQ(1, successes);
+  EXPECT_EQ(1, errors);
+  EXPECT_EQ(statements, batch.sql_log());
+}
+} // namespace
