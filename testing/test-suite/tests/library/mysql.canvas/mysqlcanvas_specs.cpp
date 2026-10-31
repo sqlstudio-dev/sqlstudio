@@ -27,6 +27,10 @@
 #include "mdc_canvas_view_image.h"
 
 #include "gtest/gtest.h"
+#include "context.h"
+#include <cstdint>
+#include <cstdlib>
+#include <filesystem>
 
 namespace {
 
@@ -68,16 +72,40 @@ struct CairoSurface {
       cairo_surface_destroy(surface);
   }
 
-  bool operator == (const CairoSurface &other) const {
-    if (cairo_surface_status(surface) != cairo_surface_status(other.surface))
-      return false;
+  ::testing::AssertionResult matches(const CairoSurface &other) const {
     if (size != other.size)
-      return false;
-    if (stride != other.stride)
-      return false;
-    if (memcmp(data, other.data, size.height * stride) != 0)
-      return false;
-    return true;
+      return ::testing::AssertionFailure() << "Image dimensions differ: " << toString() << " vs " << other.toString();
+    cairo_surface_flush(surface);
+    cairo_surface_flush(other.surface);
+    const auto format = cairo_image_surface_get_format(surface);
+    if (format != cairo_image_surface_get_format(other.surface) ||
+        (format != CAIRO_FORMAT_RGB24 && format != CAIRO_FORMAT_ARGB32))
+      return ::testing::AssertionFailure() << "Image formats differ or are unsupported";
+
+    // Cairo versions can rasterize curved edges slightly differently. Keep both
+    // the per-channel error and the affected area bounded; never replace the baseline.
+    const int maxChannelDifference = 8;
+    const size_t maxDifferentPixels = static_cast<size_t>(size.width * size.height) / 200;
+    size_t differentPixels = 0;
+    for (int y = 0; y < static_cast<int>(size.height); ++y) {
+      const auto *actual = reinterpret_cast<const uint32_t *>(data + y * stride);
+      const auto *expected = reinterpret_cast<const uint32_t *>(other.data + y * other.stride);
+      for (int x = 0; x < static_cast<int>(size.width); ++x) {
+        bool different = false;
+        for (int shift = 0; shift < (format == CAIRO_FORMAT_ARGB32 ? 32 : 24); shift += 8) {
+          const int delta = std::abs(static_cast<int>((actual[x] >> shift) & 255) -
+                                     static_cast<int>((expected[x] >> shift) & 255));
+          if (delta > maxChannelDifference)
+            return ::testing::AssertionFailure() << "Pixel (" << x << ", " << y
+              << ") differs by " << delta << " (limit " << maxChannelDifference << ")";
+          different |= delta != 0;
+        }
+        differentPixels += different;
+      }
+    }
+    if (differentPixels > maxDifferentPixels)
+      return ::testing::AssertionFailure() << differentPixels << " pixels differ (limit " << maxDifferentPixels << ")";
+    return ::testing::AssertionSuccess();
   }
 
   std::string toString() const {
@@ -87,92 +115,49 @@ struct CairoSurface {
 
 
 
-class Thing : public mdc::Box {
-  mdc::Box title_bar;
-  mdc::IconTextFigure title;
-  mdc::TextFigure title_expander;
-
-  mdc::Box column_box;
-
-  cairo_surface_t *column_icon;
-  cairo_surface_t *key_icon;
-
-  std::vector<mdc::IconTextFigure *> columns;
-
-public:
-  Thing(mdc::Layer *layer)
-    : mdc::Box(layer, Box::Vertical),
-      title_bar(layer, Box::Horizontal),
-      title(layer),
-      title_expander(layer),
-      column_box(layer, Box::Vertical, true) {
-
-    // TODO: Verify these urls
-    column_icon =
-      cairo_image_surface_create_from_png("/Users/kojima/Development/sql-studio-pro/images/grt/column.png");
-    key_icon =
-      cairo_image_surface_create_from_png("/Users/kojima/Development/sql-studio-pro/images/grt/column_pk.png");
-
-    set_accepts_focus(true);
-    set_accepts_selection(true);
-
-    set_background_color(base::Color(1, 1, 1));
-    set_border_color(base::Color(0.5, 0.5, 0.5));
-    set_draw_background(true);
-
-    add(&title_bar, false, false);
-    title_bar.set_padding(4, 4);
-    title_bar.add(&title, true, true);
-    title_bar.set_background_color(base::Color(0.5, 0.7, 0.83));
-    title_bar.set_border_color(base::Color(0.5, 0.5, 0.5));
-    title_bar.set_draw_background(true);
-
-    title.set_icon(cairo_image_surface_create_from_png(
-      "/Users/kojima/Development/sql-studio-pro/images/grt/db.Table.12x12.png"));
-    title.set_font(mdc::FontSpec("Lucida Grande", mdc::SNormal, mdc::WBold, 10));
-    title.set_text("Hello World");
-
-    title_expander.set_fixed_size(base::Size(10, -1));
-    title_expander.set_text(">");
-    title_bar.add(&title_expander, false, true);
-
-    add(&column_box, false, true);
-    column_box.set_spacing(2);
-    column_box.set_padding(3, 3);
-
-    add_column("id int primary key", key_icon);
-    add_column("name varchar(32)", column_icon);
-    add_column("address varchar(200)", column_icon);
-    add_column("city int", column_icon);
-    add_column("country int", column_icon);
-    add_column("phone varchar(40)", column_icon);
-    add_column("email varchar(80)", column_icon);
-  }
-
-  void add_column(const std::string &text, cairo_surface_t *icon) {
-    mdc::IconTextFigure *tf;
-
-    tf = new mdc::IconTextFigure(_layer);
-    tf->set_icon(icon);
-    tf->set_spacing(1);
-    tf->set_font(mdc::FontSpec("Lucida Grande", mdc::SNormal, mdc::WNormal, 10));
-    tf->set_text(text);
-
-    column_box.add(tf, false, true);
-  }
-};
-
 class MDC_CanvasTest : public ::testing::Test {
 protected:
     std::unique_ptr<mdc::CanvasView> view;
     std::unique_ptr<mdc::AreaGroup> group;
-    std::unique_ptr<Thing> item0, item1, item2;
+    std::unique_ptr<mdc::RectangleFigure> item0, item1, item2;
     std::string outputDir;
     std::string dataDir;
 
+    void createHierarchy() {
+        view = std::make_unique<mdc::ImageCanvasView>(1000, 1000);
+        view->initialize();
+        mdc::Layer *layer = view->get_current_layer();
+        ASSERT_NE(layer, nullptr);
+        item0 = std::make_unique<mdc::RectangleFigure>(layer);
+        layer->add_item(item0.get());
+        item0->move_to(base::Point(100, 100));
+        item1 = std::make_unique<mdc::RectangleFigure>(layer);
+        layer->add_item(item1.get());
+        item2 = std::make_unique<mdc::RectangleFigure>(layer);
+        layer->add_item(item2.get());
+        item1->move_to(base::Point(100, 100));
+        item2->move_to(base::Point(200, 50));
+        for (auto *item : {item0.get(), item1.get(), item2.get()}) {
+            item->set_accepts_selection(true);
+            item->set_fixed_size(base::Size(80, 60));
+        }
+        view->get_selection()->add(item1.get());
+        view->get_selection()->add(item2.get());
+        EXPECT_EQ(view->get_selected_items().size(), 2U);
+        std::list<mdc::CanvasItem *> items;
+        mdc::Selection::ContentType selection(view->get_selected_items());
+        for (auto iter = selection.begin(); iter != selection.end(); ++iter)
+            items.push_back(*iter);
+        group.reset(layer->create_area_group_with(items));
+        ASSERT_NE(group, nullptr);
+        group->set_draw_background(true);
+        group->set_background_color(base::Color(1.0, 1.0, 0.6));
+    }
+
     void SetUp() override {
-        outputDir = "./output";
-        dataDir = "./data";
+        outputDir = testing::Context::get().outputDir();
+        dataDir = testing::Context::get().tmpDataDir();
+        std::filesystem::create_directories(outputDir);
     }
 };
 
@@ -187,33 +172,16 @@ TEST_F(MDC_CanvasTest, ViewCreationZoom) {
 }
 
 TEST_F(MDC_CanvasTest, ViewHierarchyCreation) {
-    view = std::make_unique<mdc::ImageCanvasView>(1000, 1000);
-    view->initialize();
-    mdc::Layer *layer = view->get_current_layer();
-    ASSERT_NE(layer, nullptr);
-    item0 = std::make_unique<Thing>(layer);
-    layer->add_item(item0.get());
-    item0->move_to(base::Point(100, 100));
-    item1 = std::make_unique<Thing>(layer);
-    layer->add_item(item1.get());
-    item2 = std::make_unique<Thing>(layer);
-    layer->add_item(item2.get());
-    item1->move_to(base::Point(100, 100));
-    item2->move_to(base::Point(200, 50));
-    view->get_selection()->add(item1.get());
-    view->get_selection()->add(item2.get());
-    EXPECT_EQ(view->get_selected_items().size(), 2U);
-    std::list<mdc::CanvasItem *> items;
-    mdc::Selection::ContentType selection(view->get_selected_items());
-    for (auto iter = selection.begin(); iter != selection.end(); ++iter)
-        items.push_back(*iter);
-    group.reset(layer->create_area_group_with(items));
-    group->set_draw_background(true);
-    group->set_background_color(base::Color(1.0, 1.0, 0.6));
-    EXPECT_TRUE(group != nullptr);
+    ASSERT_NO_FATAL_FAILURE(createHierarchy());
+    ASSERT_NE(group, nullptr);
+    EXPECT_EQ(item1->get_parent(), group.get());
+    EXPECT_EQ(item2->get_parent(), group.get());
 }
 
 TEST_F(MDC_CanvasTest, TestGetCommonAncestor) {
+    ASSERT_NO_FATAL_FAILURE(createHierarchy());
+    ASSERT_NE(item1, nullptr);
+    ASSERT_NE(item2, nullptr);
     mdc::CanvasItem *ancestor;
     ancestor = item1->get_common_ancestor(item2.get());
     EXPECT_EQ(ancestor, item1->get_parent());
@@ -223,6 +191,8 @@ TEST_F(MDC_CanvasTest, TestGetCommonAncestor) {
 }
 
 TEST_F(MDC_CanvasTest, CoordinateConversion) {
+    ASSERT_NO_FATAL_FAILURE(createHierarchy());
+    ASSERT_NE(item0, nullptr);
     base::Point p;
     ASSERT_EQ(item0->get_position().x, 100);
     ASSERT_EQ(item0->get_position().y, 100);
@@ -375,7 +345,7 @@ TEST_F(MDC_CanvasTest, RectangleRendering) {
     ASSERT_EQ((int)cairo_surface_status(targetSurface.surface), CAIRO_STATUS_SUCCESS) << "Target surface invalid";
     CairoSurface sourceSurface(dataDir + "/images/shapes_rects.png");
     ASSERT_EQ((int)cairo_surface_status(sourceSurface.surface), CAIRO_STATUS_SUCCESS) << "Source surface invalid";
-    EXPECT_EQ(targetSurface == sourceSurface, true);
+    EXPECT_TRUE(targetSurface.matches(sourceSurface));
 }
 
 }
