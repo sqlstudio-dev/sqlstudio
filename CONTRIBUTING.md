@@ -133,12 +133,20 @@ propagation with strict mocks. `getCatalogs()` is exercised rather than treated 
 unimplemented. Real getter values are checked by `DbcMetadataIntegrationTest.*`;
 the offline tests do not validate a live connector's metadata.
 
+`--gtest_filter=DbcResultSetTest.*` runs all eight result-set contract tests offline.
+Strict mocks check statement/result ownership, prepared-query row access, repeated
+queries, ordered transaction calls, and invalid-column exceptions. Canned row
+counts do not verify MySQL commit/rollback behavior or native column validation;
+those checks remain in `DbcResultSetIntegrationTest.*`. The multistatement check
+uses native prepared statements, which reject multiple SQL statements regardless
+of the connection manager enabling them for regular statements.
+
 To run those checks against a real, isolated MySQL test server on Windows:
 
 ```powershell
 # Configure DB_HOST, DB_PORT, DB_USER and DB_PASSWORD for the test server first.
 $env:SQLSTUDIO_DBC_LIVE_TESTS = '1'
-.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=DbcGeneralIntegrationTest.*:DbcMetadataIntegrationTest.*'
+.\testing\test-suite\compile.ps1 -Action test -SkipBuild -TestArgs '--gtest_filter=DbcGeneralIntegrationTest.*:DbcMetadataIntegrationTest.*:DbcResultSetIntegrationTest.*'
 Remove-Item Env:\SQLSTUDIO_DBC_LIVE_TESTS
 ```
 
@@ -146,11 +154,13 @@ The Windows runner and the top-level CMake test target use `DB_HOST`, `DB_PORT`,
 `DB_USER`, and `DB_PASSWORD` (defaulting to `localhost`, `3306`, `root`, and an
 empty password). The legacy `testing/test-suite` CMake target uses the equivalent
 `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, and `TEST_DB_PASSWORD` variables.
-Both integration suites are skipped unless explicitly enabled; connection and SQL
+All three integration suites are skipped unless explicitly enabled; connection and SQL
 errors fail the tests once enabled. The account needs permission to create and drop
 schemas and tables for the general integration suite. Its tests create a uniquely
 named `sqlstudio_dbc_<uuid>` schema and drop only that schema during teardown;
-an interrupted process may leave it behind. The metadata integration suite is read-only.
+an interrupted process may leave it behind. The result-set integration suite
+similarly creates and drops only its own `sqlstudio_dbc_result_<uuid>` schema,
+never the shared `test` schema. The metadata integration suite is read-only.
 
 Additional offline regressions can be selected with these suite filters:
 
