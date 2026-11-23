@@ -824,9 +824,10 @@ jobs:
 
   # The one check the rulesets require, the same on every branch: the set of
   # jobs differs per stage (Debug or Release on Windows) and matrix job names
-  # change with the distro list. A job skipped by design is fine; a failed or
-  # cancelled one fails this check, and a job skipped because one of its
-  # dependencies failed is caught through that dependency.
+  # change with the distro list. Only success and skipped (by design) pass.
+  # Anything else fails this check: failure, cancelled, and also abandoned,
+  # which a job gets when no runner picked it up. A job skipped because one of
+  # its dependencies failed is caught through that dependency.
   ci-result:
     name: CI result
     if: always()
@@ -839,7 +840,7 @@ jobs:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
-          if jq -e 'any(.[]; .result == "failure" or .result == "cancelled")' <<<"$NEEDS" >/dev/null; then
-            echo "::error::At least one job failed or was cancelled."
+          if jq -e 'any(.[]; .result != "success" and .result != "skipped")' <<<"$NEEDS" >/dev/null; then
+            echo "::error::At least one job did not succeed (failed, cancelled or never started)."
             exit 1
           fi
