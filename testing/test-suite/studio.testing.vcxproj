@@ -76,7 +76,7 @@
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>$(ProjectDir)core;$(ProjectDir)tests;$(ProjectDir)tests\library\forms\stub;$(ProjectDir)..\..\library;$(ProjectDir)..\..\library\base;$(ProjectDir)..\..\library\base\base;$(ProjectDir)..\..\library\cdbc\src;$(ProjectDir)..\..\library\forms;$(ProjectDir)..\..\library\forms\stub;$(ProjectDir)..\..\library\grt\src;$(ProjectDir)..\..\library\mysql.canvas\src;$(ProjectDir)..\..\library\parsers;$(ProjectDir)..\..\library\parsers\code-completion;$(ProjectDir)..\..\library\ssh;$(ProjectDir)..\..\generated;$(ProjectDir)..\..\backend\wbpublic;$(ProjectDir)..\..\backend\wbpublic\grt;$(ProjectDir)..\..\backend\wbprivate;$(ProjectDir)..\..\backend\wbprivate\model;$(ProjectDir)..\..\backend\wbprivate\sqlide;$(ProjectDir)..\..\backend\wbprivate\studio;$(ProjectDir)..\..\plugins\db.mysql;$(ProjectDir)..\..\plugins\db.mysql\backend;$(ProjectDir)..\..\plugins\db.mysql.editors\backend;$(ProjectDir)..\..\modules;$(ProjectDir)..\..\modules\db.mysql\src;$(ProjectDir)..\..\modules\db.mysql.sqlparser\src;$(ProjectDir)..\..\ext\scintilla\include;$(ProjectDir)..\..\library\sql.parser\include;$(ProjectDir)..\..\library\sql.parser\source;$(ProjectDir)..\..\generated\grts\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /FS /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -99,7 +99,7 @@
       <ForcedIncludeFiles>pch.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>$(ProjectDir)core;$(ProjectDir)tests;$(ProjectDir)tests\library\forms\stub;$(ProjectDir)..\..\library;$(ProjectDir)..\..\library\base;$(ProjectDir)..\..\library\base\base;$(ProjectDir)..\..\library\cdbc\src;$(ProjectDir)..\..\library\forms;$(ProjectDir)..\..\library\forms\stub;$(ProjectDir)..\..\library\grt\src;$(ProjectDir)..\..\library\mysql.canvas\src;$(ProjectDir)..\..\library\parsers;$(ProjectDir)..\..\library\parsers\code-completion;$(ProjectDir)..\..\library\ssh;$(ProjectDir)..\..\generated;$(ProjectDir)..\..\backend\wbpublic;$(ProjectDir)..\..\backend\wbpublic\grt;$(ProjectDir)..\..\backend\wbprivate;$(ProjectDir)..\..\backend\wbprivate\model;$(ProjectDir)..\..\backend\wbprivate\sqlide;$(ProjectDir)..\..\backend\wbprivate\studio;$(ProjectDir)..\..\plugins\db.mysql;$(ProjectDir)..\..\plugins\db.mysql\backend;$(ProjectDir)..\..\plugins\db.mysql.editors\backend;$(ProjectDir)..\..\modules;$(ProjectDir)..\..\modules\db.mysql\src;$(ProjectDir)..\..\modules\db.mysql.sqlparser\src;$(ProjectDir)..\..\ext\scintilla\include;$(ProjectDir)..\..\library\sql.parser\include;$(ProjectDir)..\..\library\sql.parser\source;$(ProjectDir)..\..\generated\grts\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /FS /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -217,9 +217,7 @@
     <ClCompile Include="tests\library\base\threading_specs.cpp" />
     <ClCompile Include="tests\library\base\utf8string_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_connection_specs.cpp" />
-    <ClCompile Include="tests\library\cdbc\dbc_general_specs.cpp">
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
-    </ClCompile>
+    <ClCompile Include="tests\library\cdbc\dbc_general_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_metadata_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_result_set_specs.cpp" />
     <ClCompile Include="tests\library\cdbc\dbc_statement_specs.cpp" />
