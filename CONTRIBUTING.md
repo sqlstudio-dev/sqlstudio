@@ -276,8 +276,8 @@ configured, and avoid unrelated repository-wide formatting changes.
 
 ## Build and Package Checks
 
-Every pull request to `develop` or `master`, and every push to them, runs the
-**Build** workflow (`.github/workflows/build.yml`). For each supported Linux
+Every pull request to `develop`, `master` or a `releases/*` branch, and every
+push to them, runs the **Build** workflow (`.github/workflows/build.yml`). For each supported Linux
 distribution (Ubuntu 22.04, 24.04, 26.04 and 26.10, Debian 12 and 13) it:
 
 1. builds SqlStudio in a clean container of that distribution, because each one
@@ -300,15 +300,25 @@ hidden, checks that all library references stay inside the app, that the
 signature is intact and that pyodbc imports, and runs the smoke test
 (`build/mac/smoke_test.sh`).
 
-On Windows (x64) the workflow builds the whole solution with the v143 toolset
-and packages it twice: as a portable `.zip` that carries the Visual C++
-runtime (`build/zip/make_zip.ps1`), and as an `.msi` built from that `.zip`
-(`build/msi`). A separate job unpacks the `.zip` on a fresh runner with the
-runner's Python taken off `PATH`, checks that every DLL resolves
-(`build/windows/check_dll_deps.ps1`) and that pyodbc imports, and runs the
-smoke test (`build/windows/smoke_test.ps1`). It then installs the `.msi`
-silently, runs the same checks on the installed copy, and checks that an
-uninstall removes it.
+On Windows (x64) the workflow builds the whole solution with the v143 toolset,
+checks that every DLL resolves (`build/windows/check_dll_deps.ps1`) and runs
+the native unit tests (`testing/test-suite`). The configuration depends on the
+branch:
+
+- **Debug** for pull requests to `develop` and pushes to it. The unit tests
+  then run against the Debug libraries of the third-party bundle as well. No
+  packages are made.
+- **Release** for `master`, `releases/*` branches and manual runs. The build
+  is packaged twice: as a portable `.zip` that carries the Visual C++ runtime
+  (`build/zip/make_zip.ps1`), and as an `.msi` built from that `.zip`
+  (`build/msi`). A separate job unpacks the `.zip` on a fresh runner with the
+  runner's Python taken off `PATH`, checks that every DLL resolves and that
+  pyodbc imports, and runs the smoke test (`build/windows/smoke_test.ps1`). It
+  then installs the `.msi` silently, runs the same checks on the installed
+  copy, and checks that an uninstall removes it.
+
+The **CI result** job sums up all the other jobs and fails if any of them
+failed or was cancelled. It is the check to require in branch rules.
 
 The packages and the smoke test results (screenshot and logs) are attached to
 the workflow run as artifacts for 14 days. To try a package by hand, see
@@ -318,8 +328,9 @@ The third-party libraries (MySQL client, Connector/C++, GDAL, ANTLR runtime,
 ...) take a long time to build, so they are cached per distribution and
 rebuilt only when `build/linux/list.txt`, `build/linux/build_3rdparty.sh` or
 `build/linux/install_deps.sh` change (on Windows: `build/windows/libs.txt`,
-`build/windows/build_3rdparty.ps1` or the toolset). A pull request can use caches saved by
-its own earlier runs or on its target branch, so the first run after such a
+`build/windows/build_3rdparty.ps1` or the toolset; the Debug libraries are
+cached separately). A pull request can use caches saved by its own earlier
+runs, on its target branch or on `master`, so the first run after such a
 change takes longer.
 
 A daily `Cleanup` workflow deletes the caches of closed pull requests and the
