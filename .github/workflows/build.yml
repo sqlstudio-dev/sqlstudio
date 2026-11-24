@@ -2,9 +2,9 @@ name: Build
 
 on:
   pull_request:
-    branches: [develop, master]
+    branches: [develop, master, "releases/**"]
   push:
-    branches: [develop, master]
+    branches: [develop, master, "releases/**"]
   workflow_dispatch:
 
 # A new push to the same PR cancels the build that is still running for it.
@@ -489,10 +489,18 @@ jobs:
   # Studio 2026, building with its v143 toolset).
   # build/windows/build_3rdparty.ps1 builds every library the app links
   # from source.
+  #
+  # Pull requests to develop and pushes to it build Debug and run the unit
+  # tests against the Debug bundle; no packages are made. Everything else
+  # (master, releases/**, manual runs) builds Release and packages it. The
+  # condition is repeated in the job name because a job name cannot read env;
+  # windows-package-test reads it from the job's outputs.
   windows:
-    name: Windows (x64)
+    name: Windows (x64, ${{ (github.event_name != 'workflow_dispatch' && (github.event_name == 'pull_request' && github.base_ref || github.ref_name) == 'develop') && 'Debug' || 'Release' }})
     runs-on: windows-2025
     timeout-minutes: 300
+    outputs:
+      configuration: ${{ env.CONFIGURATION }}
     defaults:
       run:
         shell: pwsh
@@ -501,6 +509,9 @@ jobs:
       # boost::function constructors, so the app fails at startup with
       # "Bad method token". The libraries and the app are built with v143.
       PLATFORM_TOOLSET: v143
+      # For pull requests github.ref is refs/pull/<n>/merge, so the stage
+      # comes from the target branch (base_ref).
+      CONFIGURATION: ${{ (github.event_name != 'workflow_dispatch' && (github.event_name == 'pull_request' && github.base_ref || github.ref_name) == 'develop') && 'Debug' || 'Release' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -526,7 +537,8 @@ jobs:
       # Only what a Release build of the app needs: no Debug libraries
       # (debug), build-time tools (_tools) or build trees (_work). The path
       # ends in /* because exclusions only filter matched entries: a bare
-      # directory is archived whole, exclusions included.
+      # directory is archived whole, exclusions included. Debug Python
+      # (python_d.exe, *_d.pyd) lives in python\, so it is part of this cache.
       - name: Restore 3rd-party bundle
         id: bundle-cache
         uses: actions/cache/restore@v6
@@ -538,11 +550,33 @@ jobs:
             !${{ runner.temp }}/bundle/debug
           key: bundle-windows-x64-${{ env.PLATFORM_TOOLSET }}-${{ hashFiles('build/windows/libs.txt', 'build/windows/build_3rdparty.ps1') }}
 
+      # The Debug libraries (debug\lib) are cached on their own, on top of the
+      # Release bundle above, so a Debug run on develop does not store a second
+      # copy of the whole bundle. Pull requests to develop can restore both:
+      # this one from develop, the Release part also from master.
+      - name: Restore 3rd-party Debug libraries
+        id: debug-cache
+        if: env.CONFIGURATION == 'Debug'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/bundle/debug
+          key: bundle-windows-x64-debug-${{ env.PLATFORM_TOOLSET }}-${{ hashFiles('build/windows/libs.txt', 'build/windows/build_3rdparty.ps1') }}
+
+      # build_3rdparty.ps1 always builds the Release and Debug variants
+      # together, so a miss on either cache rebuilds the whole bundle.
+      - name: Check bundle caches
+        id: bundle
+        run: |
+          $missing = '${{ steps.bundle-cache.outputs.cache-hit }}' -ne 'true' -or
+            ($env:CONFIGURATION -eq 'Debug' -and '${{ steps.debug-cache.outputs.cache-hit }}' -ne 'true')
+          "build=$($missing.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          Write-Host "Build the 3rd-party bundle: $missing"
+
       # The cairo/glib build uses an MSYS2 MinGW pkg-config with libffi-8.dll
       # next to it, from C:\msys64 (preinstalled on the runner). Its bin
       # directory goes last on PATH so it does not shadow MSVC or Python.
       - name: Install bundle build tools
-        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        if: steps.bundle.outputs.build == 'true'
         run: |
           python -m pip install --disable-pip-version-check meson==1.12.1 ninja==1.13.2
           C:\msys64\usr\bin\pacman.exe -Sy --noconfirm --needed mingw-w64-x86_64-pkgconf mingw-w64-x86_64-libffi
@@ -550,14 +584,14 @@ jobs:
           "C:\msys64\mingw64\bin" >> $env:GITHUB_PATH
 
       - name: Build 3rd-party bundle
-        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        if: steps.bundle.outputs.build == 'true'
         run: |
           build/windows/build_3rdparty.ps1 -BundleDir $env:MSS_3DPARTY_PATH -VerboseOutput -PlatformToolset $env:PLATFORM_TOOLSET
           if ($LASTEXITCODE) { throw "build_3rdparty.ps1 failed with exit code $LASTEXITCODE" }
 
       # Saved right away so a failing application build does not throw the bundle away.
       - name: Save 3rd-party bundle
-        if: steps.bundle-cache.outputs.cache-hit != 'true'
+        if: steps.bundle.outputs.build == 'true' && steps.bundle-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v6
         with:
           path: |
@@ -567,9 +601,19 @@ jobs:
             !${{ runner.temp }}/bundle/debug
           key: ${{ steps.bundle-cache.outputs.cache-primary-key }}
 
+      - name: Save 3rd-party Debug libraries
+        if: steps.bundle.outputs.build == 'true' && env.CONFIGURATION == 'Debug' && steps.debug-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/bundle/debug
+          key: ${{ steps.debug-cache.outputs.cache-primary-key }}
+
       # Built after the cache is saved, so it stays out of the bundle cache.
-      # PrepareOutputDir.ps1 copies it to python\site-packages.
+      # PrepareOutputDir.ps1 copies it to python\site-packages. Release only:
+      # build_pyodbc.ps1 builds against the release Python (/MD), and a Debug
+      # output directory only takes the *_d.pyd variants.
       - name: Build pyodbc
+        if: env.CONFIGURATION == 'Release'
         run: |
           $sdist = "$env:RUNNER_TEMP\pyodbc-$env:PYODBC_VERSION.tar.gz"
           Invoke-WebRequest -UseBasicParsing -OutFile $sdist `
@@ -579,24 +623,33 @@ jobs:
 
       - name: Build SqlStudio
         run: |
-          build/windows/compile.ps1 -Action build -Configuration Release -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
+          build/windows/compile.ps1 -Action build -Configuration $env:CONFIGURATION -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
           if ($LASTEXITCODE) { throw "compile.ps1 failed with exit code $LASTEXITCODE" }
-          Get-ChildItem bin\x64\Release | Format-Table Name, Length
+          Get-ChildItem bin\x64\$env:CONFIGURATION | Format-Table Name, Length
 
       - name: Check DLL dependencies
         run: |
-          build/windows/check_dll_deps.ps1 -OutputDir bin\x64\Release
+          build/windows/check_dll_deps.ps1 -OutputDir bin\x64\$env:CONFIGURATION
           if ($LASTEXITCODE) { throw "check_dll_deps.ps1 failed with exit code $LASTEXITCODE" }
 
       # Modules the app imports only when a feature is used: pyodbc for the
       # migration plugins, ssl and hashlib for SSH tunnels and connections.
+      # A Debug build runs python_d.exe and has no pyodbc (see above).
       - name: Check Python modules
         run: |
-          $env:PYTHONHOME = "$PWD\bin\x64\Release\python"
-          bin\x64\Release\python.exe -c "import sys; sys.path.insert(0, r'$env:PYTHONHOME\site-packages'); import ssl, hashlib, sqlite3, ctypes, pyodbc; print(ssl.OPENSSL_VERSION); print('sqlite', sqlite3.sqlite_version); print('pyodbc', pyodbc.version, pyodbc.drivers())"
+          $env:PYTHONHOME = "$PWD\bin\x64\$env:CONFIGURATION\python"
+          if ($env:CONFIGURATION -eq 'Debug') {
+            $python = "bin\x64\Debug\python_d.exe"
+            $code = "import ssl, hashlib, sqlite3, ctypes; print(ssl.OPENSSL_VERSION); print('sqlite', sqlite3.sqlite_version)"
+          } else {
+            $python = "bin\x64\Release\python.exe"
+            $code = "import sys; sys.path.insert(0, r'$env:PYTHONHOME\site-packages'); import ssl, hashlib, sqlite3, ctypes, pyodbc; print(ssl.OPENSSL_VERSION); print('sqlite', sqlite3.sqlite_version); print('pyodbc', pyodbc.version, pyodbc.drivers())"
+          }
+          & $python -c $code
           if ($LASTEXITCODE) { throw "Python module import failed" }
 
       - name: Build .zip
+        if: env.CONFIGURATION == 'Release'
         run: |
           build/zip/make_zip.ps1 -BinDir bin\x64\Release -OutDir dist
           Get-ChildItem dist | Format-Table Name, Length
@@ -605,6 +658,7 @@ jobs:
       # AcceptEula accepts the WiX 7 EULA (Open Source Maintenance Fee terms,
       # https://docs.firegiant.com/wix/osmf/); WiX refuses to build without it.
       - name: Build .msi
+        if: env.CONFIGURATION == 'Release'
         run: |
           $zip = Get-Item dist\*.zip
           $version = $zip.BaseName -replace '^sql-studio-(.+)-winx64$', '$1'
@@ -619,34 +673,37 @@ jobs:
           Set-Content -LiteralPath "dist\$name.sha256" -Value "$hash  $name" -Encoding ascii -NoNewline
           Get-ChildItem dist | Format-Table Name, Length
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload packages
+        if: env.CONFIGURATION == 'Release'
+        uses: actions/upload-artifact@v7
         with:
           name: sql-studio-windows-x64-${{ env.SHORT_SHA }}
           path: dist/*
           compression-level: 0
           retention-days: 14
 
-      # Native unit tests (testing/test-suite) against the Release build
-      # above. After the packages, because preparing the test runtime copies
-      # test data into bin\x64\Release as well.
+      # Native unit tests (testing/test-suite) against the build above, so a
+      # Debug run also checks the Debug bundle (Bundle/ThirdPartyRuntime).
+      # After the packages, because preparing the test runtime copies test
+      # data into bin\x64\<configuration> as well. Debug tests run slower.
       - name: Build unit tests
         run: |
-          testing/test-suite/compile.ps1 -Action build -Configuration Release -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
+          testing/test-suite/compile.ps1 -Action build -Configuration $env:CONFIGURATION -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
           if ($LASTEXITCODE) { throw "compile.ps1 failed with exit code $LASTEXITCODE" }
 
       # Fails when any test fails. The Google Test XML report and the list of
       # failed suites go to testing/test-suite/TestResults.
       - name: Run unit tests
-        timeout-minutes: 20
+        timeout-minutes: ${{ env.CONFIGURATION == 'Debug' && 40 || 20 }}
         run: |
-          testing/test-suite/compile.ps1 -Action test -SkipBuild -Configuration Release -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
+          testing/test-suite/compile.ps1 -Action test -SkipBuild -Configuration $env:CONFIGURATION -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
           if ($LASTEXITCODE) { throw "compile.ps1 failed with exit code $LASTEXITCODE" }
 
       - name: Upload unit test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: unit-tests-windows-x64-${{ env.SHORT_SHA }}
+          name: unit-tests-windows-x64-${{ env.CONFIGURATION }}-${{ env.SHORT_SHA }}
           path: testing/test-suite/TestResults
           if-no-files-found: ignore
           retention-days: 14
@@ -657,8 +714,8 @@ jobs:
     name: Test package (Windows x64)
     needs: windows
     # The packages are uploaded before the unit tests run, so test them even
-    # when a unit test failed.
-    if: ${{ !cancelled() }}
+    # when a unit test failed. Debug runs make no packages.
+    if: ${{ !cancelled() && needs.windows.outputs.configuration == 'Release' }}
     runs-on: windows-2025
     timeout-minutes: 30
     defaults:
@@ -764,3 +821,26 @@ jobs:
           path: smoke-test
           if-no-files-found: ignore
           retention-days: 14
+
+  # The one check the rulesets require, the same on every branch: the set of
+  # jobs differs per stage (Debug or Release on Windows) and matrix job names
+  # change with the distro list. Only success and skipped (by design) pass.
+  # Anything else fails this check: failure, cancelled, and also abandoned,
+  # which a job gets when no runner picked it up. A job skipped because one of
+  # its dependencies failed is caught through that dependency.
+  ci-result:
+    name: CI result
+    if: always()
+    needs: [linux, linux-package-test, macos, macos-package-test, windows, windows-package-test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check job results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          if jq -e 'any(.[]; .result != "success" and .result != "skipped")' <<<"$NEEDS" >/dev/null; then
+            echo "::error::At least one job did not succeed (failed, cancelled or never started)."
+            exit 1
+          fi
