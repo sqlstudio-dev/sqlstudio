@@ -1,0 +1,41 @@
+name: PR source
+
+# master only takes pull requests from a releases/* branch of this
+# repository: a release, or a hotfix cut from a release tag. Rulesets cannot
+# restrict the source branch of a pull request, so this check does it and the
+# master ruleset requires it.
+on:
+  pull_request:
+    branches: [master]
+    # edited: a pull request whose base is changed to master gets the check
+    # as well, otherwise the required check would never report.
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+jobs:
+  source:
+    name: PR source branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # The branch name comes from the pull request author, so it is passed
+      # through env and never expanded into the script.
+      - name: Check the source branch
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Source: $HEAD_REPO:$HEAD_REF"
+          if [ "$HEAD_REPO" != "$REPO" ]; then
+            echo "::error::Pull requests to master must come from a branch of $REPO, not from a fork ($HEAD_REPO)."
+            exit 1
+          fi
+          case "$HEAD_REF" in
+            releases/*) echo "OK: release branch." ;;
+            *)
+              echo "::error::Pull requests to master must come from a releases/* branch, not from '$HEAD_REF'. Open the pull request against develop instead."
+              exit 1
+              ;;
+          esac
