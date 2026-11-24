@@ -320,6 +320,39 @@ branch:
 The **CI result** job sums up all the other jobs and fails if any of them
 failed or was cancelled. It is the check to require in branch rules.
 
+### Package versions
+
+The numeric version (`x.y.z`) lives in `backend/wbprivate/studio/wb_version.h`
+and changes only through `./set_version`. Before the build, CI runs
+`tools/ci_version.sh --apply`, which adds a suffix that depends on the branch
+or tag, and the run number (`github.run_number`) as the build number. It
+writes both into `wb_version.h` in the workspace, so the About box,
+`--version` and "Copy Version Info" show exactly which build is running.
+Never commit these changes.
+
+| Build | Version | `APP_RELEASE_TYPE` |
+|---|---|---|
+| `develop`, pull requests to it, other branches | `1.2.0-dev.<run>` | `dev` |
+| `releases/x.y.z`, pull requests to it | `1.1.0-rc0.<run>` | `rc` |
+| tag `vX.Y.Z-rcN` | `1.1.0-rcN` | `rcN` |
+| `master`, pull requests to it, tag `vX.Y.Z` | `1.1.0` | (empty) |
+
+The run fails when a `releases/x.y.z` branch or a `v*` tag does not match the
+version in `wb_version.h`.
+
+The suffix appears in the package names:
+
+- **Linux:** `sql-studio-community_1.1.0~rc1-1~ubuntu24.04_amd64.deb`. The tilde
+  makes dpkg sort pre-releases before the final release:
+  `1.1.0~dev.N` < `1.1.0~rc0.N` < `1.1.0~rc1` < `1.1.0`. Release branch builds
+  are `rc0.<run>` so that they sort before the first tagged RC.
+- **macOS:** `SqlStudio-1.1.0-rc1-macos-arm64.dmg`. `CFBundleShortVersionString`
+  stays `1.1.0`.
+- **Windows:** `sql-studio-1.1.0-rc1-winx64.zip` and `.msi`. The MSI
+  `ProductVersion` stays `1.1.0`. Every build of the same version therefore
+  shares it, and `AllowSameVersionUpgrades` makes a newer `.msi` replace the
+  installed one instead of installing next to it.
+
 The packages and the smoke test results (screenshot and logs) are attached to
 the workflow run as artifacts for 14 days. To try a package by hand, see
 [testing/docker/linux-desktop](testing/docker/linux-desktop/README.md).
