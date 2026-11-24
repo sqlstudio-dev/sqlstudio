@@ -152,14 +152,12 @@ SqlStudioTester::SqlStudioTester(bool initPython, const base::Size &apage_size,
 
 #ifdef _MSC_VER
 
-  std::string release = APP_RELEASE_TYPE;
-  std::string configuration;
-  if (release.empty())
-    configuration = "Debug";
-  else if (release == "SE")
-    configuration = "Release";
-  else
-    configuration = "Release_OSS";
+  // The application output dir of the configuration this test binary was built with.
+#ifdef _DEBUG
+  std::string configuration = "Debug";
+#else
+  std::string configuration = "Release";
+#endif
 
   wboptions->basedir = std::filesystem::absolute("../../bin/x64/" + configuration).lexically_normal().u8string();
 

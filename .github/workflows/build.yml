@@ -626,11 +626,39 @@ jobs:
           compression-level: 0
           retention-days: 14
 
+      # Native unit tests (testing/test-suite) against the Release build
+      # above. After the packages, because preparing the test runtime copies
+      # test data into bin\x64\Release as well.
+      - name: Build unit tests
+        run: |
+          testing/test-suite/compile.ps1 -Action build -Configuration Release -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
+          if ($LASTEXITCODE) { throw "compile.ps1 failed with exit code $LASTEXITCODE" }
+
+      # Fails when any test fails. The Google Test XML report and the list of
+      # failed suites go to testing/test-suite/TestResults.
+      - name: Run unit tests
+        timeout-minutes: 20
+        run: |
+          testing/test-suite/compile.ps1 -Action test -SkipBuild -Configuration Release -BundleDir $env:MSS_3DPARTY_PATH -PlatformToolset $env:PLATFORM_TOOLSET
+          if ($LASTEXITCODE) { throw "compile.ps1 failed with exit code $LASTEXITCODE" }
+
+      - name: Upload unit test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-tests-windows-x64-${{ env.SHORT_SHA }}
+          path: testing/test-suite/TestResults
+          if-no-files-found: ignore
+          retention-days: 14
+
   # Unpacks the .zip on a fresh runner, as a user would, with the runner's
   # own Python taken off PATH, so the app can only use what it ships.
   windows-package-test:
     name: Test package (Windows x64)
     needs: windows
+    # The packages are uploaded before the unit tests run, so test them even
+    # when a unit test failed.
+    if: ${{ !cancelled() }}
     runs-on: windows-2025
     timeout-minutes: 30
     defaults:
