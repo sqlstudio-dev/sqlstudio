@@ -1,0 +1,4 @@
+# Code owners of the whole repository. The branch rulesets require a review
+# from a code owner, so every pull request needs an approval from one of them.
+# A pull request opened by one code owner is approved by the other.
+* @marcinm1980 @tomcius
