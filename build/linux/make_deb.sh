@@ -9,12 +9,17 @@
 #
 # Usage:
 #   ./make_deb.sh --stage DIR [--out DIR] [--release N] [--distro-tag TAG]
+#                 [--version-suffix SUFFIX]
 #
 # Options:
 #   --stage DIR       Installed tree (contains usr/)               (required)
 #   --out DIR         Where to write the .deb                       (default: .)
 #   --release N       Debian revision                               (default: 1)
 #   --distro-tag TAG  Version suffix, e.g. ubuntu22.04              (default: from /etc/os-release)
+#   --version-suffix SUFFIX
+#                     Pre-release suffix, e.g. dev.42, rc0.42 or rc1 (default: none)
+#                     Added with a tilde (1.1.0~rc1), which dpkg sorts before
+#                     1.1.0, so the final release upgrades an RC
 #   -h, --help        Show this help message
 #
 # Environment:
@@ -34,6 +39,7 @@ STAGE_DIR=""
 OUT_DIR="."
 RELEASE="1"
 DISTRO_TAG=""
+VERSION_SUFFIX=""
 
 usage() {
     sed -n '/^# Usage:/,/^#$/p;/^# Options:/,/^#$/p;/^# Environment:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'
@@ -46,6 +52,7 @@ while [[ $# -gt 0 ]]; do
         --out)        OUT_DIR="$2";    shift 2 ;;
         --release)    RELEASE="$2";    shift 2 ;;
         --distro-tag) DISTRO_TAG="$2"; shift 2 ;;
+        --version-suffix) VERSION_SUFFIX="$2"; shift 2 ;;
         -h|--help)    usage ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
@@ -66,6 +73,13 @@ if [[ -z "${DISTRO_TAG}" ]]; then
 fi
 
 UPSTREAM_VERSION="$("${SOURCE_DIR}/tools/get_wb_version.sh" full_version)"
+if [[ -n "${VERSION_SUFFIX}" ]]; then
+    [[ "${VERSION_SUFFIX}" =~ ^[a-z][a-z0-9.]*$ ]] || {
+        echo "--version-suffix must be lowercase letters, digits and dots: ${VERSION_SUFFIX}" >&2
+        exit 1
+    }
+    UPSTREAM_VERSION="${UPSTREAM_VERSION}~${VERSION_SUFFIX}"
+fi
 VERSION="${UPSTREAM_VERSION}-${RELEASE}~${DISTRO_TAG}"
 ARCH="$(dpkg-architecture -qDEB_HOST_ARCH)"
 LIB_DIR="usr/lib/sql-studio"

@@ -21,7 +21,9 @@
 
     <SummaryInformation Description="SqlStudio" Keywords="Installer,MSI,Database" Manufacturer="Dev4Fun" />
 
-    <MajorUpgrade Schedule="afterInstallValidate" DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit.">
+    <!-- dev, RC and final builds of one version share the numeric ProductVersion,
+         so installing any build of the same version replaces the installed one. -->
+    <MajorUpgrade Schedule="afterInstallValidate" AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit.">
     </MajorUpgrade>
 
 

@@ -74,6 +74,11 @@ jobs:
           echo "STAGE_DIR=${RUNNER_TEMP}/stage" >> "$GITHUB_ENV"
           echo "SHORT_SHA=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
 
+      # dev / rc suffix and build number from the branch or tag; written into
+      # wb_version.h in the workspace only (tools/ci_version.sh).
+      - name: Set version
+        run: tools/ci_version.sh --apply
+
       - name: Install system packages
         run: build/linux/install_deps.sh
 
@@ -133,7 +138,8 @@ jobs:
           echo "${PYODBC_SHA256}  $RUNNER_TEMP/pyodbc.tar.gz" | sha256sum -c -
           build/linux/build_pyodbc.sh --bundle "$WB_BUNDLE_DIR" \
             --sdist "$RUNNER_TEMP/pyodbc.tar.gz" --out "$STAGE_DIR/usr/lib/sql-studio"
-          build/linux/make_deb.sh --stage "$STAGE_DIR" --out dist --distro-tag ${{ matrix.tag }}
+          build/linux/make_deb.sh --stage "$STAGE_DIR" --out dist --distro-tag ${{ matrix.tag }} \
+            --version-suffix "$VERSION_SUFFIX"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -313,6 +319,9 @@ jobs:
           echo "SHORT_SHA=${GITHUB_SHA::8}" >> "$GITHUB_ENV"
           echo "/opt/homebrew/opt/openjdk/bin" >> "$GITHUB_PATH"
 
+      - name: Set version
+        run: tools/ci_version.sh --apply
+
       - name: Install Homebrew packages
         run: |
           brew install swig autoconf automake libtool pkgconf openjdk \
@@ -396,8 +405,9 @@ jobs:
       # Drag-to-Applications window with the background from build/mac.
       - name: Build .dmg
         run: |
-          version="$(tools/get_wb_version.sh full_version)"
-          build/mac/make_dmg.sh "$APP" "dist/SqlStudio-${version}-macos-arm64.dmg"
+          # The suffix goes in the file name only; CFBundleShortVersionString
+          # stays numeric.
+          build/mac/make_dmg.sh "$APP" "dist/SqlStudio-${PACKAGE_VERSION}-macos-arm64.dmg"
           ls -l dist
 
       - uses: actions/upload-artifact@v7
@@ -520,6 +530,10 @@ jobs:
         run: |
           "MSS_3DPARTY_PATH=$env:RUNNER_TEMP\bundle" >> $env:GITHUB_ENV
           "SHORT_SHA=$($env:GITHUB_SHA.Substring(0, 8))" >> $env:GITHUB_ENV
+
+      - name: Set version
+        shell: bash
+        run: bash tools/ci_version.sh --apply
 
       # The runner image has the v143 compiler but not its ATL, which
       # wbprivate.be needs (atlbase.h). Installed before anything is built:
@@ -651,7 +665,7 @@ jobs:
       - name: Build .zip
         if: env.CONFIGURATION == 'Release'
         run: |
-          build/zip/make_zip.ps1 -BinDir bin\x64\Release -OutDir dist
+          build/zip/make_zip.ps1 -BinDir bin\x64\Release -OutDir dist -Version $env:PACKAGE_VERSION
           Get-ChildItem dist | Format-Table Name, Length
 
       # Built from the unpacked .zip, so both packages ship the same files.
@@ -660,14 +674,15 @@ jobs:
       - name: Build .msi
         if: env.CONFIGURATION == 'Release'
         run: |
+          # ProductVersion must stay numeric (System.Version in the .wixproj);
+          # the suffix goes in the file name only.
           $zip = Get-Item dist\*.zip
-          $version = $zip.BaseName -replace '^sql-studio-(.+)-winx64$', '$1'
           Expand-Archive -LiteralPath $zip -DestinationPath "$env:RUNNER_TEMP\msi-payload"
           $payload = @(Get-ChildItem "$env:RUNNER_TEMP\msi-payload" -Directory)[0].FullName
-          dotnet build build/msi/SqlStudio.wixproj -c Release -p:Edition=community -p:ProductVersion=$version `
+          dotnet build build/msi/SqlStudio.wixproj -c Release -p:Edition=community -p:ProductVersion=$env:APP_VERSION `
             -p:InstallerPlatform=x64 -p:Platform=x64 "-p:PayloadDirectory=$payload" -p:AcceptEula=wix7
           if ($LASTEXITCODE) { throw "dotnet build failed with exit code $LASTEXITCODE" }
-          $name = "sql-studio-$version-winx64.msi"
+          $name = "sql-studio-$env:PACKAGE_VERSION-winx64.msi"
           Copy-Item build\msi\bin\x64\community\sql_studio.msi "dist\$name"
           $hash = (Get-FileHash -Algorithm SHA256 "dist\$name").Hash.ToLowerInvariant()
           Set-Content -LiteralPath "dist\$name.sha256" -Value "$hash  $name" -Encoding ascii -NoNewline
