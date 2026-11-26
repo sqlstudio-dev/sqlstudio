@@ -428,11 +428,13 @@ hotfixes. Only maintainers can create, move or delete `v*` tags.
 | Branch | Pull request | Required check | Deletion and force-push |
 |---|---|---|---|
 | `develop` | approval by a code owner, threads resolved | `CI result` | blocked |
-| `releases/**`, `master` | approval by a code owner, threads resolved | `CI result` | blocked |
+| `releases/**` | approval by a code owner, threads resolved, merge commit only | `CI result` | blocked |
+| `master` | approval by a code owner, threads resolved, merge commit only | `CI result`, `PR source branch` | blocked |
 
 `CI result` sums up the Build workflow and fails if any job failed, was
 cancelled or did not start. Which jobs run on which branch is described under
-Build and Package Checks.
+Build and Package Checks. `PR source branch` fails a pull request to `master`
+that does not come from a `releases/*` branch of this repository.
 
 ## Pull Request Guidelines
 

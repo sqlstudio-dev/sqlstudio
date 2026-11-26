@@ -66,7 +66,6 @@ Params.inc
 build-stamp
 configure-stamp
 SqlStudio.desktop
-build/linux/sql-studio.spec
 frontend/linux/shell/grtshell
 frontend/linux/studio/sql-studio-bin
 template_dictionary_nothreads_unittest
