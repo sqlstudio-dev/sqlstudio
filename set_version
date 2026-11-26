@@ -1,69 +1,115 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# set_version — Set the version of SqlStudio in the source tree
+#
+# Used for the version bump PRs of the release flow (CONTRIBUTING.md,
+# "Releases"): ./set_version 1.2.0 on develop right after a release branch is
+# cut, and ./set_version 1.1.1 as the first commit of a hotfix branch.
+#
+# Usage:
+#   ./set_version X.Y.Z [EDITION LICENSE]
+#
+# Arguments:
+#   X.Y.Z     Numeric version, e.g. 1.2.0
+#   EDITION   Optional edition name, e.g. Community (APP_EDITION_NAME,
+#             AssemblyConfiguration); needs LICENSE as well
+#   LICENSE   Optional license type, e.g. GPL (APP_LICENSE_TYPE)
+#
+# Updates:
+#   backend/wbprivate/studio/wb_version.h           version, edition, license
+#   frontend/windows/SqlStudio/Properties/AssemblyInfo.cs   version, edition
+#   Info.plist                                      CFBundleShortVersionString
+#
+# APP_RELEASE_TYPE and APP_BUILD_NUMBER are reset to "" and 0. CI sets them
+# for each build (tools/ci_version.sh); never commit a suffix.
+#
+set -euo pipefail
 
+usage() {
+    sed -n '/^# Usage:/,/^# Updates:/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
+    exit "${1:-0}"
+}
 
-version=$1
-major=`echo $version|cut -d. -f1`
-minor=`echo $version|cut -d. -f2`
-release=`echo $version|cut -d. -f3`
-release_number=`echo $version|cut -d. -f3|sed -e 's/\([0-9]*\).*/\1/'`
-build=`echo $version|cut -d. -f4`
-release_type=$2
-edition_name=$3
-license_type=$4
+[[ $# -ge 1 && "$1" != "-h" && "$1" != "--help" ]] || usage $(( $# == 0 ))
+[[ $# -eq 1 || $# -eq 3 ]] || { echo "Give EDITION and LICENSE together." >&2; usage 1; }
 
-echo "----------------------------------------------------"
-echo "Setting studio version"
-echo "Version       : $1"
-echo "Release Type  : $2"
-echo "Edition       : $3"
-echo "License       : $4"
-echo "Parsed Version: $major.$minor.$release.$build"
-echo "----------------------------------------------------"
+version="$1"
+edition_name="${2:-}"
+license_type="${3:-}"
 
-if test "$build" = ""; then
-    build=0
-fi
-
-if test "$version" = ""; then
-    echo "$0 <major.minor.release[.build]> [<release-type>]"
+[[ "${version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || {
+    echo "Version must be X.Y.Z with numbers only, e.g. 1.2.0 (got: ${version})" >&2
     exit 1
+}
+major="${BASH_REMATCH[1]}"
+minor="${BASH_REMATCH[2]}"
+release="${BASH_REMATCH[3]}"
+
+for value in "${edition_name}" "${license_type}"; do
+    [[ "${value}" =~ ^[A-Za-z0-9\ ._-]*$ ]] || { echo "Unsupported characters in: ${value}" >&2; exit 1; }
+done
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+WB_VERSION=backend/wbprivate/studio/wb_version.h
+ASSEMBLY_INFO=frontend/windows/SqlStudio/Properties/AssemblyInfo.cs
+INFO_PLIST=Info.plist
+
+for file in "${WB_VERSION}" "${ASSEMBLY_INFO}" "${INFO_PLIST}"; do
+    [[ -f "${file}" ]] || { echo "${file} not found" >&2; exit 1; }
+done
+
+# sed -i differs between GNU and BSD sed; edit through a temporary file.
+edit() {
+    local file="$1"; shift
+    sed "$@" "${file}" > "${file}.tmp"
+    if cmp -s "${file}" "${file}.tmp"; then
+        rm -f "${file}.tmp"
+    else
+        cat "${file}.tmp" > "${file}"
+        rm -f "${file}.tmp"
+    fi
+}
+
+echo "Setting version ${major}.${minor}.${release}${edition_name:+ (${edition_name}, ${license_type})}"
+
+edit "${WB_VERSION}" \
+    -e "s/^#define APP_MAJOR_NUMBER .*/#define APP_MAJOR_NUMBER ${major}/" \
+    -e "s/^#define APP_MINOR_NUMBER .*/#define APP_MINOR_NUMBER ${minor}/" \
+    -e "s/^#define APP_RELEASE_NUMBER .*/#define APP_RELEASE_NUMBER ${release}/" \
+    -e "s/^#define APP_BUILD_NUMBER .*/#define APP_BUILD_NUMBER 0/" \
+    -e "s/^#define APP_RELEASE_TYPE .*/#define APP_RELEASE_TYPE \"\"/"
+
+edit "${ASSEMBLY_INFO}" \
+    -e "s/^\[assembly: AssemblyVersion(\".*\")\]/[assembly: AssemblyVersion(\"${major}.${minor}.${release}\")]/" \
+    -e "s/^\[assembly: AssemblyFileVersion(\".*\")\]/[assembly: AssemblyFileVersion(\"${major}.${minor}.${release}\")]/"
+
+# The value is on the line after the key.
+edit "${INFO_PLIST}" \
+    -e "/<key>CFBundleShortVersionString<\/key>/{n;s/<string>.*<\/string>/<string>${major}.${minor}.${release}<\/string>/;}"
+
+if [[ -n "${edition_name}" ]]; then
+    edit "${WB_VERSION}" \
+        -e "s/^#define APP_EDITION_NAME .*/#define APP_EDITION_NAME \"${edition_name}\"/" \
+        -e "s/^#define APP_LICENSE_TYPE .*/#define APP_LICENSE_TYPE \"${license_type}\"/"
+    edit "${ASSEMBLY_INFO}" \
+        -e "s/^\[assembly: AssemblyConfiguration(\".*\")\]/[assembly: AssemblyConfiguration(\"${edition_name}\")]/"
 fi
 
-if test x$release_type != x; then
-    dot_release_type=.$release_type
-    space_release_type=" $release_type"
-else
-    dot_release_type=
-    space_release_type=
+# Each file must now hold the requested values.
+check() {
+    grep -qF -- "$2" "$1" || { echo "Could not update $1 (missing: $2)" >&2; exit 1; }
+}
+check "${WB_VERSION}" "#define APP_MAJOR_NUMBER ${major}"
+check "${WB_VERSION}" "#define APP_MINOR_NUMBER ${minor}"
+check "${WB_VERSION}" "#define APP_RELEASE_NUMBER ${release}"
+check "${ASSEMBLY_INFO}" "[assembly: AssemblyVersion(\"${major}.${minor}.${release}\")]"
+check "${ASSEMBLY_INFO}" "[assembly: AssemblyFileVersion(\"${major}.${minor}.${release}\")]"
+check "${INFO_PLIST}" "<string>${major}.${minor}.${release}</string>"
+if [[ -n "${edition_name}" ]]; then
+    check "${WB_VERSION}" "#define APP_EDITION_NAME \"${edition_name}\""
+    check "${WB_VERSION}" "#define APP_LICENSE_TYPE \"${license_type}\""
+    check "${ASSEMBLY_INFO}" "[assembly: AssemblyConfiguration(\"${edition_name}\")]"
 fi
 
-echo "Updating wb_version.h"
-sed -e "s/#define APP_MAJOR_NUMBER.*/#define APP_MAJOR_NUMBER $major/" \
-    -e "s/#define APP_MINOR_NUMBER.*/#define APP_MINOR_NUMBER $minor/" \
-    -e "s/#define APP_RELEASE_NUMBER.*/#define APP_RELEASE_NUMBER $release_number/" \
-    -e "s/#define APP_RELEASE_TYPE.*/#define APP_RELEASE_TYPE \"$release_type\"/" \
-    -e "s/#define APP_BUILD_NUMBER.*/#define APP_BUILD_NUMBER $build/" \
-    -i.bak backend/wbprivate/studio/wb_version.h 
-
-if test "$edition_name" != "" -a "$license_type" != ""; then
-sed -e "s/#define APP_LICENSE_TYPE.*/#define APP_LICENSE_TYPE \"$license_type\"/" \
-    -e "s/#define APP_EDITION_NAME.*/#define APP_EDITION_NAME \"$edition_name\"/" \
-    -i.bak backend/wbprivate/studio/wb_version.h 
-fi
-
-echo "Updating AssemblyInfo.cs"
-sed -e "s/\[assembly: AssemblyVersion(.*)\]/[assembly: AssemblyVersion(\"$major.$minor.$release_number\")]/"\
-    -e "s/\[assembly: AssemblyFileVersion(.*)\]/[assembly: AssemblyFileVersion(\"$major.$minor.$release_number\")]/" \
-    -e "s/\[assembly: AssemblyReleaseType(.*)\]/[assembly: AssemblyReleaseType(\"$release_type\")]/" \
-    -i.bak frontend/windows/SqlStudio/Properties/AssemblyInfo.cs
-
-if test "$edition_type" != ""; then
-sed -e "s/\[assembly: AssemblyConfiguration(.*)\]/[assembly: AssemblyConfiguration(\"$edition_type\")]/"\
-    -i.bak frontend/windows/SqlStudio/Properties/AssemblyInfo.cs
-fi
-
-echo "Updating Info.plist"
-sed -e "/<key>CFBundleShortVersionString<\/key>/N;s/.*\n.*<\/string>/	<key>CFBundleShortVersionString<\/key>@	<string>$major.$minor.$release$dot_release_type<\/string>/" -e 'y/@/\n/' -i.bak Info.plist
-
-echo "Updating sql-studio.spec.in"
-sed -e "s/--define='version.*'/--define='version $major.$minor.$release_number'/" -i.bak build/linux/sql-studio.spec.in
+git --no-pager diff --stat -- "${WB_VERSION}" "${ASSEMBLY_INFO}" "${INFO_PLIST}" 2>/dev/null || true

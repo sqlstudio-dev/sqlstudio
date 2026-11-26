@@ -371,6 +371,69 @@ artifacts of older runs of each pull request, keeping only the newest one. It
 can also be started by hand from the Actions tab; by default it then only
 lists what it would delete.
 
+## Releases
+
+A release is always made from a `releases/x.y.z` branch, hotfixes included.
+Changes travel `feature/*` → `develop` → `releases/x.y.z` → `master`, every
+step through a pull request. The release owner is a code owner
+(`.github/CODEOWNERS`).
+
+### Versions
+
+The version lives in `backend/wbprivate/studio/wb_version.h` and changes only
+through `./set_version X.Y.Z`. The script also updates the Windows
+`AssemblyInfo.cs` and the macOS `Info.plist`. Feature and fix pull requests
+never change it.
+
+- **`develop` always holds the next minor version.** Right after the cut of
+  `releases/1.1.0`, the release owner opens a pull request on `develop` with
+  `./set_version 1.2.0`.
+- **A release branch inherits the version from `develop`**, so the cut changes
+  nothing.
+- **A major release** (`2.0.0`) is a separate `./set_version` pull request on
+  `develop` before the cut.
+- **Patch versions** only come from hotfix branches.
+- **Never commit a suffix or build number.** CI adds `dev` / `rc` and the run
+  number to each build (see "Package versions" under Build and Package Checks).
+
+### Making a release
+
+1. **Feature freeze.** The release owner creates `releases/x.y.z` from
+   `develop` and pushes it. From then on, only fixes go into it, through pull
+   requests to the release branch. Anything merged into `develop` after the cut
+   goes into the next release.
+2. **Bump `develop`** with a pull request: `./set_version <next minor>`.
+3. **Release candidates.** Every push to the release branch, and every pull
+   request into it, builds RC packages. For an RC meant for testers outside the
+   team, the release owner tags `vX.Y.Z-rcN` (`rc1`, `rc2`, ...) on the release
+   branch. Builds and GitHub releases for tags are not set up yet (#40).
+4. **Release.**
+   - Open a pull request `releases/x.y.z` → `master`. It holds the same code as
+     the last RC. `master` only accepts pull requests from `releases/*`
+     branches, merged with a merge commit.
+   - After the merge, tag `vX.Y.Z` on `master`.
+   - Merge back with a pull request `releases/x.y.z` → `develop`. It conflicts
+     in `wb_version.h` (and the files `set_version` changes) every time: keep
+     `develop`'s version, the next minor.
+5. **Hotfix.** Create `releases/x.y.(z+1)` from the `vX.Y.Z` tag and commit
+   `./set_version x.y.(z+1)` on it before the first push: CI fails on a release
+   branch whose name does not match `wb_version.h`. After that, follow
+   steps 3–4.
+
+Release branches are never deleted, so they stay available as the base for
+hotfixes. Only maintainers can create, move or delete `v*` tags.
+
+### Branch protection
+
+| Branch | Pull request | Required check | Deletion and force-push |
+|---|---|---|---|
+| `develop` | approval by a code owner, threads resolved | `CI result` | blocked |
+| `releases/**`, `master` | approval by a code owner, threads resolved | `CI result` | blocked |
+
+`CI result` sums up the Build workflow and fails if any job failed, was
+cancelled or did not start. Which jobs run on which branch is described under
+Build and Package Checks.
+
 ## Pull Request Guidelines
 
 - Describe the problem and the change clearly.
