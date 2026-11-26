@@ -84,12 +84,15 @@ jobs:
 
       # The 3rd-party bundle (MySQL client, Connector/C++, GDAL, ...) takes a long
       # time to build, so it is cached and rebuilt only when its recipe changes.
+      # The path lists the bundle's entries (/*), not the bundle directory itself:
+      # actions/cache archives a matched directory as a whole, so the source and
+      # build trees would only be excluded from a listing of its entries.
       - name: Restore 3rd-party bundle
         id: bundle-cache
         uses: actions/cache/restore@v6
         with:
           path: |
-            ${{ env.WB_BUNDLE_DIR }}
+            ${{ env.WB_BUNDLE_DIR }}/*
             !${{ env.WB_BUNDLE_DIR }}/source
             !${{ env.WB_BUNDLE_DIR }}/build
           key: bundle-linux-${{ matrix.tag }}-${{ hashFiles('build/linux/list.txt', 'build/linux/build_3rdparty.sh', 'build/linux/install_deps.sh') }}
@@ -104,22 +107,40 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: |
-            ${{ env.WB_BUNDLE_DIR }}
+            ${{ env.WB_BUNDLE_DIR }}/*
             !${{ env.WB_BUNDLE_DIR }}/source
             !${{ env.WB_BUNDLE_DIR }}/build
           key: ${{ steps.bundle-cache.outputs.cache-primary-key }}
 
       - name: Remove bundle build trees
         if: steps.bundle-cache.outputs.cache-hit != 'true'
-        run: rm -rf "$WB_BUNDLE_DIR/source" "$WB_BUNDLE_DIR/build" && df -h /
+        run: |
+          rm -rf "$WB_BUNDLE_DIR/source" "$WB_BUNDLE_DIR/build"
+          du -h -d 1 "$WB_BUNDLE_DIR" || echo "Could not measure the bundle size"
+          df -h /
 
-      # The MySQL parser is generated from the grammar at build time.
+      # The MySQL parser is generated from the grammar at build time. Maven
+      # Central answers bursts of parallel jobs with HTTP 429, so the jar is
+      # cached, and download_verified.sh retries and falls back to antlr.org.
+      - name: Restore ANTLR
+        id: antlr-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.ANTLR_JAR }}
+          key: antlr-${{ env.ANTLR_VERSION }}-${{ env.ANTLR_SHA256 }}
+
       - name: Download ANTLR
         run: |
-          mkdir -p "$(dirname "$ANTLR_JAR")"
-          curl -fsSL -o "$ANTLR_JAR" \
-            "https://repo1.maven.org/maven2/org/antlr/antlr4/${ANTLR_VERSION}/antlr4-${ANTLR_VERSION}-complete.jar"
-          echo "${ANTLR_SHA256}  ${ANTLR_JAR}" | sha256sum -c -
+          tools/download_verified.sh "$ANTLR_JAR" "$ANTLR_SHA256" \
+            "https://repo1.maven.org/maven2/org/antlr/antlr4/${ANTLR_VERSION}/antlr4-${ANTLR_VERSION}-complete.jar" \
+            "https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
+
+      - name: Save ANTLR
+        if: steps.antlr-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.ANTLR_JAR }}
+          key: ${{ steps.antlr-cache.outputs.cache-primary-key }}
 
       - name: Build SqlStudio
         run: |
@@ -133,9 +154,8 @@ jobs:
       - name: Build .deb package
         run: |
           DESTDIR="$STAGE_DIR" cmake --install build/output
-          curl -fsSL -o "$RUNNER_TEMP/pyodbc.tar.gz" \
+          tools/download_verified.sh "$RUNNER_TEMP/pyodbc.tar.gz" "$PYODBC_SHA256" \
             "https://files.pythonhosted.org/packages/source/p/pyodbc/pyodbc-${PYODBC_VERSION}.tar.gz"
-          echo "${PYODBC_SHA256}  $RUNNER_TEMP/pyodbc.tar.gz" | sha256sum -c -
           build/linux/build_pyodbc.sh --bundle "$WB_BUNDLE_DIR" \
             --sdist "$RUNNER_TEMP/pyodbc.tar.gz" --out "$STAGE_DIR/usr/lib/sql-studio"
           build/linux/make_deb.sh --stage "$STAGE_DIR" --out dist --distro-tag ${{ matrix.tag }} \
@@ -336,12 +356,15 @@ jobs:
           echo "$versions"
           echo "hash=$(shasum -a 256 <<<"$versions" | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
+      # The path lists the bundle's entries (/*), not the bundle directory itself:
+      # actions/cache archives a matched directory as a whole, so the source and
+      # build trees would only be excluded from a listing of its entries.
       - name: Restore 3rd-party bundle
         id: bundle-cache
         uses: actions/cache/restore@v6
         with:
           path: |
-            ${{ env.WB_BUNDLE_DIR }}
+            ${{ env.WB_BUNDLE_DIR }}/*
             !${{ env.WB_BUNDLE_DIR }}/source
             !${{ env.WB_BUNDLE_DIR }}/build
           key: bundle-macos-arm64-${{ hashFiles('build/mac/list.txt', 'build/mac/build_3rdparty.sh') }}-${{ steps.brew.outputs.hash }}
@@ -356,27 +379,42 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: |
-            ${{ env.WB_BUNDLE_DIR }}
+            ${{ env.WB_BUNDLE_DIR }}/*
             !${{ env.WB_BUNDLE_DIR }}/source
             !${{ env.WB_BUNDLE_DIR }}/build
           key: ${{ steps.bundle-cache.outputs.cache-primary-key }}
 
       - name: Remove bundle build trees
         if: steps.bundle-cache.outputs.cache-hit != 'true'
-        run: rm -rf "$WB_BUNDLE_DIR/source" "$WB_BUNDLE_DIR/build" && df -h /
+        run: |
+          rm -rf "$WB_BUNDLE_DIR/source" "$WB_BUNDLE_DIR/build"
+          du -h -d 1 "$WB_BUNDLE_DIR" || echo "Could not measure the bundle size"
+          df -h /
+
+      # The ANTLR jar is cached and falls back to antlr.org, as on Linux.
+      - name: Restore ANTLR
+        id: antlr-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.DOWNLOADS }}/antlr-${{ env.ANTLR_VERSION }}-complete.jar
+          key: antlr-${{ env.ANTLR_VERSION }}-${{ env.ANTLR_SHA256 }}
 
       - name: Download Python, pyodbc and ANTLR
         run: |
-          mkdir -p "$DOWNLOADS"
-          curl -fsSL -o "$DOWNLOADS/pyodbc-${PYODBC_VERSION}.tar.gz" \
+          tools/download_verified.sh "$DOWNLOADS/pyodbc-${PYODBC_VERSION}.tar.gz" "$PYODBC_SHA256" \
             "https://files.pythonhosted.org/packages/source/p/pyodbc/pyodbc-${PYODBC_VERSION}.tar.gz"
-          echo "${PYODBC_SHA256}  $DOWNLOADS/pyodbc-${PYODBC_VERSION}.tar.gz" | shasum -a 256 -c -
-          curl -fsSL -o "$DOWNLOADS/python.pkg" \
+          tools/download_verified.sh "$DOWNLOADS/python.pkg" "$PYTHON_PKG_SHA256" \
             "https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-macos11.pkg"
-          echo "${PYTHON_PKG_SHA256}  $DOWNLOADS/python.pkg" | shasum -a 256 -c -
-          curl -fsSL -o "$DOWNLOADS/antlr-${ANTLR_VERSION}-complete.jar" \
-            "https://repo1.maven.org/maven2/org/antlr/antlr4/${ANTLR_VERSION}/antlr4-${ANTLR_VERSION}-complete.jar"
-          echo "${ANTLR_SHA256}  $DOWNLOADS/antlr-${ANTLR_VERSION}-complete.jar" | shasum -a 256 -c -
+          tools/download_verified.sh "$DOWNLOADS/antlr-${ANTLR_VERSION}-complete.jar" "$ANTLR_SHA256" \
+            "https://repo1.maven.org/maven2/org/antlr/antlr4/${ANTLR_VERSION}/antlr4-${ANTLR_VERSION}-complete.jar" \
+            "https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar"
+
+      - name: Save ANTLR
+        if: steps.antlr-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.DOWNLOADS }}/antlr-${{ env.ANTLR_VERSION }}-complete.jar
+          key: ${{ steps.antlr-cache.outputs.cache-primary-key }}
 
       - name: Prepare 3rd-party-ce
         run: |
